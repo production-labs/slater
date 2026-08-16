@@ -1,2 +1,8 @@
 node_modules/
 .env
+.DS_Store
+**/.DS_Store
+public/20*.html
+public/index-dnu.html
+Scratch Pad
+Business Setup.pages
