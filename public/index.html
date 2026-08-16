@@ -360,6 +360,59 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .note-img-modal.open{display:flex}
 .note-img-modal img{max-width:92vw;max-height:92vh;border-radius:8px;object-fit:contain}
 .note-img-modal button{position:absolute;top:20px;right:24px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;line-height:1}
+
+/* ── Mobile ── */
+.hamburger-btn{display:none}
+.mobile-brand{display:none}
+.sday-chevron{display:none;color:var(--film-can);font-size:22px;transition:transform .2s;margin-left:auto;margin-right:8px;flex-shrink:0;line-height:1}
+
+.day-details-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 0;border-top:1px solid var(--border);margin-top:8px;user-select:none}
+.day-details-toggle>span:first-child{font-size:11px;font-weight:600;color:var(--film-can);text-transform:uppercase;letter-spacing:.05em;flex:1}
+.day-details-chevron{font-size:22px;color:var(--film-can);transition:transform .2s;flex-shrink:0}
+@media(max-width:768px){
+  .hdr{display:none!important}
+  .lib-bar{flex-direction:row!important;align-items:center!important;padding:8px 12px!important;gap:8px!important;margin-bottom:.75rem!important}
+  #lib-sort-row,#lib-action-row,.lib-bar .select-wrap{display:none!important}
+  .hamburger-btn{display:flex!important;align-items:center;justify-content:center;width:40px;height:40px;background:none;border:none;font-size:22px;color:var(--film-can);cursor:pointer;flex-shrink:0;padding:0;min-height:unset}
+  .mobile-brand{display:block;font-size:15px;font-weight:700;color:var(--charcoal);letter-spacing:.06em;flex:1}
+  .tabs{display:none!important}
+  .g2,.g3,.g4{grid-template-columns:1fr!important;gap:0!important}
+  input,select,textarea{box-sizing:border-box}
+  button,.lb,.gb{min-height:44px}
+  .modal-box,.lb-modal,[class*="-modal"]>div{width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;border-radius:0!important;margin:0!important}
+  .sec{padding:12px!important}
+  .card,.crew-card,.expense-card,.sday-block{margin-left:0!important;margin-right:0!important}
+  #daily-sidebar{width:100%!important;max-width:100%!important}
+  #status-bar{font-size:12px;padding:6px 12px}
+  .wb-item-row{flex-wrap:wrap;gap:6px}
+  .expense-grid{grid-template-columns:1fr!important}
+  .sday-header{padding:10px 12px!important;cursor:pointer}
+  #note-editor{min-height:200px!important}
+  .contacts-modal>div{width:100%!important;height:100%!important;border-radius:0!important}
+  .g3>.fl:first-child label{font-weight:700;color:var(--charcoal)}
+  .g3+.g3>.fl:first-child{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+  .page{padding:1rem 6px 4rem!important}
+  .sec{padding:8px!important}
+  .sday-block{width:100%;box-sizing:border-box}
+  .sday-body input,.sday-body textarea{width:100%;max-width:100%;box-sizing:border-box;text-align:left;-webkit-appearance:none;appearance:none}
+  input[type="date"]{text-align:left;-webkit-appearance:none;appearance:none;width:100%;max-width:100%;box-sizing:border-box}
+  input[type="date"]::-webkit-date-and-time-value{text-align:left}
+  .g2>*,.g3>*,.g4>*{min-width:0}
+  body{overflow-x:hidden}
+  .sday-cal{width:30px!important}
+  .sday-cal-day{font-size:13px!important}
+  .sday-cal-month{font-size:7px!important}
+  .sday-title{margin-left:10px}
+  .sday-chevron{display:inline-block}
+  .sday-fmtdate-wrap{display:none!important}
+  .sday-daylabel-wrap{order:-2}
+  .sday-shootdate-wrap{order:-1}
+  .sch-entry{display:grid!important;grid-template-columns:1fr auto auto!important;grid-template-rows:auto auto;gap:4px 8px!important;margin-bottom:10px!important;align-items:start!important}
+  .sch-entry input:first-child{grid-column:1;grid-row:1;font-size:11px!important;color:var(--film-can)!important;padding:4px 8px!important}
+  .sch-entry input:nth-child(2){grid-column:1;grid-row:2;font-size:13px!important}
+  .sch-entry button:nth-child(3){grid-column:2;grid-row:1/span 2;align-self:center}
+  .sch-entry button:nth-child(4){grid-column:3;grid-row:1/span 2;align-self:center}
+}
 </style>
 </head>
 <body>
@@ -387,7 +440,9 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
     </div>
   </div>
   <div class="lib-bar">
-    <div style="display:flex;align-items:center;gap:8px;width:100%">
+    <button class="hamburger-btn" onclick="openMobileDrawer()">&#9776;</button>
+    <span class="mobile-brand">SLATER</span>
+    <div id="lib-sort-row" style="display:flex;align-items:center;gap:8px;width:100%">
       <span style="font-size:11px;color:var(--film-can);white-space:nowrap">Sort:</span>
       <div class="lib-sort-btns">
         <button class="lib-sort-btn" id="sort-recent" onclick="libSetSort('recent')">Recent</button>
@@ -398,7 +453,7 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
     <div class="select-wrap"><select id="lib-select" onchange="libSelect()">
       <option value="">— New project —</option>
     </select></div>
-    <div style="display:flex;gap:8px;align-items:center;width:100%">
+    <div id="lib-action-row" style="display:flex;gap:8px;align-items:center;width:100%">
       <div class="lib-btn-group">
         <button class="lb" onclick="libNew()" title="New">New</button>
         <button class="lb primary" onclick="libSave()" title="Save">Save</button>
@@ -23557,10 +23612,90 @@ function st(n) {
       document.getElementById("tab-"+n).classList.add("active");
     }
   });
+  document.querySelectorAll("#mobile-tab-list button").forEach(function(btn) {
+    btn.style.background = btn.dataset.tab === n ? "var(--tape)" : "none";
+  });
   if (n === "workback") refreshWbDaySelector();
   if (n === "notes") setTimeout(initNoteEditorPaste, 50);
   // Autosave on tab switch
   if (currentSheetKey) autosaveNow();
+}
+
+function openMobileDrawer() {
+  var mobileSelectWrap = document.getElementById("mobile-lib-select-wrap");
+  mobileSelectWrap.innerHTML = "";
+  var sel = document.getElementById("lib-select");
+  if (sel) {
+    var clone = sel.cloneNode(true);
+    clone.id = "mobile-lib-select";
+    clone.style.cssText = "width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;background:var(--surface);box-sizing:border-box";
+    clone.onchange = function() { sel.value = this.value; sel.dispatchEvent(new Event("change")); closeMobileDrawer(); };
+    mobileSelectWrap.appendChild(clone);
+  }
+
+  var btnWrap = document.getElementById("mobile-lib-buttons");
+  btnWrap.innerHTML = "";
+  var actions = [
+    { label: "+ New", fn: function() { libNew(); closeMobileDrawer(); } },
+    { label: "Save", fn: function() { libSave(); closeMobileDrawer(); } },
+    { label: "Duplicate", fn: function() { libDuplicate(); closeMobileDrawer(); } },
+    { label: "Delete", fn: function() { libDelete(); closeMobileDrawer(); } },
+  ];
+  actions.forEach(function(a) {
+    var btn = document.createElement("button");
+    btn.textContent = a.label;
+    btn.onclick = a.fn;
+    btn.style.cssText = "width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:14px;font-family:inherit;cursor:pointer;text-align:left;color:var(--charcoal);min-height:unset";
+    btnWrap.appendChild(btn);
+  });
+
+  var tabList = document.getElementById("mobile-tab-list");
+  tabList.innerHTML = "";
+  var tabs = [
+    {id:"project",label:"Project"},
+    {id:"schedule",label:"Schedule"},
+    {id:"crew",label:"Crew"},
+    {id:"talent",label:"Talent"},
+    {id:"workback",label:"Workback"},
+    {id:"urls",label:"URLs"},
+    {id:"notes",label:"Notes"},
+    {id:"expenses",label:"Expenses"},
+  ];
+  var activeTab = document.querySelector(".tab.active");
+  var activeTabText = activeTab ? activeTab.textContent.toLowerCase() : "project";
+  tabs.forEach(function(t) {
+    var btn = document.createElement("button");
+    btn.textContent = t.label;
+    btn.dataset.tab = t.id;
+    btn.onclick = function() { st(t.id); closeMobileDrawer(); };
+    var isActive = (t.id === activeTabText || (activeTab && activeTab.textContent === t.label));
+    btn.style.cssText = "width:100%;padding:10px 12px;border:none;border-radius:6px;background:" + (isActive ? "var(--tape)" : "none") + ";font-size:15px;font-family:inherit;cursor:pointer;text-align:left;color:var(--charcoal);min-height:unset";
+    tabList.appendChild(btn);
+  });
+
+  document.getElementById("mobile-drawer").style.display = "block";
+  document.body.style.overflow = "hidden";
+}
+
+function closeMobileDrawer() {
+  document.getElementById("mobile-drawer").style.display = "none";
+  document.body.style.overflow = "";
+}
+
+function initMobileCollapse(dayId) {
+  if (window.innerWidth > 768) return;
+  var el = document.getElementById(dayId);
+  if (!el) return;
+  var body = el.querySelector(".sday-body");
+  var header = el.querySelector(".sday-header");
+  var chevron = header ? header.querySelector(".sday-chevron") : null;
+  if (!body || !header) return;
+  body.style.display = "none";
+  header.onclick = function() {
+    var isOpen = body.style.display !== "none";
+    body.style.display = isOpen ? "none" : "block";
+    if (chevron) chevron.style.transform = isOpen ? "" : "rotate(90deg)";
+  };
 }
 
 function v(id) { const e = document.getElementById(id); return e ? e.value.trim() : ""; }
@@ -23631,8 +23766,39 @@ async function fetchHosp(lat, lng) {
   const tg = sc[0].el.tags||{}; const nm = tg.name||tg["name:en"]||"Hospital";
   const st2 = [tg["addr:housenumber"],tg["addr:street"]].filter(Boolean).join(" ");
   const ci = tg["addr:city"]||"", st3 = tg["addr:state"]||tg["addr:province"]||"", po = tg["addr:postcode"]||"";
-  return [nm, st2, ([ci,st3].filter(Boolean).join(", ")+(po?" "+po:"")).trim()].filter(Boolean).join(", ");
+  return [nm, st2, ([ci,st3].filter(Boolean).join(", ")+(po?" "+po:"")).trim()].filter(Boolean).join("\n");
 }
+
+function parseHospitalText(raw) {
+  if (!raw) return "";
+  if (raw.indexOf("\n") !== -1) return raw;
+  // Extract trailing ", STATE ZIP"
+  var m = raw.match(/^(.*),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (!m) {
+    var m2 = raw.match(/^(.+?)(\d{1,5}\s+.+)$/);
+    return m2 ? m2[1] + "\n" + m2[2] : raw;
+  }
+  var beforeCity = m[1], state = m[2], zip = m[3];
+  // City is the last capitalized word(s) at the end of beforeCity
+  var cm = beforeCity.match(/^([\s\S]*\S)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)$/);
+  if (!cm) return raw;
+  var nameAndStreet = cm[1], city = cm[2];
+  var sm = nameAndStreet.match(/^(.+?)(\d{1,5}\s+.+)$/);
+  if (sm) return sm[1] + "\n" + sm[2].trimEnd() + "\n" + city + ", " + state + " " + zip;
+  return nameAndStreet + "\n" + city + ", " + state + " " + zip;
+}
+
+function lookupHospForDay(dayId, addr) {
+  var hospEl = document.getElementById(dayId+"_hospital");
+  if (!hospEl) return;
+  geocode(addr).then(function(coords) {
+    return fetchHosp(coords.lat, coords.lng);
+  }).then(function(text) {
+    hospEl.textContent = text;
+    hospEl.style.display = text ? "block" : "none";
+  }).catch(function() {});
+}
+
 function doLookup() {
   if (!scheduleDays.length) return;
   scheduleDays.forEach(function(dayId) {
@@ -23811,7 +23977,9 @@ function addScheduleDay(data) {
   removeBtn.className = "rb"; removeBtn.title = "Remove day";
   removeBtn.innerHTML = "&#x2715;";
   removeBtn.onclick = function() { removeScheduleDay(dayId); };
-  hdr.appendChild(calWidget); hdr.appendChild(titleSpan); hdr.appendChild(removeBtn);
+  var sdayChevron = document.createElement("span");
+  sdayChevron.className = "sday-chevron"; sdayChevron.textContent = "▸";
+  hdr.appendChild(calWidget); hdr.appendChild(titleSpan); hdr.appendChild(sdayChevron); hdr.appendChild(removeBtn);
   // Populate directly here — getElementById won't work until el is in the DOM
   if (data.date_iso) {
     var _calMonths = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
@@ -23922,7 +24090,11 @@ function addScheduleDay(data) {
   const labelInp = makeInput("text", dayId+"_label", "e.g. Shoot Day", data.label||"");
   labelInp.setAttribute("list","day-label-suggestions");
   labelInp.oninput = function() { updateDayHeader(dayId); };
-  body.appendChild(makeGrid("g3",[makeField("Shoot date",dateIso),makeField("Formatted date",dateFmt),makeField("Day label",labelInp)]));
+  var dateGrid = makeGrid("g3",[makeField("Shoot date",dateIso),makeField("Formatted date",dateFmt),makeField("Day label",labelInp)]);
+  dateGrid.children[0].classList.add("sday-shootdate-wrap");
+  dateGrid.children[1].classList.add("sday-fmtdate-wrap");
+  dateGrid.children[2].classList.add("sday-daylabel-wrap");
+  body.appendChild(dateGrid);
 
   const isPost = (document.getElementById("project_type")||{}).value === "post_production";
   const callTime = makeInput("text",dayId+"_call_time","8:00 AM",data.call_time||"");
@@ -23938,9 +24110,19 @@ function addScheduleDay(data) {
   const bfast = makeInput("text",dayId+"_breakfast","8:00 AM",data.breakfast||"");
   const lunch = makeInput("text",dayId+"_lunch","12:00 PM",data.lunch||"");
   if (!isPost) {
+    var ddToggle = document.createElement("div");
+    ddToggle.className = "day-details-toggle";
+    var ddLabel = document.createElement("span"); ddLabel.textContent = "Day Details";
+    var ddChevron = document.createElement("span"); ddChevron.className = "day-details-chevron"; ddChevron.textContent = "▸";
+    ddToggle.appendChild(ddLabel); ddToggle.appendChild(ddChevron);
+
+    var ddBody = document.createElement("div");
+    ddBody.className = "day-details-body";
+    ddBody.style.display = "none";
+
     const mealGrid = makeGrid("g2",[makeField("Breakfast",bfast),makeField("Lunch",lunch)]);
     mealGrid.style.marginBottom = "4px";
-    body.appendChild(mealGrid);
+    ddBody.appendChild(mealGrid);
 
     const sunrise = makeInput("text",dayId+"_sunrise","Auto-filled from location",data.sunrise||"");
     const sunset  = makeInput("text",dayId+"_sunset","Auto-filled from location",data.sunset||"");
@@ -23948,11 +24130,20 @@ function addScheduleDay(data) {
     const slbl2 = document.createElement("label"); slbl2.innerHTML = 'Sunset <span class="at">auto</span>';
     const sf1 = document.createElement("div"); sf1.className = "fl"; sf1.appendChild(slbl1); sf1.appendChild(sunrise);
     const sf2 = document.createElement("div"); sf2.className = "fl"; sf2.appendChild(slbl2); sf2.appendChild(sunset);
-    body.appendChild(makeGrid("g2",[sf1,sf2]));
+    ddBody.appendChild(makeGrid("g2",[sf1,sf2]));
 
     const sunStatus = document.createElement("div");
     sunStatus.className = "as"; sunStatus.id = dayId+"_sun_status";
-    body.appendChild(sunStatus);
+    ddBody.appendChild(sunStatus);
+
+    ddToggle.onclick = function() {
+      var isOpen = ddBody.style.display !== "none";
+      ddBody.style.display = isOpen ? "none" : "block";
+      ddChevron.style.transform = isOpen ? "" : "rotate(90deg)";
+    };
+
+    body.appendChild(ddToggle);
+    body.appendChild(ddBody);
   }
 
   // ── Location selector ──────────────────────────────────────────────────────
@@ -23988,7 +24179,13 @@ function addScheduleDay(data) {
     var addrParts = [opt.dataset.address, opt.dataset.city, [opt.dataset.state, opt.dataset.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     if (addrParts) { infoDiv.textContent = addrParts; infoDiv.style.display = "block"; }
     var hospEl = document.getElementById(dayId+"_hospital");
-    if (hospEl && !hospEl.value && opt.dataset.hospital) hospEl.value = opt.dataset.hospital.replace(/\n/g, ", ");
+    if (hospEl) {
+      var parsedHosp = parseHospitalText(opt.dataset.hospital||"");
+      hospEl.textContent = parsedHosp;
+      hospEl.style.display = parsedHosp ? "block" : "none";
+    }
+    var locAddr = [opt.dataset.address, opt.dataset.city, opt.dataset.state].filter(Boolean).join(", ");
+    if (locAddr) lookupHospForDay(dayId, locAddr);
     var notesEl = document.getElementById(dayId+"_loc_notes");
     if (notesEl && !notesEl.value && opt.dataset.notes) notesEl.value = opt.dataset.notes;
     checkShowBlacks(dayId);
@@ -24026,10 +24223,12 @@ function addScheduleDay(data) {
   // Hospital field
   const hospWrap = document.createElement("div"); hospWrap.className = "fl";
   const hospLbl = document.createElement("label"); hospLbl.innerHTML = 'Nearest hospital <span class="at">auto</span>';
-  const hospInp = document.createElement("input"); hospInp.type = "text";
-  hospInp.id = dayId+"_hospital"; hospInp.placeholder = "Auto-filled from location";
-  hospInp.value = (data.hospital||"").replace(/\n/g, ", ");
-  hospWrap.appendChild(hospLbl); hospWrap.appendChild(hospInp);
+  var hospText = parseHospitalText(data.hospital||"");
+  var hospDiv = document.createElement("div");
+  hospDiv.id = dayId+"_hospital";
+  hospDiv.style.cssText = "font-size:12px;color:var(--film-can);margin-top:4px;line-height:1.4;word-wrap:break-word;overflow-wrap:break-word;text-align:left;white-space:pre-line;display:"+(hospText?"block":"none");
+  hospDiv.textContent = hospText;
+  hospWrap.appendChild(hospLbl); hospWrap.appendChild(hospDiv);
   body.appendChild(hospWrap);
 
   // Location notes field
@@ -24070,6 +24269,7 @@ function addScheduleDay(data) {
     data.sched_entries.forEach(function(e) { addScheduleEntry2(dayId, e.time, e.desc); });
   }
 
+  initMobileCollapse(dayId);
   refreshWbDaySelector();
 }
 
@@ -24297,7 +24497,7 @@ function getScheduleDays() {
         var opt = sel.options[sel.selectedIndex];
         return opt ? opt.textContent : "";
       })(),
-      hospital:     v(dayId+"_hospital"),
+      hospital:     (document.getElementById(dayId+"_hospital")||{}).textContent||"",
       loc_notes:    v(dayId+"_loc_notes"),
       show_blacks:       (document.getElementById(dayId+"_show_blacks")||{}).checked||false,
       exclude_callsheet: (document.getElementById(dayId+"_exclude_callsheet")||{}).checked||false,
@@ -29884,6 +30084,22 @@ window.addEventListener("beforeunload", function() {
     <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
       <button class="lb" onclick="closeDayCrewModal()">Done</button>
     </div>
+  </div>
+</div>
+
+<div id="mobile-drawer" style="display:none;position:fixed;inset:0;z-index:500">
+  <div id="mobile-drawer-overlay" onclick="closeMobileDrawer()" style="position:absolute;inset:0;background:rgba(0,0,0,.5)"></div>
+  <div id="mobile-drawer-panel" style="position:absolute;top:0;left:0;width:280px;height:100%;background:var(--surface);overflow-y:auto;display:flex;flex-direction:column;padding:16px;box-sizing:border-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700;color:var(--charcoal);letter-spacing:.06em">SLATER</div>
+      <button onclick="closeMobileDrawer()" style="background:none;border:none;font-size:20px;color:var(--film-can);cursor:pointer;min-height:unset;padding:4px 8px">&#x2715;</button>
+    </div>
+    <div style="margin-bottom:12px" id="mobile-lib-select-wrap"></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px" id="mobile-lib-buttons"></div>
+    <hr style="border:none;border-top:1px solid var(--border);margin-bottom:16px">
+    <div style="display:flex;flex-direction:column;gap:4px" id="mobile-tab-list"></div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+    <button onclick="openMyInfo();closeMobileDrawer()" style="background:none;border:none;text-align:left;font-size:14px;color:var(--film-can);cursor:pointer;padding:8px 0;min-height:unset">&#9881; My Info</button>
   </div>
 </div>
 </body>
