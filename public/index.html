@@ -398,7 +398,17 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
   input[type="date"]{text-align:left;-webkit-appearance:none;appearance:none;width:100%;max-width:100%;box-sizing:border-box}
   input[type="date"]::-webkit-date-and-time-value{text-align:left}
   .g2>*,.g3>*,.g4>*{min-width:0}
-  body{overflow-x:hidden}
+  html,body{overflow-x:hidden;max-width:100%}
+  .wb-item{max-width:100%;box-sizing:border-box}
+  .wb-row1{grid-template-columns:1fr auto auto auto;min-width:0}
+  .wb-row1>*{min-width:0}
+  .wb-row2{display:flex;flex-direction:column;gap:6px}
+  .wb-mode-sel,.wb-date-inp{width:100%;box-sizing:border-box}
+  .wb-date-ctrl{flex-wrap:wrap;gap:4px;width:100%}
+  .wb-date-ctrl select{max-width:100%!important;box-sizing:border-box;flex:1;min-width:0}
+  .wb-date-ctrl input[type="number"]{flex-shrink:0}
+  #tab-workback>div:first-child{flex-wrap:wrap;gap:6px}
+  #tab-workback>div:first-child>div:last-child{flex-wrap:wrap;gap:6px}
   .sday-cal{width:30px!important}
   .sday-cal-day{font-size:13px!important}
   .sday-cal-month{font-size:7px!important}
