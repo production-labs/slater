@@ -1,0 +1,13 @@
+{
+  "actions" : {
+    "build" : {
+      "enabled" : true,
+      "script" : "brew services stop postgresql@16"
+    },
+    "run" : {
+      "enabled" : true,
+      "script" : "brew services list"
+    }
+  },
+  "buildBeforeRunning" : true
+}

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slater Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Geist', sans-serif;
+      background: #f3f0ed;
+      color: #222;
+      min-height: 100vh;
+    }
+
+    /* Top bar */
+    .topbar {
+      background: #222;
+      color: #fff;
+      padding: 0 28px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-left { display: flex; align-items: baseline; gap: 12px; }
+    .topbar-left h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+    .topbar-left span { font-size: 12px; color: #9D9D99; }
+    .topbar-right a {
+      color: #9D9D99;
+      text-decoration: none;
+      font-size: 13px;
+      transition: color .15s;
+    }
+    .topbar-right a:hover { color: #fff; }
+
+    /* Content wrapper */
+    .content { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    /* Stats bar */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .stat-box {
+      background: #fff;
+      border: 1px solid #e5e0d8;
+      border-radius: 10px;
+      padding: 20px 20px 16px;
+    }
+    .stat-box .stat-label { font-size: 11px; font-weight: 500; color: #9D9D99; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .stat-box .stat-value { font-size: 32px; font-weight: 600; color: #222; line-height: 1; }
+
+    /* Section cards */
+    .section {
+      background: #fff;
+      border: 1px solid #e5e0d8;
+      border-radius: 10px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e5e0d8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .section-header h2 { font-size: 14px; font-weight: 600; color: #222; }
+    .section-body { padding: 20px; }
+
+    /* Generate keys form */
+    .gen-form {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .gen-form .field { display: flex; flex-direction: column; gap: 5px; }
+    .gen-form label { font-size: 11px; font-weight: 500; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+    .gen-form input, .gen-form select {
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #fff;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .gen-form input:focus, .gen-form select:focus { border-color: #222; }
+    .gen-form input[type=number] { width: 72px; }
+    .gen-form input[type=date] { width: 150px; }
+    .btn {
+      padding: 8px 18px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-primary { background: #222; color: #fff; }
+    .btn-primary:hover { background: #333; }
+    .btn-danger { background: transparent; color: #D94B43; border: 1px solid #D94B43; padding: 5px 10px; font-size: 12px; }
+    .btn-danger:hover { background: #D94B43; color: #fff; }
+
+    .gen-results {
+      margin-top: 16px;
+      display: none;
+    }
+    .gen-results .result-label { font-size: 12px; color: #9D9D99; margin-bottom: 8px; }
+    .key-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .key-item {
+      font-family: 'Geist', monospace;
+      font-size: 13px;
+      background: #f3f0ed;
+      border: 1px solid #e5e0d8;
+      border-radius: 6px;
+      padding: 8px 12px;
+      letter-spacing: 0.08em;
+      color: #222;
+      user-select: all;
+    }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      background: #F5F0E8;
+      padding: 9px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #e5e0d8;
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid #f0ece6; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:nth-child(even) { background: #faf8f5; }
+    tbody tr.expired { background: #fff2f2; }
+    tbody tr.expired:nth-child(even) { background: #ffe8e8; }
+    tbody td { padding: 10px 14px; vertical-align: middle; color: #333; }
+    tbody td.muted { color: #9D9D99; font-size: 12px; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .badge-beta { background: #E9DFC8; color: #6b5a35; }
+    .badge-solo { background: #d4e8d4; color: #2a5a2a; }
+    .badge-team { background: #d4dff5; color: #1a3080; }
+
+    .mono { font-family: 'Geist', monospace; letter-spacing: 0.05em; font-size: 12px; }
+
+    .empty-row td { text-align: center; color: #9D9D99; padding: 28px; font-size: 13px; }
+
+    /* Feedback banner */
+    .banner {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #222;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+      z-index: 999;
+    }
+    .banner.error { background: #D94B43; }
+
+    @media (max-width: 700px) {
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .gen-form { flex-direction: column; align-items: stretch; }
+      .gen-form input[type=number], .gen-form input[type=date] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1>Slater Admin</h1>
+      <span>Production Labs LLC</span>
+    </div>
+    <div class="topbar-right">
+      <a href="/admin/logout">Logout</a>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-box">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value" id="stat-users">-</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Total Licenses</div>
+        <div class="stat-value" id="stat-licenses">-</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Active Devices</div>
+        <div class="stat-value" id="stat-devices">-</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Total Projects</div>
+        <div class="stat-value" id="stat-projects">-</div>
+      </div>
+    </div>
+
+    <!-- Generate Keys -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Generate License Keys</h2>
+      </div>
+      <div class="section-body">
+        <div class="gen-form">
+          <div class="field">
+            <label>Count</label>
+            <input type="number" id="gen-count" value="1" min="1" max="50">
+          </div>
+          <div class="field">
+            <label>Plan</label>
+            <select id="gen-plan">
+              <option value="beta">Beta</option>
+              <option value="solo">Solo</option>
+              <option value="team">Team</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Max Devices</label>
+            <input type="number" id="gen-devices" value="3" min="1" max="10">
+          </div>
+          <div class="field">
+            <label>Expires (optional)</label>
+            <input type="date" id="gen-expires">
+          </div>
+          <button class="btn btn-primary" onclick="generateKeys()">Generate</button>
+        </div>
+        <div class="gen-results" id="gen-results">
+          <div class="result-label" id="gen-result-label"></div>
+          <div class="key-list" id="key-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Users</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Plan</th>
+              <th>License Key</th>
+              <th>Devices</th>
+              <th>Joined</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr class="empty-row"><td colspan="7">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Licenses Table -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Licenses</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Plan</th>
+              <th>User</th>
+              <th>Devices</th>
+              <th>Expires</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="licenses-tbody">
+            <tr class="empty-row"><td colspan="7">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Feedback banner -->
+  <div class="banner" id="banner"></div>
+
+  <script>
+    function showBanner(msg, isError) {
+      var el = document.getElementById('banner');
+      el.textContent = msg;
+      el.className = 'banner' + (isError ? ' error' : '');
+      el.style.display = 'block';
+      clearTimeout(el._timer);
+      el._timer = setTimeout(function() { el.style.display = 'none'; }, 3000);
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '-';
+      var d = new Date(iso);
+      return (d.getMonth() + 1) + '/' + d.getDate() + '/' + String(d.getFullYear()).slice(2);
+    }
+
+    function planBadge(plan) {
+      if (!plan) return '<span class="muted">-</span>';
+      var cls = plan === 'beta' ? 'badge-beta' : plan === 'solo' ? 'badge-solo' : 'badge-team';
+      return '<span class="badge ' + cls + '">' + plan + '</span>';
+    }
+
+    function isExpired(dateStr) {
+      if (!dateStr) return false;
+      return new Date(dateStr) < new Date();
+    }
+
+    // Load stats
+    async function loadStats() {
+      try {
+        var r = await fetch('/api/admin/stats');
+        if (!r.ok) return;
+        var d = await r.json();
+        document.getElementById('stat-users').textContent = d.users;
+        document.getElementById('stat-licenses').textContent = d.licenses;
+        document.getElementById('stat-devices').textContent = d.devices;
+        document.getElementById('stat-projects').textContent = d.projects;
+      } catch (e) { /* silently skip */ }
+    }
+
+    // Load users
+    async function loadUsers() {
+      var tbody = document.getElementById('users-tbody');
+      try {
+        var r = await fetch('/api/admin/users');
+        if (!r.ok) throw new Error('Failed');
+        var rows = await r.json();
+        if (rows.length === 0) {
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No users found</td></tr>';
+          return;
+        }
+        tbody.innerHTML = rows.map(function(u) {
+          return '<tr>' +
+            '<td>' + (u.name || '<span class="muted">-</span>') + '</td>' +
+            '<td>' + u.email + '</td>' +
+            '<td>' + planBadge(u.plan) + '</td>' +
+            '<td class="mono">' + (u.license_key || '<span class="muted">-</span>') + '</td>' +
+            '<td>' + (u.device_count || 0) + '</td>' +
+            '<td class="muted">' + fmtDate(u.created_at) + '</td>' +
+            '<td><button class="btn btn-danger" onclick="deleteUser(' + u.id + ', \'' + (u.email || '').replace(/'/g, '') + '\')">Delete</button></td>' +
+            '</tr>';
+        }).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Error loading users</td></tr>';
+      }
+    }
+
+    // Load licenses
+    async function loadLicenses() {
+      var tbody = document.getElementById('licenses-tbody');
+      try {
+        var r = await fetch('/api/admin/licenses');
+        if (!r.ok) throw new Error('Failed');
+        var rows = await r.json();
+        if (rows.length === 0) {
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No licenses found</td></tr>';
+          return;
+        }
+        tbody.innerHTML = rows.map(function(l) {
+          var rowClass = isExpired(l.expires_at) ? ' class="expired"' : '';
+          var userCell = l.user_email
+            ? (l.user_name ? l.user_name + '<br><span class="muted">' + l.user_email + '</span>' : l.user_email)
+            : '<span class="muted">Unassigned</span>';
+          var devCell = (l.device_count || 0) + ' / ' + (l.max_devices || 3);
+          return '<tr' + rowClass + '>' +
+            '<td class="mono">' + l.key + '</td>' +
+            '<td>' + planBadge(l.plan) + '</td>' +
+            '<td>' + userCell + '</td>' +
+            '<td>' + devCell + '</td>' +
+            '<td class="muted">' + fmtDate(l.expires_at) + '</td>' +
+            '<td class="muted">' + fmtDate(l.created_at) + '</td>' +
+            '<td><button class="btn btn-danger" onclick="revokeLicense(' + l.id + ', \'' + l.key.replace(/'/g, '') + '\')">Revoke</button></td>' +
+            '</tr>';
+        }).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Error loading licenses</td></tr>';
+      }
+    }
+
+    async function generateKeys() {
+      var count = parseInt(document.getElementById('gen-count').value) || 1;
+      var plan = document.getElementById('gen-plan').value;
+      var max_devices = parseInt(document.getElementById('gen-devices').value) || 3;
+      var expires_at = document.getElementById('gen-expires').value || null;
+
+      try {
+        var r = await fetch('/api/admin/licenses/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ count: count, plan: plan, max_devices: max_devices, expires_at: expires_at })
+        });
+        var data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed');
+
+        var resultEl = document.getElementById('gen-results');
+        var labelEl = document.getElementById('gen-result-label');
+        var listEl = document.getElementById('key-list');
+        labelEl.textContent = data.keys.length + ' key' + (data.keys.length !== 1 ? 's' : '') + ' generated:';
+        listEl.innerHTML = data.keys.map(function(k) {
+          return '<div class="key-item">' + k + '</div>';
+        }).join('');
+        resultEl.style.display = 'block';
+        showBanner('Generated ' + data.keys.length + ' key' + (data.keys.length !== 1 ? 's' : ''));
+        loadLicenses();
+        loadStats();
+      } catch (e) {
+        showBanner(e.message || 'Error generating keys', true);
+      }
+    }
+
+    async function deleteUser(id, email) {
+      if (!confirm('Delete user "' + email + '"? This cannot be undone.')) return;
+      try {
+        var r = await fetch('/api/admin/users/' + id, { method: 'DELETE' });
+        if (!r.ok) throw new Error('Failed');
+        showBanner('User deleted');
+        loadUsers();
+        loadStats();
+      } catch (e) {
+        showBanner('Error deleting user', true);
+      }
+    }
+
+    async function revokeLicense(id, key) {
+      if (!confirm('Revoke license ' + key + '? This cannot be undone.')) return;
+      try {
+        var r = await fetch('/api/admin/licenses/' + id, { method: 'DELETE' });
+        if (!r.ok) throw new Error('Failed');
+        showBanner('License revoked');
+        loadLicenses();
+        loadUsers();
+        loadStats();
+      } catch (e) {
+        showBanner('Error revoking license', true);
+      }
+    }
+
+    // Init
+    loadStats();
+    loadUsers();
+    loadLicenses();
+  </script>
+</body>
+</html>

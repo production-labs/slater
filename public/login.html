@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slater — Sign in</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Geist', sans-serif; background: #f3f0ed; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #fff; border-radius: 12px; padding: 40px; width: 100%; max-width: 380px; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+    .logo-text h1 { font-size: 22px; font-weight: 600; color: #222; }
+    .logo-text p { font-size: 12px; color: #9D9D99; }
+    label { display: block; font-size: 12px; font-weight: 500; color: #555; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; margin-bottom: 16px; outline: none; transition: border-color .2s; }
+    input:focus { border-color: #222; }
+    button { width: 100%; padding: 11px; background: #222; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-family: inherit; font-weight: 500; cursor: pointer; }
+    button:hover { background: #333; }
+    .error { color: #D94B43; font-size: 13px; margin-bottom: 16px; display: none; }
+    .toggle-link { text-align: center; margin-top: 20px; font-size: 13px; color: #9D9D99; }
+    .toggle-link a { color: #222; text-decoration: none; font-weight: 500; cursor: pointer; }
+    .toggle-link a:hover { text-decoration: underline; }
+    .view { display: none; }
+    .view.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-text">
+        <h1>Slater</h1>
+        <p>The producer's toolbox</p>
+      </div>
+    </div>
+    <div class="error" id="error-msg"></div>
+
+    <!-- Sign in view -->
+    <div class="view active" id="view-login">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="you@example.com" autofocus>
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••">
+      <div style="text-align:right;margin-top:-10px;margin-bottom:16px;"><a onclick="showView('forgot')" style="font-size:12px;color:#9D9D99;cursor:pointer;text-decoration:none;">Forgot password?</a></div>
+      <button onclick="login()">Sign in</button>
+      <div class="toggle-link">Don't have an account? <a onclick="showView('register')">Create account</a></div>
+    </div>
+
+    <!-- Create account view -->
+    <div class="view" id="view-register">
+      <label>Name</label>
+      <input type="text" id="reg-name" placeholder="Your name">
+      <label>Email</label>
+      <input type="email" id="reg-email" placeholder="you@example.com">
+      <label>License Key</label>
+      <input type="text" id="reg-license" placeholder="SLTR-XXXX-XXXX-XXXX" autocomplete="off" style="text-transform: uppercase; letter-spacing: 0.05em;">
+      <label>Password</label>
+      <input type="password" id="reg-password" placeholder="••••••••">
+      <button onclick="register()">Create account</button>
+      <div class="toggle-link">Already have an account? <a onclick="showView('login')">Sign in</a></div>
+    </div>
+
+    <!-- Forgot password view -->
+    <div class="view" id="view-forgot">
+      <h2 style="font-size:18px;font-weight:600;color:#222;margin-bottom:8px;">Forgot password?</h2>
+      <p style="font-size:13px;color:#9D9D99;margin-bottom:20px;">Enter your email and we'll send you a reset link.</p>
+      <div id="forgot-success" style="display:none;background:#f0f9f0;border:1px solid #b7ddb7;border-radius:6px;padding:12px 14px;font-size:13px;color:#2d6a2d;margin-bottom:16px;">Check your email for a reset link.</div>
+      <label>Email</label>
+      <input type="email" id="forgot-email" placeholder="you@example.com">
+      <button onclick="forgotPassword()">Send reset link</button>
+      <div class="toggle-link"><a onclick="showView('login')">Back to sign in</a></div>
+    </div>
+  </div>
+  <script>
+    function showView(view) {
+      var errEl = document.getElementById('error-msg');
+      errEl.style.display = 'none';
+      document.getElementById('view-login').className = 'view' + (view === 'login' ? ' active' : '');
+      document.getElementById('view-register').className = 'view' + (view === 'register' ? ' active' : '');
+      document.getElementById('view-forgot').className = 'view' + (view === 'forgot' ? ' active' : '');
+      document.getElementById('forgot-success').style.display = 'none';
+      if (view === 'login') {
+        document.getElementById('login-email').focus();
+      } else if (view === 'register') {
+        document.getElementById('reg-name').focus();
+      } else if (view === 'forgot') {
+        document.getElementById('forgot-email').focus();
+      }
+    }
+
+    async function login() {
+      var email = document.getElementById('login-email').value;
+      var password = document.getElementById('login-password').value;
+      var errEl = document.getElementById('error-msg');
+      errEl.style.display = 'none';
+      try {
+        var r = await fetch('/api/users/login', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email: email, password: password})
+        });
+        var data = await r.json();
+        if (!r.ok) {
+          errEl.textContent = data.error || 'Login failed';
+          errEl.style.display = 'block';
+          return;
+        }
+        window.location.href = '/';
+      } catch(e) {
+        errEl.textContent = 'Connection error';
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function register() {
+      var name = document.getElementById('reg-name').value;
+      var email = document.getElementById('reg-email').value;
+      var license_key = document.getElementById('reg-license').value;
+      var password = document.getElementById('reg-password').value;
+      var errEl = document.getElementById('error-msg');
+      errEl.style.display = 'none';
+      try {
+        var r = await fetch('/api/users/register', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name: name, email: email, license_key: license_key, password: password})
+        });
+        var data = await r.json();
+        if (!r.ok) {
+          if (data.device_limit) {
+            errEl.textContent = 'Device limit reached. Please deactivate a device from another browser to continue.';
+          } else {
+            errEl.textContent = data.error || 'Registration failed';
+          }
+          errEl.style.display = 'block';
+          return;
+        }
+        window.location.href = '/';
+      } catch(e) {
+        errEl.textContent = 'Connection error';
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function forgotPassword() {
+      var email = document.getElementById('forgot-email').value;
+      var errEl = document.getElementById('error-msg');
+      var successEl = document.getElementById('forgot-success');
+      errEl.style.display = 'none';
+      successEl.style.display = 'none';
+      try {
+        var r = await fetch('/api/users/forgot-password', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email: email})
+        });
+        var data = await r.json();
+        if (!r.ok) {
+          errEl.textContent = data.error || 'Something went wrong';
+          errEl.style.display = 'block';
+          return;
+        }
+        successEl.style.display = 'block';
+      } catch(e) {
+        errEl.textContent = 'Connection error';
+        errEl.style.display = 'block';
+      }
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        var loginActive = document.getElementById('view-login').className.indexOf('active') !== -1;
+        var forgotActive = document.getElementById('view-forgot').className.indexOf('active') !== -1;
+        if (loginActive) {
+          login();
+        } else if (forgotActive) {
+          forgotPassword();
+        } else {
+          register();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
