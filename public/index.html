@@ -369,6 +369,7 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .day-details-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 0;border-top:1px solid var(--border);margin-top:8px;user-select:none}
 .day-details-toggle>span:first-child{font-size:11px;font-weight:600;color:var(--film-can);text-transform:uppercase;letter-spacing:.05em;flex:1}
 .day-details-chevron{font-size:22px;color:var(--film-can);transition:transform .2s;flex-shrink:0}
+#mobile-bottom-nav,#mobile-more-menu{display:none}
 @media(max-width:768px){
   .hdr{display:none!important}
   .lib-bar{flex-direction:row!important;align-items:center!important;padding:8px 12px!important;gap:8px!important;margin-bottom:.75rem!important}
@@ -424,6 +425,15 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
   .sch-entry input:nth-child(2){grid-column:1;grid-row:2;font-size:13px!important}
   .sch-entry button:nth-child(3){grid-column:2;grid-row:1/span 2;align-self:center}
   .sch-entry button:nth-child(4){grid-column:3;grid-row:1/span 2;align-self:center}
+  #mobile-bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surface);border-top:1px solid var(--border);z-index:200;align-items:stretch}
+  .mobile-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:6px 0;gap:2px;color:var(--film-can);font-family:'Geist',sans-serif;min-height:unset}
+  .mobile-nav-btn.active{color:var(--charcoal)}
+  .mobile-nav-icon{font-size:18px;line-height:1}
+  .mobile-nav-label{font-size:10px;font-weight:500;letter-spacing:.03em}
+  #mobile-more-menu{position:fixed;bottom:56px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0;padding:8px 0;z-index:300;min-width:160px;box-shadow:0 -4px 16px rgba(0,0,0,.12)}
+  #mobile-more-menu button{display:block;width:100%;padding:12px 20px;background:none;border:none;text-align:left;font-size:15px;font-family:'Geist',sans-serif;color:var(--charcoal);cursor:pointer;min-height:unset}
+  #mobile-more-menu button:hover{background:var(--tape)}
+  .sec{padding-bottom:72px!important}
 }
 </style>
 </head>
@@ -23624,8 +23634,8 @@ function st(n) {
       document.getElementById("tab-"+n).classList.add("active");
     }
   });
-  document.querySelectorAll("#mobile-tab-list button").forEach(function(btn) {
-    btn.style.background = btn.dataset.tab === n ? "var(--tape)" : "none";
+  document.querySelectorAll(".mobile-nav-btn").forEach(function(btn) {
+    btn.classList.toggle("active", btn.dataset.tab === n);
   });
   if (n === "workback") refreshWbDaySelector();
   if (n === "notes") setTimeout(initNoteEditorPaste, 50);
@@ -23661,30 +23671,6 @@ function openMobileDrawer() {
     btnWrap.appendChild(btn);
   });
 
-  var tabList = document.getElementById("mobile-tab-list");
-  tabList.innerHTML = "";
-  var tabs = [
-    {id:"project",label:"Project"},
-    {id:"schedule",label:"Schedule"},
-    {id:"crew",label:"Crew"},
-    {id:"talent",label:"Talent"},
-    {id:"workback",label:"Workback"},
-    {id:"urls",label:"URLs"},
-    {id:"notes",label:"Notes"},
-    {id:"expenses",label:"Expenses"},
-  ];
-  var activeTab = document.querySelector(".tab.active");
-  var activeTabText = activeTab ? activeTab.textContent.toLowerCase() : "project";
-  tabs.forEach(function(t) {
-    var btn = document.createElement("button");
-    btn.textContent = t.label;
-    btn.dataset.tab = t.id;
-    btn.onclick = function() { st(t.id); closeMobileDrawer(); };
-    var isActive = (t.id === activeTabText || (activeTab && activeTab.textContent === t.label));
-    btn.style.cssText = "width:100%;padding:10px 12px;border:none;border-radius:6px;background:" + (isActive ? "var(--tape)" : "none") + ";font-size:15px;font-family:inherit;cursor:pointer;text-align:left;color:var(--charcoal);min-height:unset";
-    tabList.appendChild(btn);
-  });
-
   document.getElementById("mobile-drawer").style.display = "block";
   document.body.style.overflow = "hidden";
 }
@@ -23693,6 +23679,27 @@ function closeMobileDrawer() {
   document.getElementById("mobile-drawer").style.display = "none";
   document.body.style.overflow = "";
 }
+
+function mobileNavGo(tabId) {
+  st(tabId);
+  closeMobileMoreMenu();
+}
+
+function toggleMobileMoreMenu() {
+  var menu = document.getElementById("mobile-more-menu");
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+}
+
+function closeMobileMoreMenu() {
+  var menu = document.getElementById("mobile-more-menu");
+  if (menu) menu.style.display = "none";
+}
+
+document.addEventListener("click", function(e) {
+  if (!e.target.closest("#mobile-more-menu") && !e.target.closest("#mobile-nav-more")) {
+    closeMobileMoreMenu();
+  }
+});
 
 function initMobileCollapse(dayId) {
   if (window.innerWidth > 768) return;
@@ -24684,8 +24691,7 @@ function wbRecalc() {
       var base;
       if (seqAnchorId === "kickoff") { base = kickoffIso || anchorIso; }
       else if (seqAnchorId && seqAnchorId.indexOf("pin_") === 0) {
-        var pinMilestone = schedMilestones.find(function(m) { return ("pin_"+m.id) === seqAnchorId; });
-        base = (pinMilestone && pinMilestone.date_iso) || kickoffIso || anchorIso;
+        base = seqAnchorId.slice(4) || kickoffIso || anchorIso;
       }
       else if (seqAnchorId && dueMap.hasOwnProperty(seqAnchorId)) { base = dueMap[seqAnchorId] || kickoffIso || anchorIso; }
       else { base = prevDue || kickoffIso || anchorIso; }
@@ -24775,42 +24781,53 @@ function refreshSeqAnchorDropdowns() {
     var nameEl = document.getElementById(wid+"_item");
     return {id: wid, label: (nameEl ? nameEl.value.trim() : "") || "(untitled)"};
   });
-  // Schedule day pins, using the same "pin_"+m.id scheme as wbRebuildPins()
-  var pins = getSchedMilestones().filter(function(m) {
-    return !m.isKickoff && !m.isVideoDue;
-  }).map(function(m) {
-    return {id: "pin_"+m.id, label: "📅 " + m.label + " (" + wbFmtDate(m.date_iso) + ")"};
+
+  // Get schedule day pins using the same scheme as wbRebuildPins()
+  var pins = [];
+  var days = getScheduleDays();
+  days.forEach(function(day) {
+    if (day.date_iso) {
+      pins.push({
+        id: "pin_"+day.date_iso,
+        label: "📅 " + (day.label || day.date_iso),
+      });
+    }
   });
+
   wbItems.forEach(function(wid, idx) {
     var modeSel = document.getElementById(wid+"_mode");
     if (!modeSel || modeSel.value !== "sequential") return;
     var anchorSel = document.getElementById(wid+"_seq_anchor");
     if (!anchorSel) return;
-    // Determine target value: prefer pendingValue (set by load), then current selection
+
+    // Read current selection BEFORE rebuilding
     var pendingVal = anchorSel.dataset.pendingValue;
-    var targetVal = (pendingVal !== undefined && pendingVal !== "") ? pendingVal : anchorSel.value;
+    var currentVal = (pendingVal !== undefined && pendingVal !== "")
+      ? pendingVal
+      : anchorSel.value;
     anchorSel.dataset.pendingValue = "";
+
     // Rebuild options
     anchorSel.innerHTML = "";
     var kickoffOpt = document.createElement("option");
     kickoffOpt.value = "kickoff"; kickoffOpt.textContent = "Kickoff";
     anchorSel.appendChild(kickoffOpt);
-    // Schedule day pins next, since they represent fixed dates on the timeline
     pins.forEach(function(pin) {
       var opt = document.createElement("option");
       opt.value = pin.id; opt.textContent = pin.label;
       anchorSel.appendChild(opt);
     });
     allItems.forEach(function(item) {
-      if (item.id === wid) return; // skip self
+      if (item.id === wid) return;
       var opt = document.createElement("option");
       opt.value = item.id; opt.textContent = item.label;
       anchorSel.appendChild(opt);
     });
-    // Restore value if valid, else default to item directly above or kickoff
+
+    // Restore previously selected value if it still exists
     var validIds = Array.from(anchorSel.options).map(function(o) { return o.value; });
-    if (targetVal && validIds.indexOf(targetVal) !== -1) {
-      anchorSel.value = targetVal;
+    if (currentVal && validIds.indexOf(currentVal) !== -1) {
+      anchorSel.value = currentVal;
     } else {
       var prevId = idx > 0 ? wbItems[idx - 1] : null;
       anchorSel.value = (prevId && prevId !== wid) ? prevId : "kickoff";
@@ -30009,6 +30026,10 @@ setTimeout(refreshWbDaySelector, 200);
 setTimeout(acAttachAll, 100);
 setTimeout(updateVideoDueVisibility, 100);
 setTimeout(initNoteEditorPaste, 200);
+(function() {
+  var defaultBtn = document.querySelector(".mobile-nav-btn[data-tab='project']");
+  if (defaultBtn) defaultBtn.classList.add("active");
+})();
 document.getElementById("notes-search").addEventListener("input", function() {
   var query = this.value.trim();
   var clearBtn = document.getElementById("notes-search-clear");
@@ -30127,11 +30148,39 @@ window.addEventListener("beforeunload", function() {
     </div>
     <div style="margin-bottom:12px" id="mobile-lib-select-wrap"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px" id="mobile-lib-buttons"></div>
-    <hr style="border:none;border-top:1px solid var(--border);margin-bottom:16px">
-    <div style="display:flex;flex-direction:column;gap:4px" id="mobile-tab-list"></div>
     <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
     <button onclick="openMyInfo();closeMobileDrawer()" style="background:none;border:none;text-align:left;font-size:14px;color:var(--film-can);cursor:pointer;padding:8px 0;min-height:unset">&#9881; My Info</button>
   </div>
+</div>
+
+<div id="mobile-bottom-nav">
+  <button class="mobile-nav-btn" data-tab="project" onclick="mobileNavGo('project')">
+    <span class="mobile-nav-icon">&#128203;</span>
+    <span class="mobile-nav-label">Project</span>
+  </button>
+  <button class="mobile-nav-btn" data-tab="schedule" onclick="mobileNavGo('schedule')">
+    <span class="mobile-nav-icon">&#128197;</span>
+    <span class="mobile-nav-label">Schedule</span>
+  </button>
+  <button class="mobile-nav-btn" data-tab="crew" onclick="mobileNavGo('crew')">
+    <span class="mobile-nav-icon">&#128101;</span>
+    <span class="mobile-nav-label">Crew</span>
+  </button>
+  <button class="mobile-nav-btn" data-tab="expenses" onclick="mobileNavGo('expenses')">
+    <span class="mobile-nav-icon">&#128176;</span>
+    <span class="mobile-nav-label">Expenses</span>
+  </button>
+  <button class="mobile-nav-btn" id="mobile-nav-more" onclick="toggleMobileMoreMenu()">
+    <span class="mobile-nav-icon" style="letter-spacing:-2px">&#8226;&#8226;&#8226;</span>
+    <span class="mobile-nav-label">More</span>
+  </button>
+</div>
+
+<div id="mobile-more-menu" style="display:none">
+  <button onclick="mobileNavGo('talent')">Talent</button>
+  <button onclick="mobileNavGo('workback')">Workback</button>
+  <button onclick="mobileNavGo('urls')">URLs</button>
+  <button onclick="mobileNavGo('notes')">Notes</button>
 </div>
 </body>
 </html>
