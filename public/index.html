@@ -403,7 +403,9 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
   .wb-row1{grid-template-columns:1fr auto auto auto;min-width:0}
   .wb-row1>*{min-width:0}
   .wb-row2{display:flex;flex-direction:column;gap:6px}
-  .wb-mode-sel,.wb-date-inp{width:100%;box-sizing:border-box}
+  .wb-mode-sel{width:100%;box-sizing:border-box}
+  .wb-date-inp{width:150px!important;min-width:unset;box-sizing:border-box}
+  .wb-date-inp::-webkit-date-and-time-value{text-align:left;min-height:1.5em}
   .wb-date-ctrl{flex-wrap:wrap;gap:4px;width:100%}
   .wb-date-ctrl select{max-width:100%!important;box-sizing:border-box;flex:1;min-width:0}
   .wb-date-ctrl input[type="number"]{flex-shrink:0}
@@ -24884,20 +24886,20 @@ function wbAdd(item, afterId) {
   const seqCtrl = document.createElement("div");
   seqCtrl.className = "wb-date-ctrl"; seqCtrl.id = id+"_seq_ctrl";
   seqCtrl.style.display = mode === "sequential" ? "" : "none";
-  const seqDaysLbl = document.createElement("span"); seqDaysLbl.textContent = "Days:";
-  seqDaysLbl.style.cssText = "font-size:12px;color:var(--film-can)";
   const seqInp = document.createElement("input");
   seqInp.type = "number"; seqInp.className = "wb-seq-inp"; seqInp.id = id+"_seq_days";
   seqInp.min = "0"; seqInp.max = "365"; seqInp.value = item.seq_days === undefined ? 1 : item.seq_days;
   seqInp.oninput = function() { wbRecalc(); };
-  const seqAfterLbl = document.createElement("span"); seqAfterLbl.textContent = "After:";
+  const seqDaysSuffix = document.createElement("span"); seqDaysSuffix.textContent = "days";
+  seqDaysSuffix.style.cssText = "font-size:12px;color:var(--film-can)";
+  const seqAfterLbl = document.createElement("span"); seqAfterLbl.textContent = "after:";
   seqAfterLbl.style.cssText = "font-size:12px;color:var(--film-can);margin-left:4px";
   const seqAnchorSel = document.createElement("select");
   seqAnchorSel.id = id+"_seq_anchor";
   seqAnchorSel.style.cssText = "padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:12px;font-family:inherit;max-width:140px;color:#444;background:var(--bg)";
   seqAnchorSel.dataset.pendingUuid = item.seq_anchor_uuid || "";
   seqAnchorSel.onchange = function() { wbRecalc(); };
-  seqCtrl.appendChild(seqDaysLbl); seqCtrl.appendChild(seqInp);
+  seqCtrl.appendChild(seqInp); seqCtrl.appendChild(seqDaysSuffix);
   seqCtrl.appendChild(seqAfterLbl); seqCtrl.appendChild(seqAnchorSel);
 
   // Manual control
@@ -24907,6 +24909,7 @@ function wbAdd(item, afterId) {
   const manualInp = document.createElement("input");
   manualInp.type = "date"; manualInp.className = "wb-date-inp"; manualInp.id = id+"_manual_date";
   manualInp.value = item.manual_date||"";
+  manualInp.style.width = "150px";
   manualInp.onchange = function() { wbRecalc(); };
   manualCtrl.appendChild(manualInp);
 
