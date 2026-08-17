@@ -24671,6 +24671,7 @@ function wbRecalc() {
   const soon  = _localIso(new Date(Date.now()+5*864e5));
   var dueMap = {};
   var prevDue = kickoffIso;
+  var schedMilestones = getSchedMilestones();
   wbItems.forEach(function(id) {
     const dueEl = document.getElementById(id+"_due");
     if (!dueEl) return;
@@ -24682,6 +24683,10 @@ function wbRecalc() {
       const days = parseInt((document.getElementById(id+"_seq_days")||{}).value)||0;
       var base;
       if (seqAnchorId === "kickoff") { base = kickoffIso || anchorIso; }
+      else if (seqAnchorId && seqAnchorId.indexOf("pin_") === 0) {
+        var pinMilestone = schedMilestones.find(function(m) { return ("pin_"+m.id) === seqAnchorId; });
+        base = (pinMilestone && pinMilestone.date_iso) || kickoffIso || anchorIso;
+      }
       else if (seqAnchorId && dueMap.hasOwnProperty(seqAnchorId)) { base = dueMap[seqAnchorId] || kickoffIso || anchorIso; }
       else { base = prevDue || kickoffIso || anchorIso; }
       due = wbBusinessDaysAfter(base, days);
@@ -24770,6 +24775,12 @@ function refreshSeqAnchorDropdowns() {
     var nameEl = document.getElementById(wid+"_item");
     return {id: wid, label: (nameEl ? nameEl.value.trim() : "") || "(untitled)"};
   });
+  // Schedule day pins, using the same "pin_"+m.id scheme as wbRebuildPins()
+  var pins = getSchedMilestones().filter(function(m) {
+    return !m.isKickoff && !m.isVideoDue;
+  }).map(function(m) {
+    return {id: "pin_"+m.id, label: "📅 " + m.label + " (" + wbFmtDate(m.date_iso) + ")"};
+  });
   wbItems.forEach(function(wid, idx) {
     var modeSel = document.getElementById(wid+"_mode");
     if (!modeSel || modeSel.value !== "sequential") return;
@@ -24784,6 +24795,12 @@ function refreshSeqAnchorDropdowns() {
     var kickoffOpt = document.createElement("option");
     kickoffOpt.value = "kickoff"; kickoffOpt.textContent = "Kickoff";
     anchorSel.appendChild(kickoffOpt);
+    // Schedule day pins next, since they represent fixed dates on the timeline
+    pins.forEach(function(pin) {
+      var opt = document.createElement("option");
+      opt.value = pin.id; opt.textContent = pin.label;
+      anchorSel.appendChild(opt);
+    });
     allItems.forEach(function(item) {
       if (item.id === wid) return; // skip self
       var opt = document.createElement("option");
@@ -26754,6 +26771,7 @@ function wbRebuildPins() {
   var list = document.getElementById("wb-list");
   if (!list) return;
   var milestones = getSchedMilestones();
+  refreshSeqAnchorDropdowns();
   if (!milestones.length) return;
 
   // Get current due dates from values already computed by wbRecalc
