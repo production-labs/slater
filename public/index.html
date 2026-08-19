@@ -24690,6 +24690,9 @@ function wbRecalc() {
       const days = parseInt((document.getElementById(id+"_seq_days")||{}).value)||0;
       var base;
       if (seqAnchorId === "kickoff") { base = kickoffIso || anchorIso; }
+      else if (seqAnchorId === "video_due") {
+        base = (document.getElementById("video_due_date_iso")||{}).value || kickoffIso || anchorIso;
+      }
       else if (seqAnchorId && seqAnchorId.indexOf("pin_") === 0) {
         base = seqAnchorId.slice(4) || kickoffIso || anchorIso;
       }
@@ -24711,6 +24714,11 @@ function wbRecalc() {
     }
   });
   if (typeof sidebarOpen !== "undefined" && sidebarOpen) refreshSidebar();
+  var _wbScroll = window.scrollY;
+  var _wbFocused = document.activeElement;
+  wbRebuildPins();
+  window.scrollTo(0, _wbScroll);
+  if (_wbFocused && document.body.contains(_wbFocused)) _wbFocused.focus({preventScroll: true});
 }
 
 function wbSortAnimated() {
@@ -24812,6 +24820,12 @@ function refreshSeqAnchorDropdowns() {
     var kickoffOpt = document.createElement("option");
     kickoffOpt.value = "kickoff"; kickoffOpt.textContent = "Kickoff";
     anchorSel.appendChild(kickoffOpt);
+    var _vdIso = (document.getElementById("video_due_date_iso")||{}).value||"";
+    if (_vdIso) {
+      var vdOpt = document.createElement("option");
+      vdOpt.value = "video_due"; vdOpt.textContent = "Video Due Date";
+      anchorSel.appendChild(vdOpt);
+    }
     pins.forEach(function(pin) {
       var opt = document.createElement("option");
       opt.value = pin.id; opt.textContent = pin.label;
