@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="https://app.termly.io/resource-blocker/6f7722ad-5bc5-42d1-be34-96e846aa1d8a?autoBlock=on"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Slater</title>
@@ -25712,6 +25713,29 @@ function refreshSidebar() {
       else if (due >= dayAfterTomorrow && due <= endOfWeek) thisWeek.push(entry);
       else if (due >= startOfNextWeek && due <= endOfNextWeek) nextWeek.push(entry);
     });
+
+    // Add schedule pins (all pins, including internal-only, since Rundown is a personal producer view)
+    var pinMilestones = [];
+    if (sheet.kickoff_date_iso) {
+      pinMilestones.push({id:"kickoff", label:"Kickoff / Project Start", date_iso:sheet.kickoff_date_iso});
+    }
+    (sheet.schedule_days||[]).forEach(function(day, i) {
+      if (!day.date_iso) return;
+      pinMilestones.push({id:day.id||"day_"+i, label:day.label||"Day "+(i+1), date_iso:day.date_iso});
+    });
+    if (sheet.video_due_date_iso) {
+      pinMilestones.push({id:"video_due", label:"Video Due Date", date_iso:sheet.video_due_date_iso});
+    }
+    pinMilestones.forEach(function(pin) {
+      var pinDue = pin.date_iso;
+      if (!pinDue) return;
+      var pinEntry = {project:project, item:"📅 "+pin.label, owner:"", due:pinDue, status:"pin", sheetKey:sheetKey, itemName:pin.label, isPin:true};
+      if (pinDue < today) overdue.push(pinEntry);
+      else if (pinDue === today) dueToday.push(pinEntry);
+      else if (pinDue === tomorrow) dueTomorrow.push(pinEntry);
+      else if (pinDue >= dayAfterTomorrow && pinDue <= endOfWeek) thisWeek.push(pinEntry);
+      else if (pinDue >= startOfNextWeek && pinDue <= endOfNextWeek) nextWeek.push(pinEntry);
+    });
   });
 
   [overdue, dueToday, dueTomorrow, thisWeek, nextWeek].forEach(function(arr) {
@@ -25736,35 +25760,38 @@ function refreshSidebar() {
       items.forEach(function(entry) {
         var row = document.createElement("div");
         row.className = "daily-item";
-        var cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.checked = (entry.status === "Complete");
-        cb.addEventListener("change", function() {
-          var newStatus = cb.checked ? "Complete" : "Not Started";
-          // 1. Update localStorage
-          var db2 = libLoad();
-          var sheet2 = db2[entry.sheetKey];
-          if (sheet2) {
-            (sheet2.wb_items||[]).forEach(function(wi) {
-              if (wi.item === entry.itemName) wi.status = newStatus;
-            });
-            localStorage.setItem("slater_callsheets", JSON.stringify(db2));
-          }
-          // 2. If this is the currently loaded project, also update the live form
-          if (currentSheetKey === entry.sheetKey) {
-            wbItems.forEach(function(wid) {
-              var itemEl = document.getElementById(wid+"_item");
-              var statusEl = document.getElementById(wid+"_status");
-              if (itemEl && statusEl && itemEl.value === entry.itemName) {
-                statusEl.value = newStatus;
-                updateWbItemStyle(wid);
-              }
-            });
-            autosaveTrigger();
-          }
-          nameDiv.classList.toggle("done", cb.checked);
-          setTimeout(refreshSidebar, 300);
-        });
+        if (!entry.isPin) {
+          var cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = (entry.status === "Complete");
+          cb.addEventListener("change", function() {
+            var newStatus = cb.checked ? "Complete" : "Not Started";
+            // 1. Update localStorage
+            var db2 = libLoad();
+            var sheet2 = db2[entry.sheetKey];
+            if (sheet2) {
+              (sheet2.wb_items||[]).forEach(function(wi) {
+                if (wi.item === entry.itemName) wi.status = newStatus;
+              });
+              localStorage.setItem("slater_callsheets", JSON.stringify(db2));
+            }
+            // 2. If this is the currently loaded project, also update the live form
+            if (currentSheetKey === entry.sheetKey) {
+              wbItems.forEach(function(wid) {
+                var itemEl = document.getElementById(wid+"_item");
+                var statusEl = document.getElementById(wid+"_status");
+                if (itemEl && statusEl && itemEl.value === entry.itemName) {
+                  statusEl.value = newStatus;
+                  updateWbItemStyle(wid);
+                }
+              });
+              autosaveTrigger();
+            }
+            nameDiv.classList.toggle("done", cb.checked);
+            setTimeout(refreshSidebar, 300);
+          });
+          row.appendChild(cb);
+        }
         var bodyDiv = document.createElement("div");
         bodyDiv.className = "daily-item-body";
         var nameDiv = document.createElement("div");
@@ -25785,7 +25812,6 @@ function refreshSidebar() {
         bodyDiv.appendChild(nameDiv);
         bodyDiv.appendChild(metaDiv);
         bodyDiv.appendChild(openDiv);
-        row.appendChild(cb);
         row.appendChild(bodyDiv);
         sec.appendChild(row);
       });
@@ -30195,6 +30221,12 @@ window.addEventListener("beforeunload", function() {
   <button onclick="mobileNavGo('workback')">Workback</button>
   <button onclick="mobileNavGo('urls')">URLs</button>
   <button onclick="mobileNavGo('notes')">Notes</button>
+</div>
+<div style="text-align:center;padding:12px;font-size:11px;color:#9D9D99;border-top:1px solid #e5e0d8">
+  <a href="#" target="_blank" style="color:#9D9D99;text-decoration:underline;margin:0 8px">Privacy Policy</a>
+  <a href="#" target="_blank" style="color:#9D9D99;text-decoration:underline;margin:0 8px">Terms of Service</a>
+  <a href="#" target="_blank" style="color:#9D9D99;text-decoration:underline;margin:0 8px">Refund Policy</a>
+  <a href="#" class="termly-display-preferences" style="color:#9D9D99;text-decoration:underline;margin:0 8px">Consent Preferences</a>
 </div>
 </body>
 </html>
