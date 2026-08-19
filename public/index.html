@@ -24561,7 +24561,9 @@ function loadScheduleDays(days, legacyData) {
   }
 
   (days||[]).forEach(function(d) { addScheduleDay(d); });
-  if (scheduleDays.length === 0) addScheduleDay();
+  // Post production projects have no shoot days — only kickoff/video-due pins
+  var _isPostProd = (document.getElementById("project_type")||{}).value === "post_production";
+  if (scheduleDays.length === 0 && !_isPostProd) addScheduleDay();
 }
 
 
@@ -28572,6 +28574,7 @@ const LS_KEY = "slater_callsheets";
 let currentSheetKey = null;
 let modalCallback = null;
 var _libSortMode = localStorage.getItem("slater_sort_mode") || "recent";
+var _projectsLoaded = false; // set true after initial API.getProjects() sync
 
 function libSetSort(mode) {
   _libSortMode = mode;
@@ -28734,6 +28737,11 @@ function libRefreshDropdown(selectKey) {
     if (!selectKey) sel.value = "";
     document.getElementById("lib-delete").style.display = currentSheetKey ? "" : "none";
     document.getElementById("lib-duplicate").style.display = currentSheetKey ? "" : "none";
+    // After the initial server sync, refresh an open sidebar so links use fresh sheetKeys
+    if (!_projectsLoaded) {
+      _projectsLoaded = true;
+      if (sidebarOpen && dailyTab !== "crew") refreshSidebar();
+    }
   });
 }
 
@@ -30057,9 +30065,11 @@ setTimeout(refreshWbDaySelector, 200);
   document.getElementById("lib-delete").style.display = "";
   document.getElementById("lib-duplicate").style.display = "";
   setTimeout(function() {
-    var sel = document.getElementById("lib-select");
-    if (sel) sel.value = lastKey;
     API.getProject(lastKey).then(function(result) {
+      // Bail if the user navigated to a different project while this was loading
+      if (currentSheetKey !== lastKey) return;
+      var sel = document.getElementById("lib-select");
+      if (sel) sel.value = lastKey;
       if (result && result.data) {
         loadFormData(result.data);
       } else {
