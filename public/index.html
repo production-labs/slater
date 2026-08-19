@@ -26049,9 +26049,6 @@ function renderSidebarCrew() {
   var body = document.getElementById("daily-body");
   body.innerHTML = '<div style="color:#bbb;font-size:13px;padding:20px 0;text-align:center;font-style:italic">Loading crew status…</div>';
 
-  var SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
-  var now = Date.now();
-
   function parseLabelDate(label) {
     var parts = (label || "").split("|");
     var last = (parts[parts.length - 1] || "").trim();
@@ -26061,16 +26058,18 @@ function renderSidebarCrew() {
     return new Date(yr, parseInt(m[1]) - 1, parseInt(m[2]));
   }
 
+  var _crewToday = new Date(); _crewToday.setHours(0,0,0,0);
+
   API.getProjects().then(function(projects) {
     if (!projects || !projects.length) {
       body.innerHTML = '<div style="color:#bbb;font-size:13px;padding:20px 0;text-align:center;font-style:italic">No projects found.</div>';
       return;
     }
 
-    // Filter to active projects before fetching full data
+    // Only show projects whose date is today or in the future; no-date projects are assumed active
     var active = projects.filter(function(p) {
       var d = parseLabelDate(p.label);
-      return !d || (now - d.getTime()) < SIXTY_DAYS_MS;
+      return !d || d.getTime() >= _crewToday.getTime();
     });
 
     if (!active.length) {
