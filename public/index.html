@@ -25729,9 +25729,9 @@ function refreshSidebar() {
     pinMilestones.forEach(function(pin) {
       var pinDue = pin.date_iso;
       if (!pinDue) return;
+      if (pinDue < today) return; // Past pins auto-complete — shown in Completed tab, never Overdue
       var pinEntry = {project:project, item:"📅 "+pin.label, owner:"", due:pinDue, status:"pin", sheetKey:sheetKey, itemName:pin.label, isPin:true};
-      if (pinDue < today) overdue.push(pinEntry);
-      else if (pinDue === today) dueToday.push(pinEntry);
+      if (pinDue === today) dueToday.push(pinEntry);
       else if (pinDue === tomorrow) dueTomorrow.push(pinEntry);
       else if (pinDue >= dayAfterTomorrow && pinDue <= endOfWeek) thisWeek.push(pinEntry);
       else if (pinDue >= startOfNextWeek && pinDue <= endOfNextWeek) nextWeek.push(pinEntry);
@@ -25882,6 +25882,22 @@ function renderCompleted() {
       if (_cDue) _cPrevDue = _cDue;
       completed.push({project:project, item:item.item, owner:item.owner||"", due:_cDue, sheetKey:sheetKey, itemName:item.item});
     });
+    // Past schedule pins auto-complete — they're events that happened
+    var _cPinMilestones = [];
+    if (sheet.kickoff_date_iso && sheet.kickoff_date_iso < today) {
+      _cPinMilestones.push({label:"Kickoff / Project Start", date_iso:sheet.kickoff_date_iso});
+    }
+    (sheet.schedule_days||[]).forEach(function(day, i) {
+      if (day.date_iso && day.date_iso < today) {
+        _cPinMilestones.push({label:day.label||"Day "+(i+1), date_iso:day.date_iso});
+      }
+    });
+    if (sheet.video_due_date_iso && sheet.video_due_date_iso < today) {
+      _cPinMilestones.push({label:"Video Due Date", date_iso:sheet.video_due_date_iso});
+    }
+    _cPinMilestones.forEach(function(pin) {
+      completed.push({project:project, item:"📅 "+pin.label, owner:"", due:pin.date_iso, sheetKey:sheetKey, itemName:pin.label, isPin:true});
+    });
   });
   completed.sort(function(a,b) { return a.project.localeCompare(b.project) || (a.due||"").localeCompare(b.due||""); });
 
@@ -25946,27 +25962,30 @@ function renderCompleted() {
     byProject[proj].forEach(function(entry) {
       var row = document.createElement("div");
       row.className = "daily-item";
-      var cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = true;
-      cb.addEventListener("change", function() {
-        var db2 = libLoad();
-        var sheet2 = db2[entry.sheetKey];
-        if (sheet2) {
-          (sheet2.wb_items||[]).forEach(function(wi) {
-            if (wi.item === entry.itemName) wi.status = "Not Started";
-          });
-          localStorage.setItem("slater_callsheets", JSON.stringify(db2));
-        }
-        if (currentSheetKey === entry.sheetKey) {
-          wbItems.forEach(function(wid) {
-            var itemEl = document.getElementById(wid+"_item");
-            var statusEl = document.getElementById(wid+"_status");
-            if (itemEl && statusEl && itemEl.value === entry.itemName) { statusEl.value = "Not Started"; }
-          });
-        }
-        setTimeout(refreshSidebar, 300);
-      });
+      if (!entry.isPin) {
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = true;
+        cb.addEventListener("change", function() {
+          var db2 = libLoad();
+          var sheet2 = db2[entry.sheetKey];
+          if (sheet2) {
+            (sheet2.wb_items||[]).forEach(function(wi) {
+              if (wi.item === entry.itemName) wi.status = "Not Started";
+            });
+            localStorage.setItem("slater_callsheets", JSON.stringify(db2));
+          }
+          if (currentSheetKey === entry.sheetKey) {
+            wbItems.forEach(function(wid) {
+              var itemEl = document.getElementById(wid+"_item");
+              var statusEl = document.getElementById(wid+"_status");
+              if (itemEl && statusEl && itemEl.value === entry.itemName) { statusEl.value = "Not Started"; }
+            });
+          }
+          setTimeout(refreshSidebar, 300);
+        });
+        row.appendChild(cb);
+      }
       var bodyDiv = document.createElement("div");
       bodyDiv.className = "daily-item-body";
       var nameDiv = document.createElement("div");
@@ -25985,7 +26004,6 @@ function renderCompleted() {
       metaDiv.appendChild(openLink);
       bodyDiv.appendChild(nameDiv);
       bodyDiv.appendChild(metaDiv);
-      row.appendChild(cb);
       row.appendChild(bodyDiv);
       sec.appendChild(row);
     });
