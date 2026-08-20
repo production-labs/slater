@@ -24105,6 +24105,7 @@ function addScheduleDay(data) {
   }
 
   const dateIso = makeInput("date", dayId+"_date_iso", "", data.date_iso||"");
+  dateIso.dataset.prevIso = data.date_iso || "";
   dateIso.oninput = function() { syncSchedDayDate(dayId); };
   const dateFmt = makeInput("text", dayId+"_date", "Monday 23 Feb. 2026", data.date||"");
   const labelInp = makeInput("text", dayId+"_label", "e.g. Shoot Day", data.label||"");
@@ -24383,8 +24384,21 @@ function sortScheduleDays() {
 }
 
 function syncSchedDayDate(dayId) {
-  const iso = (document.getElementById(dayId+"_date_iso")||{}).value||"";
+  var _dateEl = document.getElementById(dayId+"_date_iso");
+  const iso = (_dateEl||{}).value||"";
   if (!iso) return;
+  var _oldIso = _dateEl ? (_dateEl.dataset.prevIso || "") : "";
+  if (_oldIso && _oldIso !== iso) {
+    var _oldPinId = "pin_" + _oldIso;
+    var _newPinId = "pin_" + iso;
+    wbItems.forEach(function(wid) {
+      var _anchorSel = document.getElementById(wid + "_seq_anchor");
+      if (_anchorSel && _anchorSel.value === _oldPinId) {
+        _anchorSel.dataset.pendingValue = _newPinId;
+      }
+    });
+  }
+  if (_dateEl) _dateEl.dataset.prevIso = iso;
   const d = new Date(iso+"T12:00:00");
   const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -24816,7 +24830,7 @@ function refreshSeqAnchorDropdowns() {
     var currentVal = (pendingVal !== undefined && pendingVal !== "")
       ? pendingVal
       : anchorSel.value;
-    anchorSel.dataset.pendingValue = "";
+    // Do not clear pendingValue yet — only clear after successful apply below
 
     // Rebuild options
     anchorSel.innerHTML = "";
@@ -24845,10 +24859,13 @@ function refreshSeqAnchorDropdowns() {
     var validIds = Array.from(anchorSel.options).map(function(o) { return o.value; });
     if (currentVal && validIds.indexOf(currentVal) !== -1) {
       anchorSel.value = currentVal;
-    } else {
+      anchorSel.dataset.pendingValue = ""; // clear only after successful apply
+    } else if (!pendingVal) {
+      // No pending value and current selection lost — fall back to safe default
       var prevId = idx > 0 ? wbItems[idx - 1] : null;
       anchorSel.value = (prevId && prevId !== wid) ? prevId : "kickoff";
     }
+    // If pendingVal was set but not yet in options, keep it for next rebuild attempt
   });
 }
 
@@ -25052,7 +25069,10 @@ function wbGetItems() {
     const seq_days = parseInt((document.getElementById(id+"_seq_days")||{}).value)||0;
     const manual_date = (document.getElementById(id+"_manual_date")||{}).value||"";
     const elNode = document.getElementById(id);
-    const seq_anchor_uuid = seqAnchorDomId === "kickoff" ? "kickoff" : (uuidMap[seqAnchorDomId] || "");
+    var seq_anchor_uuid;
+    if (seqAnchorDomId === "kickoff") { seq_anchor_uuid = "kickoff"; }
+    else if (seqAnchorDomId === "video_due" || (seqAnchorDomId && seqAnchorDomId.indexOf("pin_") === 0)) { seq_anchor_uuid = seqAnchorDomId; }
+    else { seq_anchor_uuid = uuidMap[seqAnchorDomId] || ""; }
     return {
       item:        v(id+"_item"),
       owner:       v(id+"_owner"),
@@ -25102,6 +25122,7 @@ function wbLoadItems(items) {
     var pendingUuid = anchorSel.dataset.pendingUuid || "";
     if (!pendingUuid) return;
     if (pendingUuid === "kickoff") anchorSel.dataset.pendingValue = "kickoff";
+    else if (pendingUuid === "video_due" || (pendingUuid && pendingUuid.indexOf("pin_") === 0)) anchorSel.dataset.pendingValue = pendingUuid;
     else if (uuidToDomId[pendingUuid]) anchorSel.dataset.pendingValue = uuidToDomId[pendingUuid];
   });
   refreshSeqAnchorDropdowns();
