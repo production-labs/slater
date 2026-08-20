@@ -26240,6 +26240,7 @@ function hasUnsavedChanges() {
 function openSheetFromSidebar(sheetKey, itemName) {
   function doOpen() {
     clearTimeout(_autosaveTimer);
+    _navigating = true;
     currentSheetKey = sheetKey;
     localStorage.setItem("slater_last_project", sheetKey);
     document.getElementById("lib-select").value = sheetKey;
@@ -26252,6 +26253,8 @@ function openSheetFromSidebar(sheetKey, itemName) {
         var db2 = libLoad();
         if (db2[sheetKey]) loadFormData(db2[sheetKey]);
       }
+      document.getElementById("lib-select").value = sheetKey;
+      _navigating = false;
       st("workback");
       setTimeout(function() {
         var items = document.querySelectorAll(".wb-item");
@@ -27827,8 +27830,10 @@ function applyCrop() {
 // ── Autosave ──────────────────────────────────────────────────────────────────
 var _autosaveTimer = null;
 var _autosaveDelay = 10000; // 10 seconds after last change
+var _navigating = false; // true while switching projects via sidebar
 
 function autosaveTrigger() {
+  if (_navigating) return;
   if (!currentSheetKey) return; // only autosave existing projects
   clearTimeout(_autosaveTimer);
   _autosaveTimer = setTimeout(function() {
@@ -28772,6 +28777,7 @@ function libRefreshDropdown(selectKey) {
 }
 
 function libSelect() {
+  if (_navigating) return;
   const key = document.getElementById("lib-select").value;
   if (!key) { libNew(); return; }
   currentSheetKey = key;
