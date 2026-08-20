@@ -25710,6 +25710,7 @@ function refreshSidebar() {
     (sheet.wb_items||[]).forEach(function(item) {
       if (!item.item) return;
       if (item.status === "N/A") return;
+      if (item.status === "Complete") return;
       // Calculate due date based on mode
       // Use pre-calculated due date if available (most reliable)
       var due = item.due || "";
@@ -26238,28 +26239,33 @@ function hasUnsavedChanges() {
 
 function openSheetFromSidebar(sheetKey, itemName) {
   function doOpen() {
-    const db = libLoad();
-    if (!db[sheetKey]) return;
+    clearTimeout(_autosaveTimer);
     currentSheetKey = sheetKey;
-    loadFormData(db[sheetKey]);
+    localStorage.setItem("slater_last_project", sheetKey);
     document.getElementById("lib-select").value = sheetKey;
     document.getElementById("lib-delete").style.display = "";
     document.getElementById("lib-duplicate").style.display = "";
-    // Switch to workback tab and highlight the item
-    st("workback");
-    // Briefly highlight the matching workback item
-    setTimeout(function() {
-      var items = document.querySelectorAll(".wb-item");
-      items.forEach(function(el) {
-        var itemInput = el.querySelector("input[id$='_item']");
-        if (itemInput && itemInput.value === itemName) {
-          el.style.transition = "background .3s";
-          el.style.background = "#fff9c4";
-          setTimeout(function() { el.style.background = ""; }, 2000);
-          el.scrollIntoView({behavior:"smooth", block:"center"});
-        }
-      });
-    }, 200);
+    API.getProject(sheetKey).then(function(result) {
+      if (result && result.data) {
+        loadFormData(result.data);
+      } else {
+        var db2 = libLoad();
+        if (db2[sheetKey]) loadFormData(db2[sheetKey]);
+      }
+      st("workback");
+      setTimeout(function() {
+        var items = document.querySelectorAll(".wb-item");
+        items.forEach(function(el) {
+          var itemInput = el.querySelector("input[id$='_item']");
+          if (itemInput && itemInput.value === itemName) {
+            el.style.transition = "background .3s";
+            el.style.background = "#fff9c4";
+            setTimeout(function() { el.style.background = ""; }, 2000);
+            el.scrollIntoView({behavior:"smooth", block:"center"});
+          }
+        });
+      }, 200);
+    });
   }
 
   if (currentSheetKey && currentSheetKey !== sheetKey && hasUnsavedChanges()) {
@@ -28985,7 +28991,7 @@ function loadFormData(data) {
   if (wbDayEl && data.wb_day_select) wbDayEl.value = data.wb_day_select;
   const wbDirEl = document.getElementById("wb_direction");
   if (wbDirEl && data.wb_direction) wbDirEl.value = data.wb_direction;
-  wbLoadItems(data.wb_items && data.wb_items.length ? data.wb_items : WB_DEFAULTS);
+  wbLoadItems(Array.isArray(data.wb_items) ? data.wb_items : []);
   wbRecalc();
   wbRebuildPins();
   loadUrls(data.urls||[]);
