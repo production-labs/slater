@@ -1,14 +1,33 @@
 # CLAUDE.md — Slater Project Context
 
-This file provides persistent context for Claude Code sessions on the Slater project.
+This file provides persistent context for Claude Code (Codey) sessions on the Slater project. Read this file at the start of every session.
 
 ---
 
 ## What is Slater?
 
-**Slater** is a production management web application for video production companies and freelance producers. Tagline: "The producer's toolbox."
+**Slater** is a cloud-based production management web application for video producers, film producers, and live event production professionals. Tagline: "The producer's toolbox."
 
-It was built by John McDonald, Executive Producer at Worktank (a Seattle-based video production company whose primary client is Microsoft). John is also the founder of **Production Labs LLC** (in formation), which will be the parent company for Slater as a commercial SaaS product.
+It was built by John McDonald, Executive Producer at Worktank (a Seattle-based video production company whose primary client is Microsoft). John is also the founder of **Production Labs LLC**, a Washington state single-member LLC, which owns Slater as a commercial SaaS product.
+
+---
+
+## Business Context
+
+- **Company:** Production Labs LLC
+- **Owner:** John McDonald
+- **State:** Washington (Tacoma area)
+- **EIN:** Obtained
+- **UBI:** Obtained
+- **Business bank:** Chase Business Checking
+- **Email:** johnm@productionlabs.io (Microsoft 365 Business Basic)
+- **Support email:** hello@productionlabs.io (alias)
+- **Domains:** productionlabs.io + productionlab.io (Cloudflare)
+- **GitHub:** github.com/production-labs/slater (private repo)
+- **Live URL:** https://slater.productionlabs.io
+- **Hosting:** Railway (Hobby tier) — auto-deploys from GitHub main branch
+- **Database:** Railway PostgreSQL (internal network)
+- **Transactional email:** Resend (hello@productionlabs.io)
 
 ---
 
@@ -18,16 +37,22 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 ~/Sites/slater/
 ├── server.js              # Express server — main entry point
 ├── .env                   # Environment variables (never commit)
-├── package.json
-├── import.js              # One-time script to import projects from localStorage backup
+├── package.json           # start script: node server.js
+├── CLAUDE.md              # This file
 ├── public/
-│   ├── index.html         # The entire Slater frontend (1.3MB single HTML file)
-│   └── login.html         # Login page
+│   ├── index.html         # The entire Slater frontend (~1.4MB single HTML file)
+│   ├── login.html         # Login page with forgot password flow
+│   ├── reset-password.html # Password reset page
+│   ├── admin.html         # Admin dashboard
+│   └── admin-login.html   # Admin login page
 └── routes/
-    ├── projects.js        # CRUD for projects
-    ├── receipts.js        # Receipt image storage
+    ├── projects.js        # CRUD for projects (filtered by owner_id)
+    ├── receipts.js        # Receipt image storage (filtered by owner_id)
     ├── ocr.js             # Receipt OCR via Anthropic API
-    └── users.js           # Auth, registration, agency settings
+    ├── users.js           # Auth, registration, password reset
+    ├── agencies.js        # Agency profile CRUD
+    ├── contacts.js        # Contacts JSONB storage per user
+    └── licenses.js        # License key validation and device management
 ```
 
 ---
@@ -36,131 +61,88 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 
 - **Frontend:** Single HTML file (`public/index.html`) — vanilla JS, no framework
 - **Backend:** Node.js + Express
-- **Database:** PostgreSQL (`slater_dev` locally)
-- **Auth:** express-session + connect-pg-simple (sessions stored in DB)
+- **Database:** PostgreSQL (local: `slater_dev`, production: Railway)
+- **Auth:** express-session + connect-pg-simple
 - **Password hashing:** bcrypt
-- **OCR:** Anthropic Claude Haiku via API (claude-haiku-4-5-20251001)
+- **OCR:** Anthropic Claude Haiku (claude-haiku-4-5-20251001)
+- **Email:** Resend API
 - **Doc generation:** docx.js (CDN) + JSZip for Word doc patching
 - **Fonts:** Geist (Google Fonts)
+- **Hosting:** Railway (Node.js + PostgreSQL)
+
+---
+
+## Environment Variables (.env)
+
+```
+NODE_ENV=production
+SESSION_SECRET=...
+ANTHROPIC_API_KEY=...
+RESEND_API_KEY=...
+RESEND_FROM_EMAIL=hello@productionlabs.io
+ADMIN_SECRET=...
+APP_URL=https://slater.productionlabs.io
+DATABASE_URL=...
+```
 
 ---
 
 ## Database Schema
 
 ```sql
--- Users (includes agency/My Info settings)
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  name TEXT,
-  agency_name TEXT,
-  agency_address TEXT,
-  agency_city TEXT,
-  agency_state TEXT,
-  agency_zip TEXT,
-  agency_phone TEXT,
-  agency_billing_contact TEXT,
-  agency_timezone TEXT DEFAULT 'PT',
-  agency_project_type TEXT DEFAULT 'location_shoot',
-  agency_logo TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Projects
-CREATE TABLE projects (
-  id SERIAL PRIMARY KEY,
-  key TEXT UNIQUE NOT NULL,      -- e.g. cs_1784768328378
-  label TEXT,                    -- display label for dropdown
-  data JSONB NOT NULL DEFAULT '{}', -- full project JSON
-  owner_id INTEGER REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Receipts (stored separately to avoid localStorage quota issues)
-CREATE TABLE receipts (
-  id SERIAL PRIMARY KEY,
-  project_key TEXT NOT NULL,
-  expense_index INTEGER NOT NULL,
-  image_data TEXT NOT NULL,      -- base64 encoded image
-  owner_id INTEGER REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(project_key, expense_index)
-);
-
--- Sessions (managed by connect-pg-simple)
-CREATE TABLE sessions (
-  sid TEXT PRIMARY KEY,
-  sess JSON NOT NULL,
-  expire TIMESTAMPTZ NOT NULL
-);
+users (id, email, password_hash, name, dba, phone, timezone, logo, contacts JSONB, license_id, license_key, created_at, updated_at)
+agencies (id, user_id, name, contact_name, contact_email, contact_phone, address, city, state, zip, invoicing_email, invoicing_text, default_project_type, website, timezone, logo, is_default)
+projects (id, key, label, data JSONB, owner_id, agency_id, created_at, updated_at)
+receipts (id, project_key, expense_index, image_data, owner_id, created_at)
+sessions (sid, sess, expire)
+licenses (id, key, email, plan, max_devices, activated_at, expires_at, created_at)
+license_devices (id, license_id, device_fingerprint, user_agent, last_seen, created_at)
+password_reset_tokens (id, user_id, token, expires_at, used_at, created_at)
 ```
 
 ---
 
 ## API Endpoints
 
-### Users (`/api/users`)
-- `POST /api/users/register` — create account (invite only, no public signup)
-- `POST /api/users/login` — login, creates session
-- `POST /api/users/logout` — destroy session
-- `GET /api/users/me` — get current user
-- `GET /api/users/me/agency` — get agency/My Info settings
-- `PUT /api/users/me/agency` — save agency/My Info settings
-
-### Projects (`/api/projects`) — requires auth
-- `GET /api/projects` — list all projects (key, label, updated_at)
-- `GET /api/projects/:key` — get single project with full data
-- `POST /api/projects/:key` — save/upsert project
-- `DELETE /api/projects/:key` — delete project
-
-### Receipts (`/api/receipts`) — requires auth
-- `GET /api/receipts/:projectKey` — get all receipts for a project
-- `POST /api/receipts/:projectKey/:index` — save a receipt
-- `DELETE /api/receipts/:projectKey` — delete all receipts for a project
-
-### OCR (`/api/ocr`) — requires auth
-- `POST /api/ocr` — send receipt image, returns `{vendor, date, amount, category}`
+- `/api/users` — register (requires license_key), login, logout, me, forgot-password, reset-password
+- `/api/projects` — CRUD, filtered by owner_id (requireAuth)
+- `/api/receipts/:projectKey` — save/load/delete (requireAuth)
+- `/api/ocr` — POST image → {vendor, date, amount, category} (requireAuth)
+- `/api/agencies` — CRUD + set-default (requireAuth)
+- `/api/contacts` — GET/PUT contacts JSONB per user (requireAuth)
+- `/api/licenses` — validate, generate-beta, devices CRUD
+- `/admin` — admin dashboard (requireAdmin session)
+- `/admin/login` — admin login
+- `/api/admin/*` — stats, users, licenses (requireAdmin)
+- `/reset-password` — password reset page
 
 ---
 
 ## Frontend Architecture (index.html)
 
-The entire frontend is a single HTML file with:
-- Embedded base64 Slater logo (`const LB64`)
-- fflate (bundled) for ZIP operations
-- docx.js (CDN) for Word document generation
-- JSZip for XML patching of generated docs
-- Google Fonts (Geist)
-- All app logic in vanilla JS
+### Key Global Variables
+- `currentSheetKey` — key of currently loaded project
+- `wbItems` — array of workback item IDs
+- `crew` — array of crew card IDs
+- `talent` — array of talent card IDs
+- `expenses` — array of expense card IDs
+- `_loadedAgencies` — populated on startup from API.getAgencies()
+- `window._allProjectsCache` — cache of all project data for Rundown sidebar
 
 ### Server API Client
-At the top of the script, there's a `const API = { ... }` object that wraps all fetch calls to the server. All server communication goes through this object.
-
-### Key Global Variables
-- `currentSheetKey` — the key of the currently loaded project (e.g. `cs_1784768328378`)
-- `expenses` — array of expense card IDs
-- `wbItems` — array of workback item IDs
-- `crew`, `talent`, `locs`, `urls` — arrays of card IDs for each section
-
-### LocalStorage Keys (legacy, still used as fallback)
-- `slater_callsheets` — all projects
-- `slater_contacts` — contacts/address book
-- `slater_agency` — agency settings
-- `slater_last_project` — key of last opened project
-- `slater_receipt_{projectKey}_{index}` — receipt images (being migrated to DB)
+`const API = { ... }` object wraps all fetch calls to the server.
 
 ---
 
 ## Tabs (in order)
-Project | Schedule | Location | Crew | Talent | Workback | URLs | Notes | Expenses
+Project | Schedule | Crew | Talent | Workback | URLs | Notes | Expenses
+
+**NOTE: Location tab was REMOVED — locations managed in Contacts, selected per schedule day card.**
 
 ---
 
 ## Project Types (5)
-- `post_production` — Post Production
+- `post_production` — Post Production (auto-creates pinned Video Due Date)
 - `location_shoot` — Location Shoot
 - `live_broadcast_location` — Live Broadcast: On Location
 - `live_broadcast_studio` — Live Broadcast: In Studio
@@ -170,126 +152,161 @@ Project | Schedule | Location | Crew | Talent | Workback | URLs | Notes | Expens
 
 ## Brand & Design
 
-- **Colors:** Charcoal `#222222`, Film Can `#9D9D99`, Masking Tape `#E9DFC8`, Paper Aging `#B89F76`, Marker `#181818`, Accent Red `#D94B43`, Background `#f3f0ed`
-- **Font:** Geist only
-- **Logo:** Film can with masking tape — baked in as `const LB64`, NOT user-replaceable
-- **Copyright:** © 2025 Production Labs LLC. All rights reserved.
-- **Never use em-dashes** in any content written for or on behalf of John
+- **Colors:** Charcoal `#222222`, Film Can `#9D9D99`, Masking Tape `#E9DFC8`, Paper Aging `#B89F76`, Marker `#181818`, Accent Red `#D94B43`, Background `#f3f0ed`, Tape Light `#F5F0E8`
+- **Font:** Geist only (Google Fonts)
+- **Logo:** Film can baked in as `const LB64`
+- **NEVER use em-dashes** (`—`) anywhere
 
 ---
 
 ## Word Document Generation
 
-Three Word docs are generated client-side using docx.js:
+Three Word docs generated client-side:
+1. **Call Sheet** — `generateDoc()` — respects `exclude_callsheet` flag per day
+2. **Workback** — `generateWorkback()` — excludes internal-only items
+3. **Expense Report** — `generateExpenseDoc()`
 
-1. **Call Sheet** — generated by `generateDoc()` — 2 pages per shoot day
-2. **Workback** — generated by `generateWorkback()` — schedule with milestone pins
-3. **Expense Report** — generated by `generateExpenseDoc()` — expenses + receipt grid
-
-All docs use:
-- Agency logo (if set) or Slater logo top-left
-- "Powered by SLATER" in footer
-- Calibri font throughout
-- A JSZip XML patch step to inject `gridSpan` attributes that docx.js doesn't write correctly
+All docs respect per-project `doc_branding` setting (Agency or Client logo).
+JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attributes.
 
 ---
 
-## Key Features
+## Key Features Built
 
-### Library System
-- Projects stored with keys like `cs_1784768328378`
-- Dropdown label format: `Company | Project Title | F. LastName | MM/DD/YY`
-- Autosave: debounced 10s after changes, immediate on tab switch
-- New | Save | Duplicate | Delete buttons
+### Schedule Tab
+- Multi-day shoot cards with dynamic CSS calendar icon (red/white, shows actual date)
+- Day Details section (sunrise, sunset, breakfast, lunch — collapsed by default)
+- Location dropdown from Contacts, address displayed below, hospital as plain text
+- Exclude from call sheet checkbox + Show blacks required checkbox (top of card)
+- Per-day crew editing modal (Edit Crew button)
+- Per-day ICS export (📅 button on each card)
+- Collapsible cards with chevron indicator
+
+### Crew Tab
+- Booking status: TBD (gray), Pencil (yellow), 1st Hold (orange), Confirmed (green)
+- Status pills with tooltips
+- Crew roster status bar with progress
+- Crew configurations (save/load role templates, merge-only)
+- Per-day crew exclusion via schedule card modal
 
 ### Workback Tab
-- Three item modes: Anchor, Sequential, Manual
-- Schedule milestone pins (blue cards) integrated from Schedule tab
-- "Internal only" checkbox on both items and pins — hides from Word doc export
-- `wbGetItemsForDoc()` merges regular items + pins, filters internal-only
+- Modes: Anchor, Sequential, Manual
+- Sequential "After:" dropdown — chain off any item OR schedule pin
+- Pin IDs: `pin_YYYY-MM-DD` for schedule days, `video_due` for post production
+- Changing a schedule day date updates all sequential anchor references
+- Internal only checkbox — hides from Word doc, shows in Rundown
+- All pins sorted by date in live UI
+- `wbRecalc()` handles all date calculations
 
-### Expenses Tab
-- Per expense: date, vendor, category, amount, paid by, reimbursable, receipt
-- Receipt images compressed to max 1200px JPEG before storage
-- OCR auto-populates fields on upload
-- Receipts stored in PostgreSQL `receipts` table (separate from project JSON)
-- Expense report Word doc with 2x2 receipt grid
+### Rundown Sidebar (📋 button)
+- Three tabs: Pending, Completed, Crew
+- Pending categories: Overdue, Due Today, Due Tomorrow, This Week, Next Week
+- ALL pins visible in Rundown including internal-only
+- Schedule day pins: never Overdue, auto-move to Completed when date passes
+- Completed tab has search/filter
+- Crew tab: active projects only, crew status per project
+- Loads ALL project data on login via `window._allProjectsCache`
+- "Open Project" navigates on first click (race condition fixed with navigation flag)
 
-### Location Tab
-- Structured address fields: address, city, state, zip (matches agency address format)
-- Per-location hospital field with Nominatim/Overpass auto-lookup
-- "Show blacks required" detection — compares location address to agency address
-- Location autocomplete fills all fields from contacts bucket
+### Contacts
+- Buckets: Staff, Crew, Talent, Locations, Companies
+- Companies: name, logo (square crop), website, notes
+- Stored in PostgreSQL contacts JSONB + localStorage
+- Company autocomplete on Project tab for client branding
+
+### Client Branding
+- Per-project doc_branding: Agency or Client
+- Warning if client selected but no logo on file
 
 ### Notes Tab
-- Rich text editor (bold, italic, underline, lists)
-- Image paste: compressed to 1200px, stored as base64, 50% width, drop shadow, click to expand
-- Draft persistence: saves `_note_draft` with project data
+- Rich text editor with sub-bullets (Tab/Shift+Tab)
+- Note search with highlighted snippets results view
 
-### My Info (Agency Settings)
-- Modal accessed via gear icon in library bar
-- Fields: Agency Name or DBA, Billing Contact Name, Address, City, State, Zip, Phone, Timezone, Default Project Type, Logo
-- Settings stored in PostgreSQL `users` table per user
-- Loaded from server on startup, falls back to localStorage
+### License System
+- Format: `SLTR-XXXX-XXXX-XXXX`
+- Required for registration
+- 3-device limit with device fingerprinting
+- 10 beta keys generated (plan=beta, expires 2026-12-31)
 
----
+### Admin Dashboard
+- At `/admin` protected by ADMIN_SECRET
+- Generate keys, manage users and licenses
 
-## Authentication Flow
+### Password Reset
+- Forgot password flow via Resend email
+- Token expires in 1 hour
+- Reset page at `/reset-password?token=xxx`
 
-1. Unauthenticated requests to `/` redirect to `/login`
-2. Login form POSTs to `/api/users/login`
-3. Session stored in `sessions` table via connect-pg-simple
-4. All `/api/projects`, `/api/receipts`, `/api/ocr` routes require auth via `requireAuth` middleware
-5. `/api/users/register` is unprotected (invite-only by convention, no public link)
-
----
-
-## Current State (as of August 2026)
-
-### Working
-- Full CRUD for projects via PostgreSQL
-- Receipt storage in PostgreSQL
-- OCR via Anthropic Haiku
-- User authentication with sessions
-- Agency settings stored per user in PostgreSQL
-- All 10 real projects migrated from localStorage
-- Word doc generation for call sheet, workback, expense report
-
-### Known Issues / TODO
-- Projects are NOT yet filtered by `owner_id` — all users see all projects (critical fix needed)
-- No logout button in the Slater UI yet
-- Workback download button may be missing from server version
-- `owner_id` not being set on new projects/receipts when saved
-
-### Roadmap
-- Filter projects by `owner_id` (next priority)
-- Logout button in UI
-- Set `owner_id` on save
-- License key system (Gumroad) with 3-device limit
-- PDF export (call sheet + workback)
-- Default workback templates (5 project types)
-- Azure deployment (PostgreSQL + Node.js)
-- Microsoft Entra SSO
-- Domain: productionlabs.io
+### Mobile Responsive
+- Breakpoint: 768px (iPhone 13 target)
+- Hamburger drawer: project management only
+- Bottom nav bar: Project, Schedule, Crew, Expenses, More
+- Schedule cards collapsible on mobile
+- Modals full screen on mobile
 
 ---
 
-## Key Personnel (for testing/default data)
-- John McDonald — EP, john@vandonald.com
-- Shaun Parker — Producer
-- Wayne Mohammed — EIC
-- Kiko Toledo — Managing Producer
-- Brian Snyder — EIC (default in some forms)
+## Auth Flow
+
+1. License key required for registration
+2. Sessions via connect-pg-simple
+3. `requireAuth` middleware for all data routes
+4. `requireAdmin` for admin routes
+5. `app.set('trust proxy', 1)` required for Railway SSL — DO NOT REMOVE
 
 ---
 
-## Important Notes for Claude Code
+## Deployment
 
-1. **Never use em-dashes** (`—`) anywhere in the codebase or generated content
-2. The frontend (`public/index.html`) is a single large file — be careful with edits
-3. Always use `var` or `function` declarations (not `const`/`let`) inside non-strict contexts in index.html to avoid Safari compatibility issues
-4. The JSZip XML patch in `generateWorkback()` is critical — it injects `gridSpan` attributes that docx.js omits
-5. Receipt images are stored as base64 strings — they can be large (up to ~1MB each)
-6. `currentSheetKey` is the source of truth for which project is active
-7. The `API` object at the top of index.html handles all server communication
-8. localStorage is kept as a fallback for all server operations
+### Local
+```
+cd ~/Sites/slater && node server.js
+# http://localhost:3000
+```
+
+### Production
+- Push to GitHub main → Railway auto-deploys in 2-3 minutes
+- URL: https://slater.productionlabs.io
+
+### Git Workflow
+```
+git add -A
+git commit -m "Description"
+git push
+```
+
+---
+
+## Known Issues / In Progress
+
+- Open Project from Rundown requires two clicks (autosave race condition — fix in progress)
+- Mobile bottom nav bar (in progress)
+- Post production projects: blank Day 1 card auto-created (fix in progress)
+- Workback anchor date sometimes changes on its own (multiple causes, fix in progress)
+
+---
+
+## V1.0 Remaining
+
+- Default workback templates (5 project types) — waiting on John's spreadsheet
+- Legal pages via TermsFeed (Privacy Policy, Terms of Service, Cookie Policy)
+- Update Slater footer with real legal page URLs
+- Stripe setup (needs Chase bank account activation)
+- Copyright registration at copyright.gov
+
+## Legal Review Required (before EU/international users)
+- International data transfer framework (SCCs vs Binding Corporate Rules)
+- Data Privacy Framework (DPF) certification evaluation
+- DMCA Designated Copyright Agent registration
+- VAT registration evaluation for international customers
+
+---
+
+## V1.5 — Client Portal
+Full spec: `/mnt/user-data/outputs/Slater_V1.5_Client_Portal_Spec.docx`
+Mockup: `/mnt/user-data/outputs/Slater_Client_Portal_Mockup.html`
+
+Features: unique URL per project, password protection, workback view, schedule view, producer updates, approvals, file delivery, client branding, mobile friendly.
+
+## V2.0 — Team Tier (Premium)
+Project sharing, shared contacts/configs/templates, Microsoft Entra SSO, Azure migration.
