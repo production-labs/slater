@@ -244,6 +244,9 @@ body.sidebar-open{padding-right:320px;transition:padding-right .4s cubic-bezier(
 .sday-cal.sm{width:32px}
 .sday-cal.sm .sday-cal-month{font-size:8px;padding:2px 0}
 .sday-cal.sm .sday-cal-day{font-size:16px;padding:1px 0 3px}
+.sday-cal.xs{width:22px}
+.sday-cal.xs .sday-cal-month{font-size:6px;padding:1px 0}
+.sday-cal.xs .sday-cal-day{font-size:12px;padding:1px 0 2px}
 
 /* ── Template manager ──────────────────────────────────────────────────────── */
 .tmpl-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);z-index:2000;align-items:flex-start;justify-content:center;padding-top:40px}
@@ -26093,7 +26096,7 @@ function loadProjectAndGoToCrew(key) {
 
 function makeRundownCalWidget(dateIso) {
   var wrap = document.createElement("div");
-  wrap.className = "sday-cal sm";
+  wrap.className = "sday-cal xs";
   wrap.style.cssText = "flex-shrink:0;cursor:default";
   var monthEl = document.createElement("div");
   monthEl.className = "sday-cal-month";
