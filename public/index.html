@@ -25685,8 +25685,8 @@ function refreshSidebar() {
   var startOfNextWeek = localDateIso(_startOfNextWeek);
   var endOfNextWeek = localDateIso(_endOfNextWeek);
 
-  var db = libLoad();
-  // Merge live form data for current project so changes show instantly
+  var db = {};
+  Object.keys(_allProjectsCache).forEach(function(k) { db[k] = _allProjectsCache[k].data; });
   if (currentSheetKey) db[currentSheetKey] = gather();
   var overdue = [], dueToday = [], dueTomorrow = [], thisWeek = [], nextWeek = [];
   Object.keys(db).forEach(function(sheetKey) {
@@ -25877,7 +25877,8 @@ function renderCompleted() {
   var monNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   document.getElementById("daily-date").textContent = dayNames[d.getDay()]+", "+monNames[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear();
 
-  var db = libLoad();
+  var db = {};
+  Object.keys(_allProjectsCache).forEach(function(k) { db[k] = _allProjectsCache[k].data; });
   if (currentSheetKey) db[currentSheetKey] = gather();
   var completed = [];
   Object.keys(db).forEach(function(sheetKey) {
@@ -27855,6 +27856,7 @@ function autosaveNow() {
   data.expenses = expenses.map(function(e) { return Object.assign({}, e, {receipt:""}); });
   db[currentSheetKey] = data;
   libSaveAll(db);
+  _allProjectsCache[currentSheetKey] = { label: data.label, data: data };
   mergeContactsFromSheet(data);
   showAutosaveIndicator();
   // Also save to server
@@ -28606,6 +28608,7 @@ let currentSheetKey = null;
 let modalCallback = null;
 var _libSortMode = localStorage.getItem("slater_sort_mode") || "recent";
 var _projectsLoaded = false; // set true after initial API.getProjects() sync
+var _allProjectsCache = {}; // full project data for all projects, used by Rundown tabs
 
 function libSetSort(mode) {
   _libSortMode = mode;
@@ -28776,6 +28779,30 @@ function libRefreshDropdown(selectKey) {
   });
 }
 
+function fetchAllProjectsForRundown() {
+  API.getProjects().then(function(projects) {
+    if (!projects || !projects.length) return Promise.resolve();
+    var batchSize = 5;
+    var batches = [];
+    for (var i = 0; i < projects.length; i += batchSize) {
+      batches.push(projects.slice(i, i + batchSize));
+    }
+    return batches.reduce(function(chain, batch) {
+      return chain.then(function() {
+        return Promise.all(batch.map(function(p) {
+          return API.getProject(p.key).then(function(result) {
+            if (result && result.data) {
+              _allProjectsCache[p.key] = { label: p.label, data: result.data };
+            }
+          });
+        }));
+      });
+    }, Promise.resolve());
+  }).then(function() {
+    if (sidebarOpen && dailyTab !== "crew") refreshSidebar();
+  });
+}
+
 function libSelect() {
   if (_navigating) return;
   const key = document.getElementById("lib-select").value;
@@ -28838,6 +28865,7 @@ function doSave(data, label, key) {
   data.expenses = expenses.map(function(e) { return Object.assign({}, e, {receipt:""}); });
   db[k] = data;
   libSaveAll(db);
+  _allProjectsCache[k] = { label: label, data: data };
   currentSheetKey = k;
   document.getElementById("lib-delete").style.display = "";
   document.getElementById("lib-duplicate").style.display = "";
@@ -28862,6 +28890,7 @@ function libDelete() {
     var db = libLoad();
     delete db[currentSheetKey];
     libSaveAll(db);
+    delete _allProjectsCache[currentSheetKey];
     var deletedKey = currentSheetKey;
     currentSheetKey = null;
     clearForm();
@@ -30111,6 +30140,8 @@ setTimeout(refreshWbDaySelector, 200);
     });
   }, 500);
 })();
+// Fetch all projects in the background to populate Rundown tabs
+setTimeout(fetchAllProjectsForRundown, 1000);
 // Backfill contacts from all existing saved call sheets
 (function() {
   try {
