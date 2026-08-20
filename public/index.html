@@ -25740,20 +25740,20 @@ function refreshSidebar() {
     // Add schedule pins (all pins, including internal-only, since Rundown is a personal producer view)
     var pinMilestones = [];
     if (sheet.kickoff_date_iso) {
-      pinMilestones.push({id:"kickoff", label:"Kickoff / Project Start", date_iso:sheet.kickoff_date_iso});
+      pinMilestones.push({id:"kickoff", label:"Kickoff / Project Start", date_iso:sheet.kickoff_date_iso, call_time:sheet.kickoff_time||""});
     }
     (sheet.schedule_days||[]).forEach(function(day, i) {
       if (!day.date_iso) return;
-      pinMilestones.push({id:day.id||"day_"+i, label:day.label||"Day "+(i+1), date_iso:day.date_iso});
+      pinMilestones.push({id:day.id||"day_"+i, label:day.label||"Day "+(i+1), date_iso:day.date_iso, call_time:day.call_time||""});
     });
     if (sheet.video_due_date_iso) {
-      pinMilestones.push({id:"video_due", label:"Video Due Date", date_iso:sheet.video_due_date_iso});
+      pinMilestones.push({id:"video_due", label:"Video Due Date", date_iso:sheet.video_due_date_iso, call_time:sheet.video_due_time||""});
     }
     pinMilestones.forEach(function(pin) {
       var pinDue = pin.date_iso;
       if (!pinDue) return;
       if (pinDue < today) return; // Past pins auto-complete — shown in Completed tab, never Overdue
-      var pinEntry = {project:project, item:"📅 "+pin.label, owner:"", due:pinDue, status:"pin", sheetKey:sheetKey, itemName:pin.label, isPin:true};
+      var pinEntry = {project:project, item:pin.label, owner:"", due:pinDue, status:"pin", sheetKey:sheetKey, itemName:pin.label, isPin:true, call_time:pin.call_time||""};
       if (pinDue === today) dueToday.push(pinEntry);
       else if (pinDue === tomorrow) dueTomorrow.push(pinEntry);
       else if (pinDue >= dayAfterTomorrow && pinDue <= endOfWeek) thisWeek.push(pinEntry);
@@ -25833,8 +25833,19 @@ function refreshSidebar() {
         })(entry.sheetKey, entry.itemName));
         openDiv.appendChild(openLink);
         bodyDiv.appendChild(nameDiv);
+        if (entry.isPin && entry.due) {
+          var pinDateEl = document.createElement("div");
+          pinDateEl.style.cssText = "font-size:11px;color:var(--film-can);margin-top:1px";
+          var _pd = new Date(entry.due + "T12:00:00");
+          var _dayN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][_pd.getDay()];
+          var _monN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][_pd.getMonth()];
+          var _dStr = _dayN + " " + _monN + " " + _pd.getDate();
+          pinDateEl.textContent = entry.call_time ? _dStr + " · " + entry.call_time : _dStr;
+          bodyDiv.appendChild(pinDateEl);
+        }
         bodyDiv.appendChild(metaDiv);
         bodyDiv.appendChild(openDiv);
+        if (entry.isPin) row.appendChild(makeRundownCalWidget(entry.due));
         row.appendChild(bodyDiv);
         sec.appendChild(row);
       });
@@ -25909,18 +25920,18 @@ function renderCompleted() {
     // Past schedule pins auto-complete — they're events that happened
     var _cPinMilestones = [];
     if (sheet.kickoff_date_iso && sheet.kickoff_date_iso < today) {
-      _cPinMilestones.push({label:"Kickoff / Project Start", date_iso:sheet.kickoff_date_iso});
+      _cPinMilestones.push({label:"Kickoff / Project Start", date_iso:sheet.kickoff_date_iso, call_time:sheet.kickoff_time||""});
     }
     (sheet.schedule_days||[]).forEach(function(day, i) {
       if (day.date_iso && day.date_iso < today) {
-        _cPinMilestones.push({label:day.label||"Day "+(i+1), date_iso:day.date_iso});
+        _cPinMilestones.push({label:day.label||"Day "+(i+1), date_iso:day.date_iso, call_time:day.call_time||""});
       }
     });
     if (sheet.video_due_date_iso && sheet.video_due_date_iso < today) {
-      _cPinMilestones.push({label:"Video Due Date", date_iso:sheet.video_due_date_iso});
+      _cPinMilestones.push({label:"Video Due Date", date_iso:sheet.video_due_date_iso, call_time:sheet.video_due_time||""});
     }
     _cPinMilestones.forEach(function(pin) {
-      completed.push({project:project, item:"📅 "+pin.label, owner:"", due:pin.date_iso, sheetKey:sheetKey, itemName:pin.label, isPin:true});
+      completed.push({project:project, item:pin.label, owner:"", due:pin.date_iso, sheetKey:sheetKey, itemName:pin.label, isPin:true, call_time:pin.call_time||""});
     });
   });
   completed.sort(function(a,b) { return a.project.localeCompare(b.project) || (a.due||"").localeCompare(b.due||""); });
@@ -26027,7 +26038,18 @@ function renderCompleted() {
       metaDiv.appendChild(document.createTextNode(" "));
       metaDiv.appendChild(openLink);
       bodyDiv.appendChild(nameDiv);
+      if (entry.isPin && entry.due) {
+        var pinDateEl2 = document.createElement("div");
+        pinDateEl2.style.cssText = "font-size:11px;color:var(--film-can);margin-top:1px";
+        var _pd2 = new Date(entry.due + "T12:00:00");
+        var _dayN2 = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][_pd2.getDay()];
+        var _monN2 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][_pd2.getMonth()];
+        var _dStr2 = _dayN2 + " " + _monN2 + " " + _pd2.getDate();
+        pinDateEl2.textContent = entry.call_time ? _dStr2 + " · " + entry.call_time : _dStr2;
+        bodyDiv.appendChild(pinDateEl2);
+      }
       bodyDiv.appendChild(metaDiv);
+      if (entry.isPin) row.appendChild(makeRundownCalWidget(entry.due));
       row.appendChild(bodyDiv);
       sec.appendChild(row);
     });
@@ -26067,6 +26089,28 @@ function loadProjectAndGoToCrew(key) {
   } else {
     doLoad();
   }
+}
+
+function makeRundownCalWidget(dateIso) {
+  var wrap = document.createElement("div");
+  wrap.className = "sday-cal sm";
+  wrap.style.cssText = "flex-shrink:0;cursor:default";
+  var monthEl = document.createElement("div");
+  monthEl.className = "sday-cal-month";
+  var dayEl = document.createElement("div");
+  dayEl.className = "sday-cal-day";
+  if (dateIso) {
+    var months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    var parts = dateIso.split("-");
+    monthEl.textContent = months[parseInt(parts[1],10)-1] || "---";
+    dayEl.textContent = parseInt(parts[2],10) || "--";
+  } else {
+    monthEl.textContent = "---";
+    dayEl.textContent = "--";
+  }
+  wrap.appendChild(monthEl);
+  wrap.appendChild(dayEl);
+  return wrap;
 }
 
 function renderSidebarCrew() {
