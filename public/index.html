@@ -437,7 +437,18 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
   #mobile-more-menu button{display:block;width:100%;padding:12px 20px;background:none;border:none;text-align:left;font-size:15px;font-family:'Geist',sans-serif;color:var(--charcoal);cursor:pointer;min-height:unset}
   #mobile-more-menu button:hover{background:var(--tape)}
   .sec{padding-bottom:72px!important}
+  .contact-card-row3{grid-template-columns:1fr!important}
 }
+.contact-card-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.contact-card-role-input{background:none;border:none;border-bottom:1px dashed var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);padding:0 0 1px 0;width:120px;outline:none;font-family:inherit}
+.contact-card-role-input:focus{border-bottom-color:var(--charcoal);color:var(--charcoal)}
+.contact-card-pencil{font-size:11px;color:var(--film-can);cursor:pointer;opacity:.6;margin-left:4px;line-height:1}
+.contact-card-pencil:hover{opacity:1}
+.contact-card-delete{background:none;border:none;font-size:18px;color:var(--film-can);cursor:pointer;padding:0;line-height:1;opacity:.5;margin-left:6px;font-family:inherit}
+.contact-card-delete:hover{color:var(--accent);opacity:1}
+.contact-card-row3{display:grid;grid-template-columns:1fr 1fr 120px;gap:8px;margin-top:10px}
+.contact-card-row3 .fl{margin-bottom:0}
+.contact-card-row3 .fl select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)}
 </style>
 </head>
 <body>
@@ -669,33 +680,53 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
     </div>
     <div class="sh" style="margin-top:1.5rem">Key personnel</div>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:6px"><input type="text" id="ep_role" value="EP" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;border:none;background:transparent;padding:0;width:auto;min-width:20px;max-width:120px;font-family:inherit;outline:none;border-bottom:1px dashed #ccc"><span class="crew-status-pill" id="ep_status_pill" style="margin-left:0"></span></div>
-          <select id="ep_status" onchange="updateCrewStatusPill('ep', this.value);autosaveTrigger()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select>
+      <div class="card">
+        <div class="contact-card-row1">
+          <div style="display:flex;align-items:center;gap:4px"><input type="text" id="ep_role" value="EP" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" class="contact-card-role-input"><span class="contact-card-pencil" onclick="document.getElementById('ep_role').focus()" title="Edit role">✏</span></div>
+          <span class="crew-status-pill" id="ep_status_pill"></span>
         </div>
-        <div class="g3"><div class="fl"><label>Name</label><input type="text" id="ep_name" autocomplete="new-password" placeholder="Executive Producer"></div><div class="fl"><label>Phone</label><input type="text" id="ep_phone" autocomplete="new-password" placeholder="206.000.0000"></div><div class="fl"><label>Email</label><input type="text" id="ep_email" autocomplete="new-password" placeholder="ep@yourcompany.com"></div></div>
+        <div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="ep_name" autocomplete="new-password" placeholder="Executive Producer"></div>
+        <div class="contact-card-row3">
+          <div class="fl"><label>Phone</label><input type="text" id="ep_phone" autocomplete="new-password" placeholder="206.000.0000"></div>
+          <div class="fl"><label>Email</label><input type="text" id="ep_email" autocomplete="new-password" placeholder="ep@yourcompany.com"></div>
+          <div class="fl"><label>Status</label><select id="ep_status" onchange="updateCrewStatusPill('ep', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div>
+        </div>
       </div>
-      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:6px"><input type="text" id="prod_role" value="Producer" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;border:none;background:transparent;padding:0;width:auto;min-width:20px;max-width:120px;font-family:inherit;outline:none;border-bottom:1px dashed #ccc"><span class="crew-status-pill" id="prod_status_pill" style="margin-left:0"></span></div>
-          <select id="prod_status" onchange="updateCrewStatusPill('prod', this.value);autosaveTrigger()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select>
+      <div class="card">
+        <div class="contact-card-row1">
+          <div style="display:flex;align-items:center;gap:4px"><input type="text" id="prod_role" value="Producer" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" class="contact-card-role-input"><span class="contact-card-pencil" onclick="document.getElementById('prod_role').focus()" title="Edit role">✏</span></div>
+          <span class="crew-status-pill" id="prod_status_pill"></span>
         </div>
-        <div class="g3"><div class="fl"><label>Name</label><input type="text" id="prod_name" autocomplete="new-password" placeholder="Producer"></div><div class="fl"><label>Phone</label><input type="text" id="prod_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="prod_email" autocomplete="new-password"></div></div>
+        <div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="prod_name" autocomplete="new-password" placeholder="Producer"></div>
+        <div class="contact-card-row3">
+          <div class="fl"><label>Phone</label><input type="text" id="prod_phone" autocomplete="new-password"></div>
+          <div class="fl"><label>Email</label><input type="text" id="prod_email" autocomplete="new-password"></div>
+          <div class="fl"><label>Status</label><select id="prod_status" onchange="updateCrewStatusPill('prod', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div>
+        </div>
       </div>
-      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:6px"><input type="text" id="eic_role" value="EIC" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;border:none;background:transparent;padding:0;width:auto;min-width:20px;max-width:120px;font-family:inherit;outline:none;border-bottom:1px dashed #ccc"><span class="crew-status-pill" id="eic_status_pill" style="margin-left:0"></span></div>
-          <select id="eic_status" onchange="updateCrewStatusPill('eic', this.value);autosaveTrigger()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select>
+      <div class="card">
+        <div class="contact-card-row1">
+          <div style="display:flex;align-items:center;gap:4px"><input type="text" id="eic_role" value="EIC" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" class="contact-card-role-input"><span class="contact-card-pencil" onclick="document.getElementById('eic_role').focus()" title="Edit role">✏</span></div>
+          <span class="crew-status-pill" id="eic_status_pill"></span>
         </div>
-        <div class="g3"><div class="fl"><label>Name</label><input type="text" id="eic_name" autocomplete="new-password" placeholder="Engineer in Charge"></div><div class="fl"><label>Phone</label><input type="text" id="eic_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="eic_email" autocomplete="new-password"></div></div>
+        <div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="eic_name" autocomplete="new-password" placeholder="Engineer in Charge"></div>
+        <div class="contact-card-row3">
+          <div class="fl"><label>Phone</label><input type="text" id="eic_phone" autocomplete="new-password"></div>
+          <div class="fl"><label>Email</label><input type="text" id="eic_email" autocomplete="new-password"></div>
+          <div class="fl"><label>Status</label><select id="eic_status" onchange="updateCrewStatusPill('eic', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div>
+        </div>
       </div>
-      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:6px"><input type="text" id="mngprd_role" value="Mng. Producer" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;border:none;background:transparent;padding:0;width:auto;min-width:20px;max-width:120px;font-family:inherit;outline:none;border-bottom:1px dashed #ccc"><span class="crew-status-pill" id="mngprd_status_pill" style="margin-left:0"></span></div>
-          <select id="mngprd_status" onchange="updateCrewStatusPill('mngprd', this.value);autosaveTrigger()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select>
+      <div class="card">
+        <div class="contact-card-row1">
+          <div style="display:flex;align-items:center;gap:4px"><input type="text" id="mngprd_role" value="Mng. Producer" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" class="contact-card-role-input"><span class="contact-card-pencil" onclick="document.getElementById('mngprd_role').focus()" title="Edit role">✏</span></div>
+          <span class="crew-status-pill" id="mngprd_status_pill"></span>
         </div>
-        <div class="g3"><div class="fl"><label>Name</label><input type="text" id="mngprd_name" autocomplete="new-password" placeholder="Managing Producer"></div><div class="fl"><label>Phone</label><input type="text" id="mngprd_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="mngprd_email" autocomplete="new-password"></div></div>
+        <div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="mngprd_name" autocomplete="new-password" placeholder="Managing Producer"></div>
+        <div class="contact-card-row3">
+          <div class="fl"><label>Phone</label><input type="text" id="mngprd_phone" autocomplete="new-password"></div>
+          <div class="fl"><label>Email</label><input type="text" id="mngprd_email" autocomplete="new-password"></div>
+          <div class="fl"><label>Status</label><select id="mngprd_status" onchange="updateCrewStatusPill('mngprd', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div>
+        </div>
       </div>
     </div>
   </div>
@@ -23976,7 +24007,7 @@ function addCrew(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, crew));
-  d.innerHTML = `<div class="ch"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><span class="cl">Crew member <span class="crew-status-pill" id="${id}_status_pill"></span></span><div style="display:flex;gap:4px"><button class="rb" title="Insert below" onclick="addCrew('${id}')">+</button><button class="rb" onclick="ri('${id}',crew);updateCrewStatusBar();scheduleDays.forEach(function(d){updateDayCrewBadge(d);})">&#x2715;</button></div></div><div class="g3"><div class="fl"><label>Position</label><input type="text" id="${id}_position" placeholder="DP, A1, HMU, PA..."></div><div class="fl"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateCrewStatusBar()" style="width:100%;padding:8px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="g3"><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="1.604.000.0000" autocomplete="new-password"></div><div class="fl"><label>Notes</label><input type="text" id="${id}_notes"></div></div>`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">&#x270F;</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="ri('${id}',crew);updateCrewStatusBar();scheduleDays.forEach(function(d){updateDayCrewBadge(d);})">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateCrewStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -23991,7 +24022,7 @@ function addTalent(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="ch"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><span class="cl">Talent <span class="crew-status-pill" id="${id}_status_pill"></span></span><div style="display:flex;gap:4px"><button class="rb" title="Insert below" onclick="addTalent('${id}')">+</button><button class="rb" onclick="ri('${id}',talent);updateTalentStatusBar();scheduleDays.forEach(function(d){updateDayTalentBadge(d);})">&#x2715;</button></div></div><div class="g3"><div class="fl"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="fl"><label>Title / role</label><input type="text" id="${id}_title" placeholder="e.g. Global Cyber Security Lead"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateTalentStatusBar()" style="width:100%;padding:8px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="g3"><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Notes</label><input type="text" id="${id}_notes"></div></div>`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">&#x270F;</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="ri('${id}',talent);updateTalentStatusBar();scheduleDays.forEach(function(d){updateDayTalentBadge(d);})">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateTalentStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
