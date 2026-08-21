@@ -24013,6 +24013,7 @@ function addKP(cardData) {
     };
   })(id);
   updateAddKPButton();
+  setTimeout(() => acAttachKP(id), 0);
 }
 
 function getDefaultKP() {
@@ -25318,12 +25319,13 @@ function acAttach(nameEl, getPhoneEl, getEmailEl, bucket) {
 }
 
 // Attach autocomplete to all relevant fields
+function acAttachKP(id) {
+  const nameEl = document.getElementById(id+"_name");
+  acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "staff");
+}
 function acAttachAll() {
-  // Production staff
-  [["ep","staff"],["prod","staff"],["eic","staff"],["mngprd","staff"]].forEach(([p, b]) => {
-    const nameEl = document.getElementById(p+"_name");
-    acAttach(nameEl, () => document.getElementById(p+"_phone"), () => document.getElementById(p+"_email"), b);
-  });
+  // Key personnel cards
+  kp.forEach(id => acAttachKP(id));
   // Crew cards
   crew.forEach(id => acAttachCrew(id));
   // Talent cards
