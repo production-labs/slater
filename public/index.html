@@ -679,56 +679,8 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
       <div id="branding-warning" style="display:none;color:#D94B43;font-size:12px;margin-top:6px"></div>
     </div>
     <div class="sh" style="margin-top:1.5rem">Key personnel</div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="card">
-        <div class="contact-card-row1">
-          <div style="display:flex;align-items:center;gap:4px"><input type="text" id="ep_role" value="EP" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" class="contact-card-role-input"><span class="contact-card-pencil" onclick="document.getElementById('ep_role').focus()" title="Edit role">✏</span></div>
-          <span class="crew-status-pill" id="ep_status_pill"></span>
-        </div>
-        <div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="ep_name" autocomplete="new-password" placeholder="Executive Producer"></div>
-        <div class="contact-card-row3">
-          <div class="fl"><label>Phone</label><input type="text" id="ep_phone" autocomplete="new-password" placeholder="206.000.0000"></div>
-          <div class="fl"><label>Email</label><input type="text" id="ep_email" autocomplete="new-password" placeholder="ep@yourcompany.com"></div>
-          <div class="fl"><label>Status</label><select id="ep_status" onchange="updateCrewStatusPill('ep', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="contact-card-row1">
-          <div style="display:flex;align-items:center;gap:4px"><input type="text" id="prod_role" value="Producer" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" class="contact-card-role-input"><span class="contact-card-pencil" onclick="document.getElementById('prod_role').focus()" title="Edit role">✏</span></div>
-          <span class="crew-status-pill" id="prod_status_pill"></span>
-        </div>
-        <div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="prod_name" autocomplete="new-password" placeholder="Producer"></div>
-        <div class="contact-card-row3">
-          <div class="fl"><label>Phone</label><input type="text" id="prod_phone" autocomplete="new-password"></div>
-          <div class="fl"><label>Email</label><input type="text" id="prod_email" autocomplete="new-password"></div>
-          <div class="fl"><label>Status</label><select id="prod_status" onchange="updateCrewStatusPill('prod', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="contact-card-row1">
-          <div style="display:flex;align-items:center;gap:4px"><input type="text" id="eic_role" value="EIC" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" class="contact-card-role-input"><span class="contact-card-pencil" onclick="document.getElementById('eic_role').focus()" title="Edit role">✏</span></div>
-          <span class="crew-status-pill" id="eic_status_pill"></span>
-        </div>
-        <div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="eic_name" autocomplete="new-password" placeholder="Engineer in Charge"></div>
-        <div class="contact-card-row3">
-          <div class="fl"><label>Phone</label><input type="text" id="eic_phone" autocomplete="new-password"></div>
-          <div class="fl"><label>Email</label><input type="text" id="eic_email" autocomplete="new-password"></div>
-          <div class="fl"><label>Status</label><select id="eic_status" onchange="updateCrewStatusPill('eic', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="contact-card-row1">
-          <div style="display:flex;align-items:center;gap:4px"><input type="text" id="mngprd_role" value="Mng. Producer" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" class="contact-card-role-input"><span class="contact-card-pencil" onclick="document.getElementById('mngprd_role').focus()" title="Edit role">✏</span></div>
-          <span class="crew-status-pill" id="mngprd_status_pill"></span>
-        </div>
-        <div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="mngprd_name" autocomplete="new-password" placeholder="Managing Producer"></div>
-        <div class="contact-card-row3">
-          <div class="fl"><label>Phone</label><input type="text" id="mngprd_phone" autocomplete="new-password"></div>
-          <div class="fl"><label>Email</label><input type="text" id="mngprd_email" autocomplete="new-password"></div>
-          <div class="fl"><label>Status</label><select id="mngprd_status" onchange="updateCrewStatusPill('mngprd', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div>
-        </div>
-      </div>
-    </div>
+    <div id="kp-list"></div>
+    <button id="add-kp-btn" class="ab" style="margin-top:8px" onclick="addKP();autosaveTrigger()">+ Add key personnel</button>
   </div>
 
   <div id="tab-schedule" class="sec">
@@ -23679,7 +23631,7 @@ function loadSavedLogo() {
   if(img) img.src = "data:image/png;base64," + LB64;
 }
 
-let crew = [], talent = [], lt = null, _uid = 0;
+let crew = [], talent = [], kp = [], lt = null, _uid = 0;
 
 function st(n) {
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
@@ -24007,7 +23959,7 @@ function addCrew(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, crew));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">&#x270F;</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="ri('${id}',crew);updateCrewStatusBar();scheduleDays.forEach(function(d){updateDayCrewBadge(d);})">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateCrewStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">&#x1F589;</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="ri('${id}',crew);updateCrewStatusBar();scheduleDays.forEach(function(d){updateDayCrewBadge(d);})">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateCrewStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -24022,7 +23974,7 @@ function addTalent(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">&#x270F;</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="ri('${id}',talent);updateTalentStatusBar();scheduleDays.forEach(function(d){updateDayTalentBadge(d);})">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateTalentStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">&#x1F589;</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="ri('${id}',talent);updateTalentStatusBar();scheduleDays.forEach(function(d){updateDayTalentBadge(d);})">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateTalentStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -24033,6 +23985,47 @@ function addTalent(afterId=null) {
   setTimeout(() => acAttachTalent(id), 0);
 }
 function ri(id, arr) { const i = arr.indexOf(id); if (i > -1) arr.splice(i,1); document.getElementById(id).remove(); }
+
+function addKP(cardData) {
+  cardData = cardData || {};
+  var id = "kp_"+(++_uid);
+  var d = document.createElement("div"); d.className="card"; d.id=id;
+  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role">&#x1F589;</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" onchange="updateCrewStatusPill(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>';
+  kp.push(id);
+  document.getElementById("kp-list").appendChild(d);
+  var sv = function(eid, val) { var e=document.getElementById(eid); if(e && val!==undefined) e.value=val||""; };
+  sv(id+"_role", cardData.role||"");
+  sv(id+"_name", cardData.name||"");
+  sv(id+"_phone", cardData.phone||"");
+  sv(id+"_email", cardData.email||"");
+  sv(id+"_status", cardData.status||"tbd");
+  updateCrewStatusPill(id, cardData.status||"tbd");
+  (function(cardId) {
+    document.getElementById(cardId+"_del").onclick = function() {
+      showModal("Remove key personnel?", "Remove this person from key personnel?", function() {
+        var el = document.getElementById(cardId);
+        if (el) el.parentNode.removeChild(el);
+        kp = kp.filter(function(k) { return k !== cardId; });
+        updateAddKPButton();
+        scheduleDays.forEach(function(dy) { updateDayStaffCounts(dy); });
+        autosaveTrigger();
+      });
+    };
+  })(id);
+  updateAddKPButton();
+}
+
+function getDefaultKP() {
+  return [
+    {role:"EP", name:"", phone:"", email:"", status:"tbd"},
+    {role:"Producer", name:"", phone:"", email:"", status:"tbd"}
+  ];
+}
+
+function updateAddKPButton() {
+  var btn = document.getElementById("add-kp-btn");
+  if (btn) btn.style.display = kp.length >= 4 ? "none" : "";
+}
 // ── Flexible schedule days ────────────────────────────────────────────────────
 let scheduleDays = [];
 let daySchedItems = {};
@@ -29052,10 +29045,7 @@ function gather() {
     agency_id: (function(){ var el=document.getElementById("project_agency_id"); return el?el.value||null:null; })(),
     doc_branding:(function(){ var el=document.querySelector('input[name="doc_branding"]:checked'); return el?el.value:"agency"; })(),
     project_title:v("project_title"), client:v("client_company"), client_company:v("client_company"), client_name:v("client_name"), billing_code:v("billing_code"),
-    ep_name:v("ep_name"), ep_phone:v("ep_phone"), ep_email:v("ep_email"), ep_role:v("ep_role")||"EP", ep_status:v("ep_status")||"tbd",
-    prod_name:v("prod_name"), prod_phone:v("prod_phone"), prod_email:v("prod_email"), prod_role:v("prod_role")||"Producer", prod_status:v("prod_status")||"tbd",
-    eic_name:v("eic_name"), eic_phone:v("eic_phone"), eic_email:v("eic_email"), eic_role:v("eic_role")||"EIC", eic_status:v("eic_status")||"tbd",
-    mngprd_name:v("mngprd_name"), mngprd_phone:v("mngprd_phone"), mngprd_email:v("mngprd_email"), mngprd_role:v("mngprd_role")||"Mng. Producer", mngprd_status:v("mngprd_status")||"tbd",
+    kp_cards: kp.map(function(id) { return {_id:id, role:v(id+"_role")||"", name:v(id+"_name")||"", phone:v(id+"_phone")||"", email:v(id+"_email")||"", status:v(id+"_status")||"tbd"}; }),
     hospital:v("hospital"), breakfast:v("breakfast")||"8:00 am", lunch:v("lunch")||"12:00 pm",
     sunrise:v("sunrise"), sunset:v("sunset"),
 
@@ -29098,14 +29088,18 @@ function loadFormData(data) {
   var dbEl = document.querySelector('input[name="doc_branding"][value="' + (data.doc_branding||"agency") + '"]');
   if (dbEl) dbEl.checked = true;
   updateBrandingWarning();
-  s("ep_name", data.ep_name); s("ep_phone", data.ep_phone); s("ep_email", data.ep_email);
-  s("ep_role", data.ep_role||"EP"); s("ep_status", data.ep_status||"tbd"); updateCrewStatusPill("ep", data.ep_status||"tbd");
-  s("prod_name", data.prod_name); s("prod_phone", data.prod_phone); s("prod_email", data.prod_email);
-  s("prod_role", data.prod_role||"Producer"); s("prod_status", data.prod_status||"tbd"); updateCrewStatusPill("prod", data.prod_status||"tbd");
-  s("eic_name", data.eic_name); s("eic_phone", data.eic_phone); s("eic_email", data.eic_email);
-  s("eic_role", data.eic_role||"EIC"); s("eic_status", data.eic_status||"tbd"); updateCrewStatusPill("eic", data.eic_status||"tbd");
-  s("mngprd_name", data.mngprd_name); s("mngprd_phone", data.mngprd_phone); s("mngprd_email", data.mngprd_email);
-  s("mngprd_role", data.mngprd_role||"Mng. Producer"); s("mngprd_status", data.mngprd_status||"tbd"); updateCrewStatusPill("mngprd", data.mngprd_status||"tbd");
+  document.getElementById("kp-list").innerHTML = ""; kp = [];
+  var _kpData = data.kp_cards;
+  if (!_kpData) {
+    var _kpMigrated = [];
+    if (data.ep_name||data.ep_role) _kpMigrated.push({role:data.ep_role||"EP",name:data.ep_name||"",phone:data.ep_phone||"",email:data.ep_email||"",status:data.ep_status||"tbd"});
+    if (data.prod_name||data.prod_role) _kpMigrated.push({role:data.prod_role||"Producer",name:data.prod_name||"",phone:data.prod_phone||"",email:data.prod_email||"",status:data.prod_status||"tbd"});
+    if (data.eic_name||data.eic_role) _kpMigrated.push({role:data.eic_role||"EIC",name:data.eic_name||"",phone:data.eic_phone||"",email:data.eic_email||"",status:data.eic_status||"tbd"});
+    if (data.mngprd_name||data.mngprd_role) _kpMigrated.push({role:data.mngprd_role||"Mng. Producer",name:data.mngprd_name||"",phone:data.mngprd_phone||"",email:data.mngprd_email||"",status:data.mngprd_status||"tbd"});
+    _kpData = _kpMigrated.length ? _kpMigrated : getDefaultKP();
+  }
+  (_kpData||getDefaultKP()).forEach(function(c) { addKP(c); });
+  updateAddKPButton();
   s("hospital", data.hospital); s("breakfast", data.breakfast); s("lunch", data.lunch);
   s("sunrise", data.sunrise); s("sunset", data.sunset);
   const tzEl = document.getElementById("timezone"); if(tzEl && data.timezone) tzEl.value = data.timezone;
@@ -29168,8 +29162,6 @@ function loadFormData(data) {
 // ── Clear form ────────────────────────────────────────────────────────────
 function clearForm() {
   ["project_title","client_company","client_name","billing_code",
-   "ep_name","ep_phone","ep_email","prod_name","prod_phone","prod_email",
-   "eic_name","eic_phone","eic_email","mngprd_name","mngprd_phone","mngprd_email",
    "hospital","breakfast","lunch","sunrise","sunset"
   ].forEach(function(id) { const e = document.getElementById(id); if(e) e.value = ""; });
   const ptReset = document.getElementById("project_type"); if(ptReset) ptReset.value = "live_event";
@@ -29180,10 +29172,9 @@ function clearForm() {
   const vdReset = document.getElementById("video_due_date_iso"); if(vdReset) vdReset.value = "";
   const vtReset = document.getElementById("video_due_time"); if(vtReset) vtReset.value = "";
   const tzReset = document.getElementById("timezone"); if(tzReset) tzReset.value = "PT";
-  var kpRoles = {ep_role:"EP", prod_role:"Producer", eic_role:"EIC", mngprd_role:"Mng. Producer"};
-  Object.keys(kpRoles).forEach(function(id) { var e=document.getElementById(id); if(e) e.value=kpRoles[id]; });
-  ["ep_status","prod_status","eic_status","mngprd_status"].forEach(function(id) { var e=document.getElementById(id); if(e) e.value="tbd"; });
-  ["ep","prod","eic","mngprd"].forEach(function(p) { updateCrewStatusPill(p, "tbd"); });
+  document.getElementById("kp-list").innerHTML = ""; kp = [];
+  getDefaultKP().forEach(function(c) { addKP(c); });
+  updateAddKPButton();
   document.getElementById("crew-list").innerHTML = ""; crew = []; updateCrewStatusBar();
   document.getElementById("talent-list").innerHTML = ""; talent = []; updateTalentStatusBar();
   loadScheduleDays([]);
@@ -29292,11 +29283,8 @@ async function generateWorkback() {
     function sp() { return new Paragraph({spacing:{before:60,after:60},children:[new TextRun("")]}); }
     function makeHdr(l,r) { return new Header({children:[new Paragraph({children:[new TextRun({text:l,font:"Calibri",size:18}),new TextRun({text:"	"+r,font:"Calibri",size:18})],tabStops:[{type:"right",position:10790}]}),new Paragraph({children:[new TextRun({text:"",size:18})]})]}); }
 
-    // EP/PROD/EIC/MNG PRD — only show roles that have a name
-    const prs = [
-      {role:"EP",   name:data.ep_name,   phone:data.ep_phone,   email:data.ep_email||""},
-      {role:"PROD", name:data.prod_name, phone:data.prod_phone, email:data.prod_email||""},
-    ].filter(p => p.name && p.name.trim());
+    // Key personnel — only show entries that have a name
+    const prs = (data.kp_cards||[]).filter(function(p){return p.name&&p.name.trim();}).map(function(p){return {role:p.role||"",name:p.name,phone:p.phone||"",email:p.email||""};});
 
     const logo = new ImageRun({data:lb, transformation:{width:96,height:96}, type:"png"});
 
@@ -29469,8 +29457,9 @@ function generateDayICS(dayId) {
   var data = gather();
   var STATUS_LABELS = {tbd:"TBD", pencil:"Pencil", hold:"1st Hold", confirmed:"Confirmed"};
   var ag = getAgencyInfo();
-  var orgName  = ag.billing_contact || data.ep_name  || ag.name || "Slater";
-  var orgEmail = ag.billing_email   || data.ep_email || "noreply@slater.app";
+  var _kp0 = (data.kp_cards||[])[0]||{};
+  var orgName  = ag.billing_contact || _kp0.name  || ag.name || "Slater";
+  var orgEmail = ag.billing_email   || _kp0.email || "noreply@slater.app";
 
   function esc(s) { return (s||"").replace(/\\/g,"\\\\").replace(/,/g,"\\,").replace(/;/g,"\\;"); }
   function fold(line) {
@@ -29524,12 +29513,7 @@ function generateDayICS(dayId) {
   }).filter(function(e) { return e.time||e.desc; });
 
   var _kpExcludedICS = getDayExcludedKP(dayId);
-  var kp = [
-    {id:"ep",      role:data.ep_role||"EP",           name:data.ep_name,     email:data.ep_email,     phone:data.ep_phone},
-    {id:"prod",    role:data.prod_role||"PROD",        name:data.prod_name,   email:data.prod_email,   phone:data.prod_phone},
-    {id:"eic",     role:data.eic_role||"EIC",          name:data.eic_name,    email:data.eic_email,    phone:data.eic_phone},
-    {id:"mngprd",  role:data.mngprd_role||"MNG PRD",  name:data.mngprd_name, email:data.mngprd_email, phone:data.mngprd_phone},
-  ].filter(function(p) { return (p.name || p.email) && _kpExcludedICS.indexOf(p.id) === -1; });
+  var kp = (data.kp_cards||[]).filter(function(p) { return (p.name||p.email) && _kpExcludedICS.indexOf(p._id||"") === -1; });
 
   var DIVIDER = "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500";
   var idx = scheduleDays.indexOf(dayId);
@@ -29666,23 +29650,20 @@ function updateDayStaffCounts(dayId) {
   var countEl = document.getElementById(dayId+'_staff_counts');
   var linkEl = document.getElementById(dayId+'_staff_link');
   var rowEl = document.getElementById(dayId+'_day_links_row');
-  var hasAny = crew.length > 0 || talent.length > 0;
+  var hasAny = crew.length > 0 || talent.length > 0 || kp.length > 0;
   if (rowEl) rowEl.style.display = hasAny ? 'flex' : 'none';
   if (linkEl) linkEl.style.display = hasAny ? '' : 'none';
   if (!countEl) return;
-  var kpDefs = [
-    {id:'ep', nameId:'ep_name'}, {id:'prod', nameId:'prod_name'},
-    {id:'eic', nameId:'eic_name'}, {id:'mngprd', nameId:'mngprd_name'}
-  ];
   var kpExcluded = getDayExcludedKP(dayId);
-  var kpWithNames = kpDefs.filter(function(k) { var e=document.getElementById(k.nameId); return e && e.value.trim(); });
-  var kpIncluded = kpWithNames.filter(function(k) { return kpExcluded.indexOf(k.id) === -1; }).length;
+  var kpWithNames = kp.filter(function(id) { var e=document.getElementById(id+'_name'); return e&&e.value.trim(); });
+  var kpIncluded = kpWithNames.filter(function(id) { return kpExcluded.indexOf(id)===-1; }).length;
   var crewExcluded = getDayExcludedCrew(dayId).filter(function(id) { return crew.indexOf(id) !== -1; });
   var crewIncluded = crew.length - crewExcluded.length;
   var talentExcluded = getDayExcludedTalent(dayId).filter(function(id) { return talent.indexOf(id) !== -1; });
   var talentIncluded = talent.length - talentExcluded.length;
   var parts = [];
   if (kpWithNames.length) parts.push(kpIncluded+' of '+kpWithNames.length+' key personnel');
+
   if (crew.length) parts.push(crewIncluded+' of '+crew.length+' crew');
   if (talent.length) parts.push(talentIncluded+' of '+talent.length+' talent');
   countEl.textContent = parts.join(' \xb7 ');
@@ -29730,33 +29711,27 @@ function openDayStaffModal(dayId) {
   // Key Personnel section
   var kpList = document.getElementById('day-staff-kp-list');
   kpList.innerHTML = '';
-  var kpDefs = [
-    {id:'ep', nameId:'ep_name', roleId:'ep_role', statusId:'ep_status', defaultRole:'EP'},
-    {id:'prod', nameId:'prod_name', roleId:'prod_role', statusId:'prod_status', defaultRole:'Producer'},
-    {id:'eic', nameId:'eic_name', roleId:'eic_role', statusId:'eic_status', defaultRole:'EIC'},
-    {id:'mngprd', nameId:'mngprd_name', roleId:'mngprd_role', statusId:'mngprd_status', defaultRole:'Mng. Producer'}
-  ];
   var kpExcluded = getDayExcludedKP(dayId);
   var hasKP = false;
-  kpDefs.forEach(function(kp) {
-    var name = (document.getElementById(kp.nameId)||{}).value||'';
+  kp.forEach(function(kpId) {
+    var name = (document.getElementById(kpId+'_name')||{}).value||'';
     if (!name) return;
     hasKP = true;
-    var role = (document.getElementById(kp.roleId)||{}).value || kp.defaultRole;
-    var status = (document.getElementById(kp.statusId)||{}).value || 'tbd';
-    var isIncluded = kpExcluded.indexOf(kp.id) === -1;
+    var role = (document.getElementById(kpId+'_role')||{}).value||'Key Personnel';
+    var status = (document.getElementById(kpId+'_status')||{}).value||'tbd';
+    var isIncluded = kpExcluded.indexOf(kpId) === -1;
     var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=isIncluded;
     cb.style.cssText = 'accent-color:var(--charcoal);cursor:pointer;flex-shrink:0';
-    (function(kpId, checkbox) {
+    (function(theId, checkbox) {
       checkbox.onchange = function() {
         var exc = getDayExcludedKP(dayId);
-        if (checkbox.checked) exc = exc.filter(function(x){return x!==kpId;});
-        else if (exc.indexOf(kpId)===-1) exc.push(kpId);
+        if (checkbox.checked) exc = exc.filter(function(x){return x!==theId;});
+        else if (exc.indexOf(theId)===-1) exc.push(theId);
         setDayExcludedKP(dayId, exc);
         updateDayStaffModalCounts(dayId);
         updateKPSelectAllState(dayId);
       };
-    })(kp.id, cb);
+    })(kpId, cb);
     kpList.appendChild(makeRow(cb, name, role, status));
   });
   if (!hasKP) kpList.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--film-can);font-size:13px">No key personnel added yet.</div>';
@@ -29829,7 +29804,7 @@ function closeDayStaffModal() {
 function dayStaffSelectAll(category, includeAll) {
   if (!_currentDayStaffId) return;
   if (category === 'kp') {
-    setDayExcludedKP(_currentDayStaffId, includeAll ? [] : ['ep','prod','eic','mngprd']);
+    setDayExcludedKP(_currentDayStaffId, includeAll ? [] : kp.slice());
   } else if (category === 'crew') {
     setDayExcludedCrew(_currentDayStaffId, includeAll ? [] : crew.slice());
   } else if (category === 'talent') {
@@ -29840,10 +29815,8 @@ function dayStaffSelectAll(category, includeAll) {
 
 function updateDayStaffModalCounts(dayId) {
   var kpExcl = getDayExcludedKP(dayId);
-  var kpDefs = ['ep','prod','eic','mngprd'];
-  var kpDots = [{id:'ep',nameId:'ep_name'},{id:'prod',nameId:'prod_name'},{id:'eic',nameId:'eic_name'},{id:'mngprd',nameId:'mngprd_name'}];
-  var kpWithNames = kpDots.filter(function(k){var e=document.getElementById(k.nameId);return e&&e.value.trim();});
-  var kpInc = kpWithNames.filter(function(k){return kpExcl.indexOf(k.id)===-1;}).length;
+  var kpWithNames = kp.filter(function(id){var e=document.getElementById(id+'_name');return e&&e.value.trim();});
+  var kpInc = kpWithNames.filter(function(id){return kpExcl.indexOf(id)===-1;}).length;
   var crewExcl = getDayExcludedCrew(dayId).filter(function(id){return crew.indexOf(id)!==-1;});
   var crewInc = crew.length - crewExcl.length;
   var talExcl = getDayExcludedTalent(dayId).filter(function(id){return talent.indexOf(id)!==-1;});
@@ -29858,7 +29831,7 @@ function updateDayStaffModalCounts(dayId) {
 
 function updateKPSelectAllState(dayId) {
   var cb = document.getElementById('day-staff-kp-all');
-  if (cb) cb.checked = getDayExcludedKP(dayId).length === 0;
+  if (cb) cb.checked = getDayExcludedKP(dayId).filter(function(id){return kp.indexOf(id)!==-1;}).length === 0;
 }
 function updateCrewSelectAllState(dayId) {
   var cb = document.getElementById('day-staff-crew-all');
@@ -29909,12 +29882,7 @@ async function generateDoc() {
   else if (data.doc_branding === "client") { var _cl = lookupCompanyLogo(data.client_company); if (_cl) _logoB64 = _cl; else console.warn("Client branding: no logo for", data.client_company); }
   const lb = b64u8(_logoB64);
 
-    const pr_rows = [
-      {role:"EP",      name:data.ep_name,     phone:data.ep_phone},
-      {role:"PROD",    name:data.prod_name,   phone:data.prod_phone},
-      {role:"EIC",     name:data.eic_name,    phone:data.eic_phone},
-      {role:"MNG PRD", name:data.mngprd_name, phone:data.mngprd_phone},
-    ];
+    const pr_rows = (data.kp_cards||[]).map(function(p){return {role:p.role||"",name:p.name||"",phone:p.phone||""};});
     function getDayLocInfo(dayData) {
       var locName = dayData.loc_name || dayData.loc_id || "";
       if (!locName) return {name:"", address:"", notes:""};
@@ -30074,7 +30042,7 @@ async function generateDoc() {
         ]}),
         new TableRow({children:[
           cell([pr([tx("Billing Code:",{s:18})]),pr([tx(data.billing_code||"",{b:true,s:18})])],{w:2200}),
-          cell([pr([tx((function(){var ag=getAgencyInfo();var billingEmail=ag.billing_email||"";var agencyName=ag.name||"Agency";if(ag.invoicing_text)return ag.invoicing_text;return"All CREW and GEAR Vendors - Please submit invoice to "+billingEmail+" using this code no later than five (5) days after the completion of the project. The invoice must include the Deliverable Code (to the left) and reference "+(data.mngprd_name||"the Producer")+" to ensure proper approval routing. Producers -- please reference your EP or Project Lead.";})(),{s:18})])],{w:8590}),
+          cell([pr([tx((function(){var ag=getAgencyInfo();var billingEmail=ag.billing_email||"";var agencyName=ag.name||"Agency";if(ag.invoicing_text)return ag.invoicing_text;var _kpProducer=(data.kp_cards||[]).find(function(k){return k.name&&/prod/i.test(k.role);})||(data.kp_cards||[]).find(function(k){return k.name;});return"All CREW and GEAR Vendors - Please submit invoice to "+billingEmail+" using this code no later than five (5) days after the completion of the project. The invoice must include the Deliverable Code (to the left) and reference "+(_kpProducer?_kpProducer.name:"the Producer")+" to ensure proper approval routing. Producers -- please reference your EP or Project Lead.";})(),{s:18})])],{w:8590}),
         ]}),
       ]});
 
