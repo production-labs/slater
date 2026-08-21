@@ -668,25 +668,35 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
       <div id="branding-warning" style="display:none;color:#D94B43;font-size:12px;margin-top:6px"></div>
     </div>
     <div class="sh" style="margin-top:1.5rem">Key personnel</div>
-    <div class="g3">
-      <div class="fl"><label>EP name</label><input type="text" id="ep_name" autocomplete="new-password" placeholder="Executive Producer"></div>
-      <div class="fl"><label>EP phone</label><input type="text" id="ep_phone" autocomplete="new-password" placeholder="206.000.0000"></div>
-      <div class="fl"><label>EP email</label><input type="text" id="ep_email" autocomplete="new-password" placeholder="ep@yourcompany.com"></div>
-    </div>
-    <div class="g3">
-      <div class="fl"><label>Producer name</label><input type="text" id="prod_name" autocomplete="new-password" placeholder="Producer"></div>
-      <div class="fl"><label>Producer phone</label><input type="text" id="prod_phone" autocomplete="new-password"></div>
-      <div class="fl"><label>Producer email</label><input type="text" id="prod_email" autocomplete="new-password"></div>
-    </div>
-    <div class="g3">
-      <div class="fl"><label>EIC name</label><input type="text" id="eic_name" autocomplete="new-password" placeholder="Engineer in Charge"></div>
-      <div class="fl"><label>EIC phone</label><input type="text" id="eic_phone" autocomplete="new-password"></div>
-      <div class="fl"><label>EIC email</label><input type="text" id="eic_email" autocomplete="new-password"></div>
-    </div>
-    <div class="g3">
-      <div class="fl"><label>Mng. Producer name</label><input type="text" id="mngprd_name" autocomplete="new-password" placeholder="Managing Producer"></div>
-      <div class="fl"><label>Mng. Producer phone</label><input type="text" id="mngprd_phone" autocomplete="new-password"></div>
-      <div class="fl"><label>Mng. Producer email</label><input type="text" id="mngprd_email" autocomplete="new-password"></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:6px"><input type="text" id="ep_role" value="EP" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;border:none;background:transparent;padding:0;width:auto;min-width:20px;max-width:120px;font-family:inherit;outline:none;border-bottom:1px dashed #ccc"><span class="crew-status-pill" id="ep_status_pill" style="margin-left:0"></span></div>
+          <select id="ep_status" onchange="updateCrewStatusPill('ep', this.value);autosaveTrigger()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select>
+        </div>
+        <div class="g3"><div class="fl"><label>Name</label><input type="text" id="ep_name" autocomplete="new-password" placeholder="Executive Producer"></div><div class="fl"><label>Phone</label><input type="text" id="ep_phone" autocomplete="new-password" placeholder="206.000.0000"></div><div class="fl"><label>Email</label><input type="text" id="ep_email" autocomplete="new-password" placeholder="ep@yourcompany.com"></div></div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:6px"><input type="text" id="prod_role" value="Producer" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;border:none;background:transparent;padding:0;width:auto;min-width:20px;max-width:120px;font-family:inherit;outline:none;border-bottom:1px dashed #ccc"><span class="crew-status-pill" id="prod_status_pill" style="margin-left:0"></span></div>
+          <select id="prod_status" onchange="updateCrewStatusPill('prod', this.value);autosaveTrigger()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select>
+        </div>
+        <div class="g3"><div class="fl"><label>Name</label><input type="text" id="prod_name" autocomplete="new-password" placeholder="Producer"></div><div class="fl"><label>Phone</label><input type="text" id="prod_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="prod_email" autocomplete="new-password"></div></div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:6px"><input type="text" id="eic_role" value="EIC" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;border:none;background:transparent;padding:0;width:auto;min-width:20px;max-width:120px;font-family:inherit;outline:none;border-bottom:1px dashed #ccc"><span class="crew-status-pill" id="eic_status_pill" style="margin-left:0"></span></div>
+          <select id="eic_status" onchange="updateCrewStatusPill('eic', this.value);autosaveTrigger()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select>
+        </div>
+        <div class="g3"><div class="fl"><label>Name</label><input type="text" id="eic_name" autocomplete="new-password" placeholder="Engineer in Charge"></div><div class="fl"><label>Phone</label><input type="text" id="eic_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="eic_email" autocomplete="new-password"></div></div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:6px"><input type="text" id="mngprd_role" value="Mng. Producer" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;border:none;background:transparent;padding:0;width:auto;min-width:20px;max-width:120px;font-family:inherit;outline:none;border-bottom:1px dashed #ccc"><span class="crew-status-pill" id="mngprd_status_pill" style="margin-left:0"></span></div>
+          <select id="mngprd_status" onchange="updateCrewStatusPill('mngprd', this.value);autosaveTrigger()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select>
+        </div>
+        <div class="g3"><div class="fl"><label>Name</label><input type="text" id="mngprd_name" autocomplete="new-password" placeholder="Managing Producer"></div><div class="fl"><label>Phone</label><input type="text" id="mngprd_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="mngprd_email" autocomplete="new-password"></div></div>
+      </div>
     </div>
   </div>
 
@@ -771,6 +781,18 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 
   <div id="tab-talent" class="sec">
     <div class="sh">Talent</div>
+    <div id="talent-status-bar" style="background:#F5F0E8;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:none">
+      <div class="crew-status-bar-row1">
+        <div class="crew-status-count"><span class="crew-status-dot" style="background:#9D9D99"></span><span>TBD</span>&nbsp;<strong id="tsb-tbd-count">0</strong></div>
+        <div class="crew-status-count"><span class="crew-status-dot" style="background:#E8B84B"></span><span>Pencil</span>&nbsp;<strong id="tsb-pencil-count">0</strong></div>
+        <div class="crew-status-count"><span class="crew-status-dot" style="background:#E07B39"></span><span>1st Hold</span>&nbsp;<strong id="tsb-hold-count">0</strong></div>
+        <div class="crew-status-count"><span class="crew-status-dot" style="background:#4A9E6B"></span><span>Confirmed</span>&nbsp;<strong id="tsb-confirmed-count">0</strong></div>
+      </div>
+      <div class="crew-status-bar-row2">
+        <div class="crew-progress-track"><div class="crew-progress-fill" id="tsb-progress-fill" style="width:0%"></div></div>
+        <div class="crew-progress-label" id="tsb-summary"></div>
+      </div>
+    </div>
     <div id="talent-list"></div>
     <button class="ab" onclick="addTalent()">+ Add talent</button>
   </div>
@@ -23886,6 +23908,26 @@ function updateCrewStatusBar() {
   document.getElementById("csb-summary").textContent = total + " crew · " + pct + "% confirmed";
   bar.style.display = "block";
 }
+function updateTalentStatusBar() {
+  var bar = document.getElementById("talent-status-bar");
+  if (!bar) return;
+  if (!talent.length) { bar.style.display = "none"; return; }
+  var counts = {tbd:0, pencil:0, hold:0, confirmed:0};
+  talent.forEach(function(id) {
+    var sel = document.getElementById(id+"_status");
+    var val = sel ? (sel.value || "tbd") : "tbd";
+    if (counts[val] !== undefined) counts[val]++; else counts.tbd++;
+  });
+  var total = talent.length;
+  var pct = Math.round((counts.confirmed / total) * 100);
+  document.getElementById("tsb-tbd-count").textContent = counts.tbd;
+  document.getElementById("tsb-pencil-count").textContent = counts.pencil;
+  document.getElementById("tsb-hold-count").textContent = counts.hold;
+  document.getElementById("tsb-confirmed-count").textContent = counts.confirmed;
+  document.getElementById("tsb-progress-fill").style.width = pct + "%";
+  document.getElementById("tsb-summary").textContent = total + " talent \xb7 " + pct + "% confirmed";
+  bar.style.display = "block";
+}
 // ── Drag-to-reorder (crew + talent) ──────────────────────────────────────────
 var _dragSrcId = null;
 
@@ -23949,11 +23991,13 @@ function addTalent(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="ch"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><span class="cl">Talent</span><div style="display:flex;gap:4px"><button class="rb" title="Insert below" onclick="addTalent('${id}')">+</button><button class="rb" onclick="ri('${id}',talent);scheduleDays.forEach(function(d){updateDayTalentBadge(d);})">&#x2715;</button></div></div><div class="g2"><div class="fl"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password" autocomplete="new-password"></div><div class="fl"><label>Title / role</label><input type="text" id="${id}_title" placeholder="e.g. Global Cyber Security Lead"></div></div><div class="g3"><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Notes</label><input type="text" id="${id}_notes"></div></div>`;
+  d.innerHTML = `<div class="ch"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><span class="cl">Talent <span class="crew-status-pill" id="${id}_status_pill"></span></span><div style="display:flex;gap:4px"><button class="rb" title="Insert below" onclick="addTalent('${id}')">+</button><button class="rb" onclick="ri('${id}',talent);updateTalentStatusBar();scheduleDays.forEach(function(d){updateDayTalentBadge(d);})">&#x2715;</button></div></div><div class="g3"><div class="fl"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="fl"><label>Title / role</label><input type="text" id="${id}_title" placeholder="e.g. Global Cyber Security Lead"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateTalentStatusBar()" style="width:100%;padding:8px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="g3"><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Notes</label><input type="text" id="${id}_notes"></div></div>`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
   } else { talent.push(id); document.getElementById("talent-list").appendChild(d); }
+  updateCrewStatusPill(id, "tbd");
+  updateTalentStatusBar();
   scheduleDays.forEach(function(d) { updateDayTalentBadge(d); });
   setTimeout(() => acAttachTalent(id), 0);
 }
@@ -24063,32 +24107,28 @@ function addScheduleDay(data) {
     return lnk;
   }
 
-  var editCrewLink = makeDayLink("👥", "Edit crew for this day", function() { openDayCrewModal(dayId); });
-  editCrewLink.id = dayId+"_crew_link";
-  var crewBadge = document.createElement("span");
-  crewBadge.id = dayId+"_crew_badge";
-  crewBadge.style.cssText = "font-size:11px;color:var(--film-can);margin-left:4px";
-  editCrewLink.appendChild(crewBadge);
-  dayLinksRow.appendChild(editCrewLink);
-
-  var editTalentLink = makeDayLink("🎭", "Edit talent for this day", function() { openDayTalentModal(dayId); });
-  editTalentLink.id = dayId+"_talent_link";
-  var talentBadge = document.createElement("span");
-  talentBadge.id = dayId+"_talent_badge";
-  talentBadge.style.cssText = "font-size:11px;color:var(--film-can);margin-left:4px";
-  editTalentLink.appendChild(talentBadge);
-  dayLinksRow.appendChild(editTalentLink);
+  var editStaffLink = makeDayLink("👥", "Edit cast & crew for this day", function() { openDayStaffModal(dayId); });
+  editStaffLink.id = dayId+"_staff_link";
+  dayLinksRow.appendChild(editStaffLink);
 
   body.appendChild(dayLinksRow);
 
-  // Restore excluded crew/talent from saved project data (dayId is session-scoped)
+  var staffCountEl = document.createElement("div");
+  staffCountEl.id = dayId+"_staff_counts";
+  staffCountEl.style.cssText = "font-size:11px;color:var(--film-can);margin-top:2px;margin-bottom:12px";
+  body.appendChild(staffCountEl);
+
+  // Restore excluded crew/talent/kp from saved project data (dayId is session-scoped)
   if (data.excluded_crew && data.excluded_crew.length) {
     try { localStorage.setItem('sday_excrew_'+dayId, JSON.stringify(data.excluded_crew)); } catch(e) {}
   }
   if (data.excluded_talent && data.excluded_talent.length) {
     try { localStorage.setItem('sday_extal_'+dayId, JSON.stringify(data.excluded_talent)); } catch(e) {}
   }
-  setTimeout(function() { updateDayCrewBadge(dayId); updateDayTalentBadge(dayId); }, 0);
+  if (data.excluded_kp && data.excluded_kp.length) {
+    try { localStorage.setItem('sday_exkp_'+dayId, JSON.stringify(data.excluded_kp)); } catch(e) {}
+  }
+  setTimeout(function() { updateDayStaffCounts(dayId); }, 0);
 
   function makeInput(type, id, placeholder, value) {
     const inp = document.createElement("input");
@@ -24539,6 +24579,7 @@ function getScheduleDays() {
       exclude_callsheet: (document.getElementById(dayId+"_exclude_callsheet")||{}).checked||false,
       excluded_crew: getDayExcludedCrew(dayId),
       excluded_talent: getDayExcludedTalent(dayId),
+      excluded_kp: getDayExcludedKP(dayId),
       sched_entries: (daySchedItems[dayId]||[]).map(function(eid) {
         return {time: v(eid+"_time"), desc: v(eid+"_desc")};
       }).filter(function(e) { return e.time||e.desc; }),
@@ -28980,10 +29021,10 @@ function gather() {
     agency_id: (function(){ var el=document.getElementById("project_agency_id"); return el?el.value||null:null; })(),
     doc_branding:(function(){ var el=document.querySelector('input[name="doc_branding"]:checked'); return el?el.value:"agency"; })(),
     project_title:v("project_title"), client:v("client_company"), client_company:v("client_company"), client_name:v("client_name"), billing_code:v("billing_code"),
-    ep_name:v("ep_name"), ep_phone:v("ep_phone"), ep_email:v("ep_email"),
-    prod_name:v("prod_name"), prod_phone:v("prod_phone"), prod_email:v("prod_email"),
-    eic_name:v("eic_name"), eic_phone:v("eic_phone"), eic_email:v("eic_email"),
-    mngprd_name:v("mngprd_name"), mngprd_phone:v("mngprd_phone"), mngprd_email:v("mngprd_email"),
+    ep_name:v("ep_name"), ep_phone:v("ep_phone"), ep_email:v("ep_email"), ep_role:v("ep_role")||"EP", ep_status:v("ep_status")||"tbd",
+    prod_name:v("prod_name"), prod_phone:v("prod_phone"), prod_email:v("prod_email"), prod_role:v("prod_role")||"Producer", prod_status:v("prod_status")||"tbd",
+    eic_name:v("eic_name"), eic_phone:v("eic_phone"), eic_email:v("eic_email"), eic_role:v("eic_role")||"EIC", eic_status:v("eic_status")||"tbd",
+    mngprd_name:v("mngprd_name"), mngprd_phone:v("mngprd_phone"), mngprd_email:v("mngprd_email"), mngprd_role:v("mngprd_role")||"Mng. Producer", mngprd_status:v("mngprd_status")||"tbd",
     hospital:v("hospital"), breakfast:v("breakfast")||"8:00 am", lunch:v("lunch")||"12:00 pm",
     sunrise:v("sunrise"), sunset:v("sunset"),
 
@@ -28997,7 +29038,7 @@ function gather() {
       });
       return counts;
     })(),
-    talent: talent.map(id => ({id:id,name:v(id+"_name"),title:v(id+"_title"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes")})),
+    talent: talent.map(id => ({id:id,name:v(id+"_name"),title:v(id+"_title"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd"})),
     timezone: v("timezone")||"PT",
     kickoff_date_iso: v("kickoff_date_iso"),
     kickoff_time: v("kickoff_time"),
@@ -29027,9 +29068,13 @@ function loadFormData(data) {
   if (dbEl) dbEl.checked = true;
   updateBrandingWarning();
   s("ep_name", data.ep_name); s("ep_phone", data.ep_phone); s("ep_email", data.ep_email);
+  s("ep_role", data.ep_role||"EP"); s("ep_status", data.ep_status||"tbd"); updateCrewStatusPill("ep", data.ep_status||"tbd");
   s("prod_name", data.prod_name); s("prod_phone", data.prod_phone); s("prod_email", data.prod_email);
+  s("prod_role", data.prod_role||"Producer"); s("prod_status", data.prod_status||"tbd"); updateCrewStatusPill("prod", data.prod_status||"tbd");
   s("eic_name", data.eic_name); s("eic_phone", data.eic_phone); s("eic_email", data.eic_email);
+  s("eic_role", data.eic_role||"EIC"); s("eic_status", data.eic_status||"tbd"); updateCrewStatusPill("eic", data.eic_status||"tbd");
   s("mngprd_name", data.mngprd_name); s("mngprd_phone", data.mngprd_phone); s("mngprd_email", data.mngprd_email);
+  s("mngprd_role", data.mngprd_role||"Mng. Producer"); s("mngprd_status", data.mngprd_status||"tbd"); updateCrewStatusPill("mngprd", data.mngprd_status||"tbd");
   s("hospital", data.hospital); s("breakfast", data.breakfast); s("lunch", data.lunch);
   s("sunrise", data.sunrise); s("sunset", data.sunset);
   const tzEl = document.getElementById("timezone"); if(tzEl && data.timezone) tzEl.value = data.timezone;
@@ -29058,7 +29103,11 @@ function loadFormData(data) {
     const id = talent[talent.length-1];
     s(id+"_name", t.name); s(id+"_title", t.title);
     s(id+"_email", t.email); s(id+"_phone", t.phone); s(id+"_notes", t.notes);
+    const talentStatus = t.status || "tbd";
+    s(id+"_status", talentStatus);
+    updateCrewStatusPill(id, talentStatus);
   });
+  updateTalentStatusBar();
 
   // Schedules
   var _kd = document.getElementById("kickoff_date_iso"); if(_kd) _kd.value = data.kickoff_date_iso||"";
@@ -29100,8 +29149,12 @@ function clearForm() {
   const vdReset = document.getElementById("video_due_date_iso"); if(vdReset) vdReset.value = "";
   const vtReset = document.getElementById("video_due_time"); if(vtReset) vtReset.value = "";
   const tzReset = document.getElementById("timezone"); if(tzReset) tzReset.value = "PT";
-  document.getElementById("crew-list").innerHTML = ""; crew = [];
-  document.getElementById("talent-list").innerHTML = ""; talent = [];
+  var kpRoles = {ep_role:"EP", prod_role:"Producer", eic_role:"EIC", mngprd_role:"Mng. Producer"};
+  Object.keys(kpRoles).forEach(function(id) { var e=document.getElementById(id); if(e) e.value=kpRoles[id]; });
+  ["ep_status","prod_status","eic_status","mngprd_status"].forEach(function(id) { var e=document.getElementById(id); if(e) e.value="tbd"; });
+  ["ep","prod","eic","mngprd"].forEach(function(p) { updateCrewStatusPill(p, "tbd"); });
+  document.getElementById("crew-list").innerHTML = ""; crew = []; updateCrewStatusBar();
+  document.getElementById("talent-list").innerHTML = ""; talent = []; updateTalentStatusBar();
   loadScheduleDays([]);
   const wbDayEl = document.getElementById("wb_day_select"); if(wbDayEl) wbDayEl.value = "last";
   wbLoadItems([]);
@@ -29439,12 +29492,13 @@ function generateDayICS(dayId) {
     return {time: v(eid+"_time"), desc: v(eid+"_desc")};
   }).filter(function(e) { return e.time||e.desc; });
 
+  var _kpExcludedICS = getDayExcludedKP(dayId);
   var kp = [
-    {role:"EP",      name:data.ep_name,     email:data.ep_email,     phone:data.ep_phone},
-    {role:"PROD",    name:data.prod_name,    email:data.prod_email,   phone:data.prod_phone},
-    {role:"EIC",     name:data.eic_name,     email:data.eic_email,    phone:data.eic_phone},
-    {role:"MNG PRD", name:data.mngprd_name,  email:data.mngprd_email, phone:data.mngprd_phone},
-  ].filter(function(p) { return p.name || p.email; });
+    {id:"ep",      role:data.ep_role||"EP",           name:data.ep_name,     email:data.ep_email,     phone:data.ep_phone},
+    {id:"prod",    role:data.prod_role||"PROD",        name:data.prod_name,   email:data.prod_email,   phone:data.prod_phone},
+    {id:"eic",     role:data.eic_role||"EIC",          name:data.eic_name,    email:data.eic_email,    phone:data.eic_phone},
+    {id:"mngprd",  role:data.mngprd_role||"MNG PRD",  name:data.mngprd_name, email:data.mngprd_email, phone:data.mngprd_phone},
+  ].filter(function(p) { return (p.name || p.email) && _kpExcludedICS.indexOf(p.id) === -1; });
 
   var DIVIDER = "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500";
   var idx = scheduleDays.indexOf(dayId);
@@ -29548,287 +29602,240 @@ function generateDayICS(dayId) {
   setStatus("Opening in calendar app...", "ok");
 }
 
-// ── Per-day crew management ───────────────────────────────────────────────────
+// ── Per-day cast & crew management ───────────────────────────────────────────
 function getDayExcludedCrew(dayId) {
   try { return JSON.parse(localStorage.getItem('sday_excrew_'+dayId) || '[]'); } catch(e) { return []; }
 }
-
 function setDayExcludedCrew(dayId, excluded) {
   localStorage.setItem('sday_excrew_'+dayId, JSON.stringify(excluded));
-  updateDayCrewBadge(dayId);
+  updateDayStaffCounts(dayId);
+  autosaveTrigger();
+}
+function getDayExcludedTalent(dayId) {
+  try { return JSON.parse(localStorage.getItem('sday_extal_'+dayId) || '[]'); } catch(e) { return []; }
+}
+function setDayExcludedTalent(dayId, excluded) {
+  localStorage.setItem('sday_extal_'+dayId, JSON.stringify(excluded));
+  updateDayStaffCounts(dayId);
+  autosaveTrigger();
+}
+function getDayExcludedKP(dayId) {
+  try { return JSON.parse(localStorage.getItem('sday_exkp_'+dayId) || '[]'); } catch(e) { return []; }
+}
+function setDayExcludedKP(dayId, excluded) {
+  localStorage.setItem('sday_exkp_'+dayId, JSON.stringify(excluded));
+  updateDayStaffCounts(dayId);
   autosaveTrigger();
 }
 
-function updateDayCrewBadge(dayId) {
-  var badge = document.getElementById(dayId+'_crew_badge');
-  if (!badge) return;
-  var total = crew.length;
-  var rawExcluded = getDayExcludedCrew(dayId);
-  var excluded = rawExcluded.filter(function(id) { return crew.indexOf(id) !== -1; });
-  if (excluded.length !== rawExcluded.length) {
-    localStorage.setItem('sday_excrew_'+dayId, JSON.stringify(excluded));
-  }
-  var active = total - excluded.length;
-  if (total === 0) {
-    badge.textContent = '';
-  } else if (excluded.length === 0) {
-    badge.textContent = '('+total+' crew)';
-    badge.style.color = 'var(--film-can)';
-  } else {
-    badge.textContent = '('+active+' of '+total+' crew)';
-    badge.style.color = 'var(--accent)';
-  }
-  var crewLinkEl = document.getElementById(dayId+'_crew_link');
-  if (crewLinkEl) crewLinkEl.style.display = total === 0 ? 'none' : '';
+function updateDayCrewBadge(dayId) { updateDayStaffCounts(dayId); }
+function updateDayTalentBadge(dayId) { updateDayStaffCounts(dayId); }
+
+function updateDayStaffCounts(dayId) {
+  var countEl = document.getElementById(dayId+'_staff_counts');
+  var linkEl = document.getElementById(dayId+'_staff_link');
   var rowEl = document.getElementById(dayId+'_day_links_row');
-  if (rowEl) rowEl.style.display = (crew.length === 0 && talent.length === 0) ? 'none' : 'flex';
+  var hasAny = crew.length > 0 || talent.length > 0;
+  if (rowEl) rowEl.style.display = hasAny ? 'flex' : 'none';
+  if (linkEl) linkEl.style.display = hasAny ? '' : 'none';
+  if (!countEl) return;
+  var kpDefs = [
+    {id:'ep', nameId:'ep_name'}, {id:'prod', nameId:'prod_name'},
+    {id:'eic', nameId:'eic_name'}, {id:'mngprd', nameId:'mngprd_name'}
+  ];
+  var kpExcluded = getDayExcludedKP(dayId);
+  var kpWithNames = kpDefs.filter(function(k) { var e=document.getElementById(k.nameId); return e && e.value.trim(); });
+  var kpIncluded = kpWithNames.filter(function(k) { return kpExcluded.indexOf(k.id) === -1; }).length;
+  var crewExcluded = getDayExcludedCrew(dayId).filter(function(id) { return crew.indexOf(id) !== -1; });
+  var crewIncluded = crew.length - crewExcluded.length;
+  var talentExcluded = getDayExcludedTalent(dayId).filter(function(id) { return talent.indexOf(id) !== -1; });
+  var talentIncluded = talent.length - talentExcluded.length;
+  var parts = [];
+  if (kpWithNames.length) parts.push(kpIncluded+' of '+kpWithNames.length+' key personnel');
+  if (crew.length) parts.push(crewIncluded+' of '+crew.length+' crew');
+  if (talent.length) parts.push(talentIncluded+' of '+talent.length+' talent');
+  countEl.textContent = parts.join(' \xb7 ');
 }
 
-var _currentDayCrewId = null;
+var _currentDayStaffId = null;
 
-function openDayCrewModal(dayId) {
-  _currentDayCrewId = dayId;
-  var modal = document.getElementById('day-crew-modal');
-
+function openDayStaffModal(dayId) {
+  _currentDayStaffId = dayId;
+  var modal = document.getElementById('day-staff-modal');
   var dayLabel = (document.getElementById(dayId+'_label')||{}).value || 'Schedule Day';
   var dayDate = (document.getElementById(dayId+'_date')||{}).value || '';
-  document.getElementById('day-crew-modal-title').textContent = dayLabel;
-  document.getElementById('day-crew-modal-date').textContent = dayDate;
+  document.getElementById('day-staff-modal-title').textContent = dayLabel;
+  document.getElementById('day-staff-modal-date').textContent = dayDate;
 
-  var excluded = getDayExcludedCrew(dayId);
-
-  var list = document.getElementById('day-crew-list');
-  list.innerHTML = '';
-
-  var statusLabels = {tbd:'TBD', pencil:'Pencil', hold:'1st Hold', confirmed:'Confirmed'};
   var statusColors = {tbd:'#9D9D99', pencil:'#E8B84B', hold:'#E07B39', confirmed:'#4A9E6B'};
+  var statusLabels = {tbd:'TBD', pencil:'Pencil', hold:'1st Hold', confirmed:'Confirmed'};
 
+  function makeRow(cb, name, subtitle, status) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)';
+    var info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0';
+    var nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:13px;font-weight:500;color:var(--charcoal)';
+    nameEl.textContent = name || '(unnamed)';
+    info.appendChild(nameEl);
+    if (subtitle) {
+      var sub = document.createElement('div');
+      sub.style.cssText = 'font-size:11px;color:var(--film-can);margin-top:1px';
+      sub.textContent = subtitle;
+      info.appendChild(sub);
+    }
+    if (status) {
+      var pill = document.createElement('span');
+      pill.style.cssText = 'font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;color:#fff;background:'+(statusColors[status]||'#9D9D99')+';flex-shrink:0;text-transform:uppercase;letter-spacing:.04em';
+      pill.textContent = statusLabels[status]||status;
+      row.appendChild(cb); row.appendChild(info); row.appendChild(pill);
+    } else {
+      row.appendChild(cb); row.appendChild(info);
+    }
+    return row;
+  }
+
+  // Key Personnel section
+  var kpList = document.getElementById('day-staff-kp-list');
+  kpList.innerHTML = '';
+  var kpDefs = [
+    {id:'ep', nameId:'ep_name', roleId:'ep_role', statusId:'ep_status', defaultRole:'EP'},
+    {id:'prod', nameId:'prod_name', roleId:'prod_role', statusId:'prod_status', defaultRole:'Producer'},
+    {id:'eic', nameId:'eic_name', roleId:'eic_role', statusId:'eic_status', defaultRole:'EIC'},
+    {id:'mngprd', nameId:'mngprd_name', roleId:'mngprd_role', statusId:'mngprd_status', defaultRole:'Mng. Producer'}
+  ];
+  var kpExcluded = getDayExcludedKP(dayId);
+  var hasKP = false;
+  kpDefs.forEach(function(kp) {
+    var name = (document.getElementById(kp.nameId)||{}).value||'';
+    if (!name) return;
+    hasKP = true;
+    var role = (document.getElementById(kp.roleId)||{}).value || kp.defaultRole;
+    var status = (document.getElementById(kp.statusId)||{}).value || 'tbd';
+    var isIncluded = kpExcluded.indexOf(kp.id) === -1;
+    var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=isIncluded;
+    cb.style.cssText = 'accent-color:var(--charcoal);cursor:pointer;flex-shrink:0';
+    (function(kpId, checkbox) {
+      checkbox.onchange = function() {
+        var exc = getDayExcludedKP(dayId);
+        if (checkbox.checked) exc = exc.filter(function(x){return x!==kpId;});
+        else if (exc.indexOf(kpId)===-1) exc.push(kpId);
+        setDayExcludedKP(dayId, exc);
+        updateDayStaffModalCounts(dayId);
+        updateKPSelectAllState(dayId);
+      };
+    })(kp.id, cb);
+    kpList.appendChild(makeRow(cb, name, role, status));
+  });
+  if (!hasKP) kpList.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--film-can);font-size:13px">No key personnel added yet.</div>';
+
+  // Crew section
+  var crewList = document.getElementById('day-staff-crew-list');
+  crewList.innerHTML = '';
+  var crewExcluded = getDayExcludedCrew(dayId);
   crew.forEach(function(id) {
     var position = (document.getElementById(id+'_position')||{}).value||'';
     var name     = (document.getElementById(id+'_name')||{}).value||'';
     var status   = (document.getElementById(id+'_status')||{}).value||'tbd';
     if (!position && !name) return;
-
-    var isIncluded = excluded.indexOf(id) === -1;
-
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)';
-
-    var cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = isIncluded;
+    var isIncluded = crewExcluded.indexOf(id) === -1;
+    var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=isIncluded;
     cb.style.cssText = 'accent-color:var(--charcoal);cursor:pointer;flex-shrink:0';
     (function(crewId, checkbox) {
-      checkbox.onchange = function() { dayCrewToggle(dayId, crewId, checkbox.checked); };
+      checkbox.onchange = function() {
+        var exc = getDayExcludedCrew(dayId);
+        if (checkbox.checked) exc = exc.filter(function(x){return x!==crewId;});
+        else if (exc.indexOf(crewId)===-1) exc.push(crewId);
+        setDayExcludedCrew(dayId, exc);
+        updateDayStaffModalCounts(dayId);
+        updateCrewSelectAllState(dayId);
+      };
     })(id, cb);
-
-    var info = document.createElement('div');
-    info.style.cssText = 'flex:1;min-width:0';
-
-    var nameEl = document.createElement('div');
-    nameEl.style.cssText = 'font-size:13px;font-weight:500;color:var(--charcoal)';
-    nameEl.textContent = name || '(unnamed)';
-
-    var roleEl = document.createElement('div');
-    roleEl.style.cssText = 'font-size:11px;color:var(--film-can);margin-top:1px';
-    roleEl.textContent = position;
-
-    info.appendChild(nameEl);
-    info.appendChild(roleEl);
-
-    var pill = document.createElement('span');
-    pill.style.cssText = 'font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;color:#fff;background:'+(statusColors[status]||'#9D9D99')+';flex-shrink:0;text-transform:uppercase;letter-spacing:.04em';
-    pill.textContent = statusLabels[status]||status;
-
-    row.appendChild(cb);
-    row.appendChild(info);
-    row.appendChild(pill);
-    list.appendChild(row);
+    crewList.appendChild(makeRow(cb, name, position, status));
   });
+  if (crew.length === 0) crewList.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--film-can);font-size:13px">No crew added yet.</div>';
 
-  if (crew.length === 0) {
-    list.innerHTML = '<div style="padding:20px 0;text-align:center;color:var(--film-can);font-size:13px">No crew added yet. Add crew in the Crew tab.</div>';
-  }
-
-  updateDayCrewCount(dayId);
-  updateSelectAllState(dayId);
-  modal.style.display = 'flex';
-}
-
-function closeDayCrewModal() {
-  document.getElementById('day-crew-modal').style.display = 'none';
-  if (_currentDayCrewId) updateDayCrewBadge(_currentDayCrewId);
-  _currentDayCrewId = null;
-}
-
-function dayCrewToggle(dayId, crewId, included) {
-  var excluded = getDayExcludedCrew(dayId);
-  if (included) {
-    excluded = excluded.filter(function(id) { return id !== crewId; });
-  } else {
-    if (excluded.indexOf(crewId) === -1) excluded.push(crewId);
-  }
-  setDayExcludedCrew(dayId, excluded);
-  updateDayCrewCount(dayId);
-  updateSelectAllState(dayId);
-}
-
-function dayCrewSelectAll(includeAll) {
-  if (!_currentDayCrewId) return;
-  if (includeAll) {
-    setDayExcludedCrew(_currentDayCrewId, []);
-  } else {
-    setDayExcludedCrew(_currentDayCrewId, crew.slice());
-  }
-  openDayCrewModal(_currentDayCrewId);
-}
-
-function updateDayCrewCount(dayId) {
-  var excluded = getDayExcludedCrew(dayId).filter(function(id) { return crew.indexOf(id) !== -1; });
-  var active = crew.length - excluded.length;
-  var countEl = document.getElementById('day-crew-count');
-  if (countEl) countEl.textContent = active+' of '+crew.length+' crew included';
-}
-
-function updateSelectAllState(dayId) {
-  var excluded = getDayExcludedCrew(dayId);
-  var cb = document.getElementById('day-crew-select-all');
-  if (cb) cb.checked = excluded.length === 0;
-}
-
-// ── Per-day talent management ─────────────────────────────────────────────────
-function getDayExcludedTalent(dayId) {
-  try { return JSON.parse(localStorage.getItem('sday_extal_'+dayId) || '[]'); } catch(e) { return []; }
-}
-
-function setDayExcludedTalent(dayId, excluded) {
-  localStorage.setItem('sday_extal_'+dayId, JSON.stringify(excluded));
-  updateDayTalentBadge(dayId);
-  autosaveTrigger();
-}
-
-function updateDayTalentBadge(dayId) {
-  var badge = document.getElementById(dayId+'_talent_badge');
-  if (!badge) return;
-  var total = talent.length;
-  var excluded = getDayExcludedTalent(dayId);
-  var active = total - excluded.length;
-  if (total === 0) {
-    badge.textContent = '';
-  } else if (excluded.length === 0) {
-    badge.textContent = '('+total+' talent)';
-    badge.style.color = 'var(--film-can)';
-  } else {
-    badge.textContent = '('+active+' of '+total+' talent)';
-    badge.style.color = 'var(--accent)';
-  }
-  var talentLinkEl = document.getElementById(dayId+'_talent_link');
-  if (talentLinkEl) talentLinkEl.style.display = total === 0 ? 'none' : '';
-  var rowEl = document.getElementById(dayId+'_day_links_row');
-  if (rowEl) rowEl.style.display = (crew.length === 0 && talent.length === 0) ? 'none' : 'flex';
-}
-
-var _currentDayTalentId = null;
-
-function openDayTalentModal(dayId) {
-  _currentDayTalentId = dayId;
-  var modal = document.getElementById('day-talent-modal');
-
-  var dayLabel = (document.getElementById(dayId+'_label')||{}).value || 'Schedule Day';
-  var dayDate = (document.getElementById(dayId+'_date')||{}).value || '';
-  document.getElementById('day-talent-modal-title').textContent = dayLabel;
-  document.getElementById('day-talent-modal-date').textContent = dayDate;
-
-  var excluded = getDayExcludedTalent(dayId);
-
-  var list = document.getElementById('day-talent-list');
-  list.innerHTML = '';
-
+  // Talent section
+  var talentList = document.getElementById('day-staff-talent-list');
+  talentList.innerHTML = '';
+  var talentExcluded = getDayExcludedTalent(dayId);
   talent.forEach(function(id) {
     var name  = (document.getElementById(id+'_name')||{}).value||'';
     var title = (document.getElementById(id+'_title')||{}).value||'';
+    var status = (document.getElementById(id+'_status')||{}).value||'tbd';
     if (!name) return;
-
-    var isIncluded = excluded.indexOf(id) === -1;
-
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)';
-
-    var cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = isIncluded;
+    var isIncluded = talentExcluded.indexOf(id) === -1;
+    var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=isIncluded;
     cb.style.cssText = 'accent-color:var(--charcoal);cursor:pointer;flex-shrink:0';
     (function(talentId, checkbox) {
-      checkbox.onchange = function() { dayTalentToggle(dayId, talentId, checkbox.checked); };
+      checkbox.onchange = function() {
+        var exc = getDayExcludedTalent(dayId);
+        if (checkbox.checked) exc = exc.filter(function(x){return x!==talentId;});
+        else if (exc.indexOf(talentId)===-1) exc.push(talentId);
+        setDayExcludedTalent(dayId, exc);
+        updateDayStaffModalCounts(dayId);
+        updateTalentSelectAllState(dayId);
+      };
     })(id, cb);
-
-    var info = document.createElement('div');
-    info.style.cssText = 'flex:1;min-width:0';
-
-    var nameEl = document.createElement('div');
-    nameEl.style.cssText = 'font-size:13px;font-weight:500;color:var(--charcoal)';
-    nameEl.textContent = name;
-
-    var titleEl = document.createElement('div');
-    titleEl.style.cssText = 'font-size:11px;color:var(--film-can);margin-top:1px';
-    titleEl.textContent = title;
-
-    info.appendChild(nameEl);
-    info.appendChild(titleEl);
-
-    row.appendChild(cb);
-    row.appendChild(info);
-    list.appendChild(row);
+    talentList.appendChild(makeRow(cb, name, title, status));
   });
+  if (talent.length === 0) talentList.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--film-can);font-size:13px">No talent added yet.</div>';
 
-  if (talent.length === 0) {
-    list.innerHTML = '<div style="padding:20px 0;text-align:center;color:var(--film-can);font-size:13px">No talent added yet. Add talent in the Talent tab.</div>';
-  }
-
-  updateDayTalentCount(dayId);
-  updateSelectAllTalentState(dayId);
+  updateDayStaffModalCounts(dayId);
+  updateKPSelectAllState(dayId);
+  updateCrewSelectAllState(dayId);
+  updateTalentSelectAllState(dayId);
   modal.style.display = 'flex';
 }
 
-function closeDayTalentModal() {
-  document.getElementById('day-talent-modal').style.display = 'none';
-  if (_currentDayTalentId) updateDayTalentBadge(_currentDayTalentId);
-  _currentDayTalentId = null;
+function closeDayStaffModal() {
+  document.getElementById('day-staff-modal').style.display = 'none';
+  if (_currentDayStaffId) updateDayStaffCounts(_currentDayStaffId);
+  _currentDayStaffId = null;
 }
 
-function dayTalentToggle(dayId, talentId, included) {
-  var excluded = getDayExcludedTalent(dayId);
-  if (included) {
-    excluded = excluded.filter(function(id) { return id !== talentId; });
-  } else {
-    if (excluded.indexOf(talentId) === -1) excluded.push(talentId);
+function dayStaffSelectAll(category, includeAll) {
+  if (!_currentDayStaffId) return;
+  if (category === 'kp') {
+    setDayExcludedKP(_currentDayStaffId, includeAll ? [] : ['ep','prod','eic','mngprd']);
+  } else if (category === 'crew') {
+    setDayExcludedCrew(_currentDayStaffId, includeAll ? [] : crew.slice());
+  } else if (category === 'talent') {
+    setDayExcludedTalent(_currentDayStaffId, includeAll ? [] : talent.slice());
   }
-  setDayExcludedTalent(dayId, excluded);
-  updateDayTalentCount(dayId);
-  updateSelectAllTalentState(dayId);
+  openDayStaffModal(_currentDayStaffId);
 }
 
-function dayTalentSelectAll(includeAll) {
-  if (!_currentDayTalentId) return;
-  if (includeAll) {
-    setDayExcludedTalent(_currentDayTalentId, []);
-  } else {
-    setDayExcludedTalent(_currentDayTalentId, talent.slice());
-  }
-  openDayTalentModal(_currentDayTalentId);
+function updateDayStaffModalCounts(dayId) {
+  var kpExcl = getDayExcludedKP(dayId);
+  var kpDefs = ['ep','prod','eic','mngprd'];
+  var kpDots = [{id:'ep',nameId:'ep_name'},{id:'prod',nameId:'prod_name'},{id:'eic',nameId:'eic_name'},{id:'mngprd',nameId:'mngprd_name'}];
+  var kpWithNames = kpDots.filter(function(k){var e=document.getElementById(k.nameId);return e&&e.value.trim();});
+  var kpInc = kpWithNames.filter(function(k){return kpExcl.indexOf(k.id)===-1;}).length;
+  var crewExcl = getDayExcludedCrew(dayId).filter(function(id){return crew.indexOf(id)!==-1;});
+  var crewInc = crew.length - crewExcl.length;
+  var talExcl = getDayExcludedTalent(dayId).filter(function(id){return talent.indexOf(id)!==-1;});
+  var talInc = talent.length - talExcl.length;
+  var parts = [];
+  if (kpWithNames.length) parts.push(kpInc+' of '+kpWithNames.length+' key personnel');
+  if (crew.length) parts.push(crewInc+' of '+crew.length+' crew');
+  if (talent.length) parts.push(talInc+' of '+talent.length+' talent');
+  var el = document.getElementById('day-staff-count');
+  if (el) el.textContent = parts.join(' \xb7 ');
 }
 
-function updateDayTalentCount(dayId) {
-  var excluded = getDayExcludedTalent(dayId);
-  var active = talent.length - excluded.length;
-  var countEl = document.getElementById('day-talent-count');
-  if (countEl) countEl.textContent = active+' of '+talent.length+' talent included';
+function updateKPSelectAllState(dayId) {
+  var cb = document.getElementById('day-staff-kp-all');
+  if (cb) cb.checked = getDayExcludedKP(dayId).length === 0;
 }
-
-function updateSelectAllTalentState(dayId) {
-  var excluded = getDayExcludedTalent(dayId);
-  var cb = document.getElementById('day-talent-select-all');
-  if (cb) cb.checked = excluded.length === 0;
+function updateCrewSelectAllState(dayId) {
+  var cb = document.getElementById('day-staff-crew-all');
+  if (cb) cb.checked = getDayExcludedCrew(dayId).filter(function(id){return crew.indexOf(id)!==-1;}).length === 0;
+}
+function updateTalentSelectAllState(dayId) {
+  var cb = document.getElementById('day-staff-talent-all');
+  if (cb) cb.checked = getDayExcludedTalent(dayId).filter(function(id){return talent.indexOf(id)!==-1;}).length === 0;
 }
 
 async function generateDoc() {
@@ -30280,41 +30287,38 @@ window.addEventListener("beforeunload", function() {
     <img id="exp-receipt-fullsize" src="" alt="Receipt">
   </div>
 </div>
-<div id="day-talent-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeDayTalentModal()">
-  <div style="background:var(--surface);border-radius:12px;width:480px;max-width:92vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+<div id="day-staff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeDayStaffModal()">
+  <div style="background:var(--surface);border-radius:12px;width:520px;max-width:92vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)">
     <div style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div id="day-talent-modal-title" style="font-size:15px;font-weight:600;color:var(--charcoal)"></div>
-      <div id="day-talent-modal-date" style="font-size:12px;color:var(--film-can);margin-top:2px"></div>
+      <div id="day-staff-modal-title" style="font-size:15px;font-weight:600;color:var(--charcoal)"></div>
+      <div id="day-staff-modal-date" style="font-size:12px;color:var(--film-can);margin-top:2px"></div>
     </div>
-    <div style="padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--charcoal);cursor:pointer">
-        <input type="checkbox" id="day-talent-select-all" onchange="dayTalentSelectAll(this.checked)">
-        Include all talent
-      </label>
-      <span id="day-talent-count" style="font-size:12px;color:var(--film-can)"></span>
+    <div style="overflow-y:auto;flex:1;padding:0 20px">
+      <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can)">Key Personnel</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--film-can);cursor:pointer"><input type="checkbox" id="day-staff-kp-all" onchange="dayStaffSelectAll('kp', this.checked)"> Select all</label>
+        </div>
+        <div id="day-staff-kp-list"></div>
+      </div>
+      <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can)">Crew</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--film-can);cursor:pointer"><input type="checkbox" id="day-staff-crew-all" onchange="dayStaffSelectAll('crew', this.checked)"> Select all</label>
+        </div>
+        <div id="day-staff-crew-list"></div>
+      </div>
+      <div style="padding:12px 0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can)">Talent</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--film-can);cursor:pointer"><input type="checkbox" id="day-staff-talent-all" onchange="dayStaffSelectAll('talent', this.checked)"> Select all</label>
+        </div>
+        <div id="day-staff-talent-list"></div>
+      </div>
     </div>
-    <div id="day-talent-list" style="overflow-y:auto;flex:1;padding:8px 20px"></div>
-    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;flex-shrink:0">
-      <button class="lb" onclick="closeDayTalentModal()">Done</button>
-    </div>
-  </div>
-</div>
-<div id="day-crew-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeDayCrewModal()">
-  <div style="background:var(--surface);border-radius:12px;width:480px;max-width:92vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-    <div id="day-crew-modal-header" style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div id="day-crew-modal-title" style="font-size:15px;font-weight:600;color:var(--charcoal)"></div>
-      <div id="day-crew-modal-date" style="font-size:12px;color:var(--film-can);margin-top:2px"></div>
-    </div>
-    <div style="padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--charcoal);cursor:pointer">
-        <input type="checkbox" id="day-crew-select-all" onchange="dayCrewSelectAll(this.checked)">
-        Include all crew
-      </label>
-      <span id="day-crew-count" style="font-size:12px;color:var(--film-can)"></span>
-    </div>
-    <div id="day-crew-list" style="overflow-y:auto;flex:1;padding:8px 20px"></div>
-    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
-      <button class="lb" onclick="closeDayCrewModal()">Done</button>
+    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div id="day-staff-count" style="font-size:12px;color:var(--film-can)"></div>
+      <button class="lb" onclick="closeDayStaffModal()">Done</button>
     </div>
   </div>
 </div>
