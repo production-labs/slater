@@ -29476,7 +29476,10 @@ function generateDayICS(dayId) {
     d.push("");
   }
 
-  var allCrew = (data.crew||[]).filter(function(c) { return c.name || c.position; });
+  var excludedCrew = getDayExcludedCrew(dayId);
+  var allCrew = (data.crew||[]).filter(function(c, i) {
+    return excludedCrew.indexOf(crew[i]) === -1 && (c.name || c.position);
+  });
   if (allCrew.length) {
     d.push(DIVIDER); d.push("");
     d.push("CREW"); d.push("");
@@ -29525,7 +29528,7 @@ function generateDayICS(dayId) {
     if (!p.email) return;
     lines.push(fold("ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=" + esc(p.name||p.role) + ":mailto:" + p.email));
   });
-  (data.crew||[]).forEach(function(c) {
+  (data.crew||[]).filter(function(c, i) { return excludedCrew.indexOf(crew[i]) === -1; }).forEach(function(c) {
     if (!c.email || (c.status !== "confirmed" && c.status !== "hold")) return;
     lines.push(fold("ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=" + esc(c.name||c.position||"Crew") + ":mailto:" + c.email));
   });
@@ -29533,16 +29536,11 @@ function generateDayICS(dayId) {
   lines.push("END:VCALENDAR");
 
   var icsContent = lines.join("\r\n") + "\r\n";
-  var blob = new Blob([icsContent], {type:"text/calendar;charset=utf-8"});
+  var blob = new Blob([icsContent], {type:"text/calendar;charset=utf-8;method=REQUEST"});
   var url = URL.createObjectURL(blob);
-  var a = document.createElement("a");
-  a.href = url;
-  var dayLabelFile = dayLabel || "day";
-  var projTitle = data.project_title || "project";
-  a.download = (projTitle + "_" + dayLabelFile).replace(/[^a-z0-9]/gi,"_") + ".ics";
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  setStatus("Calendar invite downloaded.", "ok");
+  window.location.href = url;
+  setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+  setStatus("Opening in calendar app...", "ok");
 }
 
 // ── Per-day crew management ───────────────────────────────────────────────────
