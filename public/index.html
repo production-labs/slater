@@ -340,6 +340,14 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .sday-loc-select{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:"Geist",sans-serif;color:var(--text-primary);background:var(--surface)}
 .sday-blacks{display:none;align-items:center;gap:6px;font-size:12px;color:var(--accent);font-weight:600;margin-bottom:8px}
 .sday-blacks input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent)}
+#schedule-days-list .sday-block{margin-bottom:0}
+.sday-title-input{width:auto;flex:1;min-width:40px}
+#wb-list .wb-item,#wb-list .wb-pin{margin-bottom:0}
+#wb-list .sday-insert{margin:3px 0}
+.sday-insert{display:flex;align-items:center;gap:0;cursor:pointer;padding:4px 0;margin:12px 0;opacity:0.3;transition:opacity 0.15s ease}
+.sday-insert:hover{opacity:1}
+.sday-insert-line{flex:1;height:1px;background:var(--film-can)}
+.sday-insert-btn{width:20px;height:20px;border-radius:50%;border:1px solid var(--film-can);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--film-can);flex-shrink:0;line-height:1;user-select:none}
 [id$="_sun_status"]{margin-top: -12px;float: right;}
 
 .exp-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:10px}
@@ -735,7 +743,6 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
       </div>
     </div>
     <div id="schedule-days-list"></div>
-    <button class="ab" onclick="addScheduleDay()" style="margin-top:8px">+ Add day</button>
   </div>
 
   <div id="tab-crew" class="sec">
@@ -805,7 +812,6 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 
     </div>
     <div id="wb-list"></div>
-    <button class="ab" onclick="wbAdd()">+ Add item</button>
   </div>
 
   <div id="tab-expenses" class="sec">
@@ -24031,22 +24037,37 @@ function updateAddKPButton() {
 let scheduleDays = [];
 let daySchedItems = {};
 
-function addScheduleDay(data) {
+function addScheduleDay(data, insertAfterDayId) {
   data = data || {};
   const dayId = "sday_" + (++_uid);
-  scheduleDays.push(dayId);
-  const dayNum = scheduleDays.length;
-  const labelVal = data.label || "";
-    const headerText = labelVal || "Day " + dayNum;
-
+  if (insertAfterDayId === undefined) {
+    scheduleDays.push(dayId);
+  } else if (insertAfterDayId === null) {
+    scheduleDays.unshift(dayId);
+  } else {
+    var _afterIdx = scheduleDays.indexOf(insertAfterDayId);
+    if (_afterIdx > -1) { scheduleDays.splice(_afterIdx + 1, 0, dayId); } else { scheduleDays.push(dayId); }
+  }
   const el = document.createElement("div");
   el.className = "sday-block"; el.id = dayId;
 
   const hdr = document.createElement("div");
   hdr.className = "sday-header";
-  const titleSpan = document.createElement("span");
-  titleSpan.className = "sday-title"; titleSpan.id = dayId+"_title";
-  titleSpan.textContent = headerText;
+  const titleWrap = document.createElement("div");
+  titleWrap.style.cssText = "display:flex;align-items:center;gap:4px;flex:1;min-width:0;overflow:hidden;padding:0 12px";
+  const titleInp = document.createElement("input");
+  titleInp.type = "text"; titleInp.id = dayId+"_label";
+  titleInp.className = "contact-card-role-input sday-title-input";
+  titleInp.placeholder = "Untitled Day";
+  titleInp.value = data.label || "";
+  titleInp.autocomplete = "new-password";
+  titleInp.oninput = function() { wbRebuildPins(); autosaveTrigger(); };
+  const titlePencil = document.createElement("span");
+  titlePencil.className = "contact-card-pencil";
+  titlePencil.innerHTML = "&#x1F589;";
+  titlePencil.title = "Edit day label";
+  titlePencil.onclick = function() { titleInp.focus(); };
+  titleWrap.appendChild(titleInp); titleWrap.appendChild(titlePencil);
 
   var calWidget = document.createElement("div");
   calWidget.className = "sday-cal";
@@ -24070,7 +24091,7 @@ function addScheduleDay(data) {
   removeBtn.onclick = function() { removeScheduleDay(dayId); };
   var sdayChevron = document.createElement("span");
   sdayChevron.className = "sday-chevron"; sdayChevron.textContent = "▸";
-  hdr.appendChild(calWidget); hdr.appendChild(titleSpan); hdr.appendChild(sdayChevron); hdr.appendChild(removeBtn);
+  hdr.appendChild(calWidget); hdr.appendChild(titleWrap); hdr.appendChild(sdayChevron); hdr.appendChild(removeBtn);
   // Populate directly here — getElementById won't work until el is in the DOM
   if (data.date_iso) {
     var _calMonths = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
@@ -24174,14 +24195,11 @@ function addScheduleDay(data) {
   const dateIso = makeInput("date", dayId+"_date_iso", "", data.date_iso||"");
   dateIso.dataset.prevIso = data.date_iso || "";
   dateIso.oninput = function() { syncSchedDayDate(dayId); };
+  dateIso.onblur = function() { sortScheduleDays(); rebuildInsertDividers(); autosaveTrigger(); };
   const dateFmt = makeInput("text", dayId+"_date", "Monday 23 Feb. 2026", data.date||"");
-  const labelInp = makeInput("text", dayId+"_label", "e.g. Shoot Day", data.label||"");
-  labelInp.setAttribute("list","day-label-suggestions");
-  labelInp.oninput = function() { updateDayHeader(dayId); };
-  var dateGrid = makeGrid("g3",[makeField("Shoot date",dateIso),makeField("Formatted date",dateFmt),makeField("Day label",labelInp)]);
+  var dateGrid = makeGrid("g2",[makeField("Shoot date",dateIso),makeField("Formatted date",dateFmt)]);
   dateGrid.children[0].classList.add("sday-shootdate-wrap");
   dateGrid.children[1].classList.add("sday-fmtdate-wrap");
-  dateGrid.children[2].classList.add("sday-daylabel-wrap");
   body.appendChild(dateGrid);
 
   const isPost = (document.getElementById("project_type")||{}).value === "post_production";
@@ -24351,7 +24369,18 @@ function addScheduleDay(data) {
   body.appendChild(btnRow);
 
   el.appendChild(body);
-  document.getElementById("schedule-days-list").appendChild(el);
+  var _sdList = document.getElementById("schedule-days-list");
+  if (insertAfterDayId === undefined) {
+    _sdList.appendChild(el);
+  } else if (insertAfterDayId === null) {
+    var _firstCard = _sdList.querySelector(".sday-block");
+    if (_firstCard) { _sdList.insertBefore(el, _firstCard); } else { _sdList.appendChild(el); }
+  } else {
+    var _afterEl = document.getElementById(insertAfterDayId);
+    if (_afterEl && _afterEl.nextSibling) { _sdList.insertBefore(el, _afterEl.nextSibling); }
+    else if (_afterEl) { _sdList.appendChild(el); }
+    else { _sdList.appendChild(el); }
+  }
 
   if (data.sched_entries && data.sched_entries.length) {
     data.sched_entries.forEach(function(e) { addScheduleEntry2(dayId, e.time, e.desc); });
@@ -24359,6 +24388,8 @@ function addScheduleDay(data) {
 
   initMobileCollapse(dayId);
   refreshWbDaySelector();
+  rebuildInsertDividers();
+  return dayId;
 }
 
 function removeScheduleDay(dayId) {
@@ -24368,21 +24399,12 @@ function removeScheduleDay(dayId) {
   refreshWbDaySelector();
   wbRecalc();
   wbRebuildPins();
+  rebuildInsertDividers();
 }
 
-function renumberDays() {
-  scheduleDays.forEach(function(dayId, i) {
-    const label = (document.getElementById(dayId+"_label")||{}).value||"";
-    const title = document.getElementById(dayId+"_title");
-    if (title) title.textContent = label || "Day "+(i+1);
-  });
-}
+function renumberDays() {}
 
 function updateDayHeader(dayId) {
-  const label = (document.getElementById(dayId+"_label")||{}).value||"";
-  const idx = scheduleDays.indexOf(dayId);
-  const title = document.getElementById(dayId+"_title");
-  if (title) title.textContent = label || "Day "+(idx+1);
   wbRebuildPins();
 }
 
@@ -24448,6 +24470,68 @@ function sortScheduleDays() {
   renumberDays();
   refreshWbDaySelector();
   wbRebuildPins();
+  rebuildInsertDividers();
+}
+
+function makeInsertDivider(insertAfterDayId) {
+  var div = document.createElement("div");
+  div.className = "sday-insert";
+  div.innerHTML = '<div class="sday-insert-line"></div><div class="sday-insert-btn">+</div><div class="sday-insert-line"></div>';
+  div.onclick = function() { insertScheduleDay(insertAfterDayId); };
+  return div;
+}
+
+function insertScheduleDay(afterDayId) {
+  var defaultDate = '';
+  if (afterDayId) {
+    var prevDateEl = document.getElementById(afterDayId + '_date_iso');
+    if (prevDateEl && prevDateEl.value) {
+      var prevDate = new Date(prevDateEl.value + 'T12:00:00');
+      prevDate.setDate(prevDate.getDate() + 1);
+      defaultDate = prevDate.toISOString().split('T')[0];
+    }
+  }
+  if (!defaultDate) {
+    var today = new Date();
+    defaultDate = today.toISOString().split('T')[0];
+  }
+  var newDayId = addScheduleDay({ date_iso: defaultDate }, afterDayId);
+  if (newDayId) {
+    var newCard = document.getElementById(newDayId);
+    if (newCard) {
+      newCard.style.transform = 'scaleY(0)';
+      newCard.style.transformOrigin = 'top';
+      newCard.style.transition = 'transform 0.2s ease';
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          newCard.style.transform = 'scaleY(1)';
+          setTimeout(function() {
+            newCard.style.transition = '';
+            newCard.style.transform = '';
+          }, 200);
+        });
+      });
+    }
+  }
+  autosaveTrigger();
+}
+
+function rebuildInsertDividers() {
+  var container = document.getElementById('schedule-days-list');
+  if (!container) return;
+  var existing = container.querySelectorAll('.sday-insert');
+  existing.forEach(function(d) { d.parentNode.removeChild(d); });
+  var firstCard = container.firstChild;
+  container.insertBefore(makeInsertDivider(null), firstCard || null);
+  scheduleDays.forEach(function(dayId) {
+    var card = document.getElementById(dayId);
+    if (!card) return;
+    if (card.nextSibling) {
+      container.insertBefore(makeInsertDivider(dayId), card.nextSibling);
+    } else {
+      container.appendChild(makeInsertDivider(dayId));
+    }
+  });
 }
 
 function syncSchedDayDate(dayId) {
@@ -24472,7 +24556,6 @@ function syncSchedDayDate(dayId) {
   const fmtEl = document.getElementById(dayId+"_date");
   if (fmtEl) fmtEl.value = days[d.getDay()]+" "+d.getDate()+" "+months[d.getMonth()]+" "+d.getFullYear();
   updateDayCalWidget(dayId, iso);
-  setTimeout(sortScheduleDays, 100);
   wbRecalc();
   wbRebuildPins();
   triggerSunLookup(dayId);
@@ -24941,7 +25024,14 @@ function wbAdd(item, afterId) {
   var isNew = !item;
   item = item || {};
   const id = "wb_"+(++_uid);
-  wbItems.push(id);
+  if (afterId === null) {
+    wbItems.unshift(id);
+  } else if (afterId) {
+    var _aidx = wbItems.indexOf(afterId);
+    if (_aidx > -1) { wbItems.splice(_aidx + 1, 0, id); } else { wbItems.push(id); }
+  } else {
+    wbItems.push(id);
+  }
 
   const el = document.createElement("div");
   el.className = "wb-item"; el.id = id;
@@ -27087,6 +27177,54 @@ function wbRebuildPins() {
     } else {
       var itemEl = document.getElementById(entry.id);
       if (itemEl) list.appendChild(itemEl);
+    }
+  });
+  rebuildWbDividers();
+}
+
+function makeWbInsertDivider(afterEl) {
+  var div = document.createElement('div');
+  div.className = 'sday-insert wb-insert';
+  div.innerHTML = '<div class="sday-insert-line"></div><div class="sday-insert-btn">+</div><div class="sday-insert-line"></div>';
+  div.onclick = function() { wbInsertAfterEl(afterEl); };
+  return div;
+}
+
+function wbInsertAfterEl(afterEl) {
+  var afterWbId = null;
+  var defaultItem = {};
+  if (afterEl) {
+    if (afterEl.classList.contains('wb-item')) {
+      afterWbId = afterEl.id;
+      defaultItem = { mode: 'sequential', seq_days: 1 };
+    } else if (afterEl.classList.contains('wb-pin')) {
+      var dateMatch = afterEl.id.match(/^pin_(\d{4}-\d{2}-\d{2})$/);
+      if (dateMatch) {
+        defaultItem = { mode: 'manual', manual_date: dateMatch[1] };
+      } else {
+        defaultItem = { mode: 'sequential', seq_days: 1 };
+      }
+      var prev = afterEl.previousSibling;
+      while (prev) {
+        if (prev.classList && prev.classList.contains('wb-item')) { afterWbId = prev.id; break; }
+        prev = prev.previousSibling;
+      }
+    }
+  }
+  wbAdd(defaultItem, afterWbId);
+}
+
+function rebuildWbDividers() {
+  var list = document.getElementById('wb-list');
+  if (!list) return;
+  list.querySelectorAll('.wb-insert').forEach(function(d) { d.remove(); });
+  var children = Array.from(list.children);
+  list.insertBefore(makeWbInsertDivider(null), children[0] || null);
+  children.forEach(function(child) {
+    if (child.nextSibling) {
+      list.insertBefore(makeWbInsertDivider(child), child.nextSibling);
+    } else {
+      list.appendChild(makeWbInsertDivider(child));
     }
   });
 }
