@@ -24729,6 +24729,8 @@ function loadScheduleDays(days, legacyData) {
   // Post production projects have no shoot days — only kickoff/video-due pins
   var _isPostProd = (document.getElementById("project_type")||{}).value === "post_production";
   if (scheduleDays.length === 0 && !_isPostProd) addScheduleDay();
+  // Ensure insert dividers are present even when no days were added (e.g. post-production)
+  if (scheduleDays.length === 0) rebuildInsertDividers();
 }
 
 
@@ -27259,8 +27261,8 @@ function loadSavedLogo() {
 
 
 function rebuildScheduleDays() {
-  // Rebuild all day blocks to reflect new project type field visibility
-  const saved = getScheduleDays();
+  var _isPostProd = (document.getElementById("project_type")||{}).value === "post_production";
+  var saved = _isPostProd ? [] : getScheduleDays();
   loadScheduleDays(saved);
 }
 
@@ -29304,7 +29306,7 @@ function clearForm() {
   ["project_title","client_company","client_name","billing_code",
    "hospital","breakfast","lunch","sunrise","sunset"
   ].forEach(function(id) { const e = document.getElementById(id); if(e) e.value = ""; });
-  const ptReset = document.getElementById("project_type"); if(ptReset) ptReset.value = "live_event";
+  const ptReset = document.getElementById("project_type"); if(ptReset) ptReset.value = "location_shoot";
   var dbReset = document.querySelector('input[name="doc_branding"][value="agency"]'); if(dbReset) dbReset.checked = true;
   updateBrandingWarning();
   const kdReset = document.getElementById("kickoff_date_iso"); if(kdReset) kdReset.value = "";
@@ -30312,7 +30314,8 @@ document.addEventListener('input', function(e) {
   el.setSelectionRange(pos + (newLen - oldLen), pos + (newLen - oldLen));
 });
 wbInit();
-addScheduleDay();
+if ((document.getElementById("project_type")||{}).value !== "post_production") addScheduleDay();
+else rebuildInsertDividers();
 setTimeout(refreshWbDaySelector, 200);
 // Restore last project
 (function() {
