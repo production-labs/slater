@@ -27010,8 +27010,7 @@ function refreshWbDaySelector() {
     const opt = document.createElement("option");
     opt.value = day.id || ("day_"+i);
     const dayNum = i + 1;
-    let label = "Day " + dayNum;
-    if (day.label) label += " — " + day.label;
+    let label = day.label || ("Day " + dayNum);
     if (day.date_iso) label += fmtDateShort(day.date_iso);
     opt.textContent = label;
     if (current === opt.value) opt.selected = true;
@@ -27019,7 +27018,7 @@ function refreshWbDaySelector() {
   });
 
   // Default to last day if nothing matched
-  if (!sel.value || (!days.find(function(d) { return (d.id||"") === sel.value; }) && current !== "kickoff")) {
+  if (!sel.value || (!days.find(function(d) { return (d.id||"") === sel.value; }) && current !== "kickoff" && current !== "video_due")) {
     sel.value = sel.options[sel.options.length-1].value;
   }
 
