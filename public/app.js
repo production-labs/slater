@@ -4303,7 +4303,55 @@ function openMyInfo() {
     document.getElementById("myinfo_phone").value    = formatPhone(data.phone || "");
     document.getElementById("myinfo_email").value    = data.email || "";
     document.getElementById("myinfo_timezone").value = data.timezone || "none";
+    window._myInfoAvatar = data.avatar || null;
+    _refreshMyInfoAvatar(data.name || "", data.avatar || null);
   });
+}
+
+function _refreshMyInfoAvatar(name, avatar) {
+  var preview  = document.getElementById("myinfo-avatar-preview");
+  var initials = document.getElementById("myinfo-avatar-initials");
+  var removeBtn = document.getElementById("myinfo-avatar-remove");
+  if (avatar) {
+    if (preview)  { preview.src = avatar; preview.style.display = ""; }
+    if (initials) initials.style.display = "none";
+    if (removeBtn) removeBtn.style.display = "";
+  } else {
+    if (preview)  { preview.src = ""; preview.style.display = "none"; }
+    if (initials) {
+      var parts = name.trim().split(/\s+/);
+      var init = parts.length >= 2 ? (parts[0][0]+parts[parts.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase();
+      initials.textContent = init || "?";
+      initials.style.display = "flex";
+    }
+    if (removeBtn) removeBtn.style.display = "none";
+  }
+}
+
+function triggerAvatarUpload() {
+  var input = document.getElementById("myinfo-avatar-input");
+  if (input) input.click();
+}
+
+function handleAvatarUpload(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    openCropModal(ev.target.result, function(cropped) {
+      window._myInfoAvatar = cropped;
+      var name = (document.getElementById("myinfo_name")||{}).value || "";
+      _refreshMyInfoAvatar(name, cropped);
+    });
+  };
+  reader.readAsDataURL(file);
+  input.value = "";
+}
+
+function removeAvatar() {
+  window._myInfoAvatar = null;
+  var name = (document.getElementById("myinfo_name")||{}).value || "";
+  _refreshMyInfoAvatar(name, null);
 }
 
 // Keep openAgencySettings as alias so any other callers still work
@@ -4319,9 +4367,10 @@ function saveMyInfo() {
     dba:      document.getElementById("myinfo_dba").value.trim(),
     phone:    document.getElementById("myinfo_phone").value.trim(),
     timezone: document.getElementById("myinfo_timezone").value,
+    avatar:   window._myInfoAvatar || null,
   };
   API.saveMe(data).then(function(result) {
-    if (!result) console.warn("My Info save failed");
+    if (result) updateSidebarUser(data);
   });
   closeAgencySettings();
   setStatus("My Info saved.", "ok");
@@ -7114,17 +7163,28 @@ loadSavedLogo();
 refreshSchedLocDropdowns();
 libSetSort(_libSortMode);  // applies active class to sort buttons and populates dropdown
 
-API.getMe().then(function(data) {
-  var name = data.name || "";
-  var dba = data.dba || "";
+function updateSidebarUser(data) {
+  var name = (data && data.name) || "";
+  var dba  = (data && data.dba)  || "";
+  var avatar = (data && data.avatar) || null;
   var parts = name.trim().split(/\s+/);
   var initials = parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase();
   var avatarEl = document.getElementById("sidebar-avatar");
-  var nameEl = document.getElementById("sidebar-name");
-  var dbaEl = document.getElementById("sidebar-dba");
-  if (avatarEl) avatarEl.textContent = initials;
+  var nameEl   = document.getElementById("sidebar-name");
+  var dbaEl    = document.getElementById("sidebar-dba");
+  if (avatarEl) {
+    if (avatar) {
+      avatarEl.innerHTML = '<img src="'+avatar+'" alt="">';
+    } else {
+      avatarEl.textContent = initials;
+    }
+  }
   if (nameEl) nameEl.textContent = name;
-  if (dbaEl) dbaEl.textContent = dba;
+  if (dbaEl)  dbaEl.textContent  = dba;
+}
+
+API.getMe().then(function(data) {
+  updateSidebarUser(data);
 }).catch(function() {});
 
 function logout() {

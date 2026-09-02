@@ -17,8 +17,9 @@
   <!-- Left sidebar -->
   <aside class="app-sidebar">
     <div class="app-sidebar-logo">
-      <img id="li" alt="Slater" style="width:36px;height:36px;object-fit:contain;border-radius:6px">
-      <span class="app-sidebar-logo-text">Slater</span>
+      <img id="li" alt="Slater" style="width:52px;height:52px;object-fit:contain;border-radius:10px">
+      <div class="app-sidebar-logo-text">slater</div>
+      <div class="app-sidebar-logo-sub">The Producers Toolbox</div>
     </div>
     <nav class="app-nav">
       <button class="app-nav-item active" data-tab="project" onclick="st('project')">&#128203; Project</button>
@@ -61,7 +62,7 @@
       </div>
       <div id="lib-action-row" style="display:flex;gap:8px;align-items:center">
         <div class="lib-btn-group">
-          <button class="lb" onclick="libNew()" title="New">New</button>
+          <button class="lb accent" onclick="libNew()" title="New">+ New Project</button>
           <button class="lb primary" onclick="libSave()" title="Save">Save</button>
           <span class="autosave-indicator" id="autosave-indicator">Autosaved</span>
           <button class="lb" id="lib-duplicate" onclick="libDuplicate()" title="Duplicate" style="display:none">Duplicate</button>
@@ -319,7 +320,7 @@
           <div id="note-ticker"></div>
         </div>
 
-        <div id="gen-btn-wrap" style="margin-top:1.5rem">
+        <div id="gen-btn-wrap">
           <button class="gb" id="gen-btn" onclick="generateDoc()">Download call sheet (.docx)</button>
           <button class="gb" id="wb-btn" onclick="generateWorkback()">Download workback (.docx)</button>
         </div>
@@ -422,6 +423,18 @@
       <button class="rb" onclick="closeAgencySettings()" style="font-size:18px">&#x2715;</button>
     </div>
     <div class="contacts-body" style="padding:16px 20px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:20px">
+        <div id="myinfo-avatar-wrap" style="position:relative;cursor:pointer" onclick="triggerAvatarUpload()">
+          <div id="myinfo-avatar-initials" class="app-sidebar-avatar" style="width:60px;height:60px;font-size:18px"></div>
+          <img id="myinfo-avatar-preview" style="display:none;width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
+          <div style="position:absolute;bottom:0;right:0;background:var(--accent);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;line-height:1">+</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="lb" style="font-size:11px;padding:4px 10px;min-height:unset" onclick="triggerAvatarUpload()">Upload photo</button>
+          <button class="lb" id="myinfo-avatar-remove" style="font-size:11px;padding:4px 10px;min-height:unset;display:none" onclick="removeAvatar()">Remove</button>
+        </div>
+        <input type="file" id="myinfo-avatar-input" accept="image/*" style="display:none" onchange="handleAvatarUpload(this)">
+      </div>
       <div class="fl" style="margin-bottom:12px"><label>Your name</label><input type="text" id="myinfo_name" placeholder="Full name" autocomplete="new-password" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%"></div>
       <div class="fl" style="margin-bottom:12px"><label>DBA / LLC name</label><input type="text" id="myinfo_dba" placeholder="Production company name (optional)" autocomplete="new-password" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%"></div>
       <div class="fl" style="margin-bottom:12px"><label>Phone</label><input type="text" id="myinfo_phone" class="fmt-phone" placeholder="(206) 555-0100" autocomplete="new-password" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%"></div>

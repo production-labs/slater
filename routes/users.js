@@ -126,7 +126,7 @@ router.get('/me', async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
   try {
     const result = await pool.query(
-      'SELECT id, email, name, dba, phone, timezone FROM users WHERE id=$1',
+      'SELECT id, email, name, dba, phone, timezone, logo FROM users WHERE id=$1',
       [req.session.userId]
     );
     const row = result.rows[0] || {};
@@ -137,6 +137,7 @@ router.get('/me', async (req, res) => {
       dba: row.dba || '',
       phone: row.phone || '',
       timezone: row.timezone || 'PT',
+      avatar: row.logo || null,
     });
   } catch (err) {
     console.error(err);
@@ -147,11 +148,11 @@ router.get('/me', async (req, res) => {
 // Update My Info
 router.put('/me', async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
-  const { name, dba, phone, timezone } = req.body;
+  const { name, dba, phone, timezone, avatar } = req.body;
   try {
     await pool.query(
-      'UPDATE users SET name=$1, dba=$2, phone=$3, timezone=$4, updated_at=NOW() WHERE id=$5',
-      [name||'', dba||'', phone||'', timezone||'PT', req.session.userId]
+      'UPDATE users SET name=$1, dba=$2, phone=$3, timezone=$4, logo=$5, updated_at=NOW() WHERE id=$6',
+      [name||'', dba||'', phone||'', timezone||'PT', avatar||null, req.session.userId]
     );
     req.session.userName = name || req.session.userName;
     res.json({ success: true });
