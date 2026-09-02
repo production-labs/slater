@@ -30,6 +30,10 @@
       <button class="app-nav-item" data-tab="urls" onclick="st('urls')">&#128279; URLs</button>
       <button class="app-nav-item" data-tab="notes" onclick="st('notes')">&#128221; Notes</button>
       <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')">&#128176; Expenses</button>
+      <button class="app-nav-item app-nav-toggle" id="sidebar-rundown-btn" onclick="toggleSidebar()">&#128203; Rundown</button>
+      <div class="app-nav-separator"></div>
+      <button class="app-nav-util" onclick="openContacts()">Contacts</button>
+      <button class="app-nav-util" onclick="openAgencyManager()">Agencies</button>
     </nav>
     <div class="app-sidebar-user" onclick="openMyInfo()">
       <div class="app-sidebar-avatar" id="sidebar-avatar"></div>
@@ -68,12 +72,6 @@
           <button class="lb" id="lib-duplicate" onclick="libDuplicate()" title="Duplicate" style="display:none">Duplicate</button>
           <button class="lb danger" id="lib-delete" onclick="libDelete()" title="Delete" style="display:none">Delete</button>
         </div>
-        <button class="lb" onclick="openContacts()" title="Contacts" style="border-color:#bbb;color:#555">&#9742; Contacts</button>
-        <button class="lb" onclick="openAgencyManager()" title="Agencies" style="border-color:#bbb;color:#555">&#127970; Agencies</button>
-        <button class="lb" onclick="toggleSidebar()" title="Rundown" style="border-color:#bbb;color:#555">&#128203; Rundown</button>
-      </div>
-      <div id="agency-logo-wrap" style="display:none;margin-left:4px">
-        <img id="agency-li" alt="Agency" style="width:36px;height:36px;object-fit:contain;border-radius:6px">
       </div>
     </div>
 

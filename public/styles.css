@@ -475,6 +475,9 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .app-nav-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;border:none;border-left:3px solid transparent;background:none;color:var(--text-muted);font-size:13px;font-family:'Inter',sans-serif;font-weight:500;cursor:pointer;text-align:left;width:100%;transition:background .15s,color .15s;min-height:unset}
 .app-nav-item:hover{background:var(--surface-2);color:var(--text-primary)}
 .app-nav-item.active{background:rgba(255,77,0,.08);color:var(--accent);font-weight:600;border-left-color:var(--accent)}
+.app-nav-separator{height:1px;background:var(--border);margin:6px 8px;flex-shrink:0}
+.app-nav-util{display:flex;align-items:center;padding:5px 15px;border:none;background:none;color:var(--text-muted);font-size:12px;font-family:'Inter',sans-serif;cursor:pointer;text-align:left;width:100%;transition:color .15s,background .15s;min-height:unset;border-radius:4px}
+.app-nav-util:hover{color:var(--text-primary);background:var(--surface-2)}
 .app-sidebar-user{padding:12px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0;transition:background .15s}
 .app-sidebar-user:hover{background:var(--surface-2)}
 .app-sidebar-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:.02em}

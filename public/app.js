@@ -170,7 +170,7 @@ function st(n) {
       document.getElementById("tab-"+n).classList.add("active");
     }
   });
-  document.querySelectorAll(".app-nav-item").forEach(function(btn) {
+  document.querySelectorAll(".app-nav-item:not(.app-nav-toggle)").forEach(function(btn) {
     btn.classList.toggle("active", btn.dataset.tab === n);
   });
   document.querySelectorAll(".mobile-nav-btn").forEach(function(btn) {
@@ -2602,6 +2602,8 @@ var sidebarRefreshTimer = null;
 function toggleSidebar() {
   sidebarOpen = !sidebarOpen;
   document.getElementById("daily-sidebar").classList.toggle("hidden", !sidebarOpen);
+  var rundownBtn = document.getElementById("sidebar-rundown-btn");
+  if (rundownBtn) rundownBtn.classList.toggle("active", sidebarOpen);
   if (sidebarOpen) { if (dailyTab === "crew") renderSidebarCrew(); else refreshSidebar(); }
 }
 
@@ -4017,9 +4019,8 @@ function rebuildWbDividers() {
 const LOGO_KEY = "slater_logo";
 
 function loadSavedLogo() {
-  // Always show the baked-in Slater logo — not user-replaceable
   const img = document.getElementById("li");
-  if (img) img.src = "data:image/png;base64," + LB64;
+  if (img) img.src = "/images/SlaterIcon.svg";
 }
 
 
