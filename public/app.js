@@ -170,6 +170,9 @@ function st(n) {
       document.getElementById("tab-"+n).classList.add("active");
     }
   });
+  document.querySelectorAll(".app-nav-item").forEach(function(btn) {
+    btn.classList.toggle("active", btn.dataset.tab === n);
+  });
   document.querySelectorAll(".mobile-nav-btn").forEach(function(btn) {
     btn.classList.toggle("active", btn.dataset.tab === n);
   });
@@ -2598,12 +2601,7 @@ var sidebarRefreshTimer = null;
 
 function toggleSidebar() {
   sidebarOpen = !sidebarOpen;
-  document.getElementById("daily-sidebar").classList.toggle("open", sidebarOpen);
-  document.body.classList.toggle("sidebar-open", sidebarOpen);
-  var w = parseInt(document.getElementById("daily-sidebar").style.width) || 320;
-  document.getElementById("daily-toggle").style.right = sidebarOpen ? w+"px" : "0";
-  document.body.style.transition = "padding-right .4s cubic-bezier(.4,0,.2,1)";
-  document.body.style.paddingRight = sidebarOpen ? w+"px" : "";
+  document.getElementById("daily-sidebar").classList.toggle("hidden", !sidebarOpen);
   if (sidebarOpen) { if (dailyTab === "crew") renderSidebarCrew(); else refreshSidebar(); }
 }
 
@@ -3222,9 +3220,6 @@ function renderSidebarCrew() {
       if (!resizing) return;
       var newW = Math.max(240, Math.min(600, startW-(e.clientX-startX)));
       document.getElementById("daily-sidebar").style.width = newW+"px";
-      document.getElementById("daily-toggle").style.right = sidebarOpen ? newW+"px" : "0";
-      var page = document.querySelector(".page");
-      document.body.style.paddingRight = sidebarOpen ? newW+"px" : "";
     });
     document.addEventListener("mouseup", function() {
       resizing = false; document.body.style.userSelect = "";
@@ -7118,6 +7113,19 @@ async function generateDoc() {
 loadSavedLogo();
 refreshSchedLocDropdowns();
 libSetSort(_libSortMode);  // applies active class to sort buttons and populates dropdown
+
+API.getMe().then(function(data) {
+  var name = data.name || "";
+  var dba = data.dba || "";
+  var parts = name.trim().split(/\s+/);
+  var initials = parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase();
+  var avatarEl = document.getElementById("sidebar-avatar");
+  var nameEl = document.getElementById("sidebar-name");
+  var dbaEl = document.getElementById("sidebar-dba");
+  if (avatarEl) avatarEl.textContent = initials;
+  if (nameEl) nameEl.textContent = name;
+  if (dbaEl) dbaEl.textContent = dba;
+}).catch(function() {});
 
 function logout() {
   fetch('/api/users/logout', {method:'POST'})

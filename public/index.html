@@ -11,58 +11,362 @@
 </head>
 <body>
 <div id="toast" class="toast"></div>
-<button id="daily-toggle" onclick="toggleSidebar()" title="Daily to-do list">Rundown</button>
-<div id="daily-sidebar">
-  <div id="daily-resize"></div>
-  <div class="daily-head"><div><h3>&#128203; Rundown</h3><div class="daily-head-date" id="daily-date"></div></div><button class="daily-close" onclick="toggleSidebar()">&#x2715;</button></div>
-  <div class="daily-tabs">
-    <div class="daily-tab active" id="dtab-pending" onclick="switchDailyTab('pending')">Pending</div>
-    <div class="daily-tab" id="dtab-completed" onclick="switchDailyTab('completed')">Completed</div>
-    <div class="daily-tab" id="dtab-crew" onclick="switchDailyTab('crew')">Crew</div>
-  </div>
-  <div class="daily-body" id="daily-body"></div>
-</div>
-<div class="page">
-  <div class="hdr">
-    <div style="display:flex;align-items:center;align-self:center">
-      <img id="li" alt="Slater" style="width:80px;height:80px;object-fit:contain;border-radius:6px">
+
+<div class="app-shell">
+
+  <!-- Left sidebar -->
+  <aside class="app-sidebar">
+    <div class="app-sidebar-logo">
+      <img id="li" alt="Slater" style="width:36px;height:36px;object-fit:contain;border-radius:6px">
+      <span class="app-sidebar-logo-text">Slater</span>
     </div>
-    <div style="display:flex;flex-direction:column;justify-content:center"><h1>Slater</h1><p>The producer's toolbox.</p></div>
-    <div style="flex:1"></div>
-    <div id="agency-logo-wrap" style="display:none">
-      <img id="agency-li" alt="Agency" style="width:80px;height:80px;object-fit:contain;border-radius:6px">
-    </div>
-  </div>
-  <div class="lib-bar">
-    <button class="hamburger-btn" onclick="openMobileDrawer()">&#9776;</button>
-    <span class="mobile-brand">SLATER</span>
-    <div id="lib-sort-row" style="display:flex;align-items:center;gap:8px;width:100%">
-      <span style="font-size:11px;color:var(--film-can);white-space:nowrap">Sort:</span>
-      <div class="lib-sort-btns">
-        <button class="lib-sort-btn" id="sort-recent" onclick="libSetSort('recent')">Recent</button>
-        <button class="lib-sort-btn" id="sort-date" onclick="libSetSort('date')">Date</button>
-        <button class="lib-sort-btn" id="sort-company" onclick="libSetSort('company')">Company</button>
+    <nav class="app-nav">
+      <button class="app-nav-item active" data-tab="project" onclick="st('project')">&#128203; Project</button>
+      <button class="app-nav-item" data-tab="schedule" onclick="st('schedule')">&#128197; Schedule</button>
+      <button class="app-nav-item" data-tab="crew" onclick="st('crew')">&#128101; Crew</button>
+      <button class="app-nav-item" data-tab="talent" onclick="st('talent')">&#127775; Talent</button>
+      <button class="app-nav-item" data-tab="workback" onclick="st('workback')">&#128198; Workback</button>
+      <button class="app-nav-item" data-tab="urls" onclick="st('urls')">&#128279; URLs</button>
+      <button class="app-nav-item" data-tab="notes" onclick="st('notes')">&#128221; Notes</button>
+      <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')">&#128176; Expenses</button>
+    </nav>
+    <div class="app-sidebar-user" onclick="openMyInfo()">
+      <div class="app-sidebar-avatar" id="sidebar-avatar"></div>
+      <div class="app-sidebar-userinfo">
+        <div class="app-sidebar-name" id="sidebar-name"></div>
+        <div class="app-sidebar-dba" id="sidebar-dba"></div>
       </div>
     </div>
-    <div class="select-wrap"><select id="lib-select" onchange="libSelect()">
-      <option value="">— New project —</option>
-    </select></div>
-    <div id="lib-action-row" style="display:flex;gap:8px;align-items:center;width:100%">
-      <div class="lib-btn-group">
-        <button class="lb" onclick="libNew()" title="New">New</button>
-        <button class="lb primary" onclick="libSave()" title="Save">Save</button>
-        <span class="autosave-indicator" id="autosave-indicator">Autosaved</span>
-        <button class="lb" id="lib-duplicate" onclick="libDuplicate()" title="Duplicate" style="display:none">Duplicate</button>
-        <button class="lb danger" id="lib-delete" onclick="libDelete()" title="Delete" style="display:none">Delete</button>
+  </aside>
+
+  <!-- Main area -->
+  <div class="app-main">
+
+    <!-- Top bar -->
+    <div class="app-topbar">
+      <button class="hamburger-btn" onclick="openMobileDrawer()">&#9776;</button>
+      <span class="mobile-brand">SLATER</span>
+      <div id="lib-sort-row" style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--film-can);white-space:nowrap">Sort:</span>
+        <div class="lib-sort-btns">
+          <button class="lib-sort-btn" id="sort-recent" onclick="libSetSort('recent')">Recent</button>
+          <button class="lib-sort-btn" id="sort-date" onclick="libSetSort('date')">Date</button>
+          <button class="lib-sort-btn" id="sort-company" onclick="libSetSort('company')">Company</button>
+        </div>
       </div>
-      <button class="lb" onclick="openContacts()" title="Contacts" style="border-color:#bbb;color:#555">&#9742; Contacts</button>
-      <button class="lb" onclick="openAgencyManager()" title="Agencies" style="border-color:#bbb;color:#555">&#127970; Agencies</button>
-      <span onclick="openMyInfo()" title="My Info" style="font-size:28px;cursor:pointer;color:var(--film-can);line-height:1;margin-left:auto;padding:2px 0" onmouseenter="this.style.color='var(--charcoal)'" onmouseleave="this.style.color='var(--film-can)'">&#9881;</span>
-
+      <div class="select-wrap" id="topbar-select-wrap" style="flex:1;min-width:140px;max-width:280px">
+        <select id="lib-select" onchange="libSelect()">
+          <option value="">— New project —</option>
+        </select>
+      </div>
+      <div id="lib-action-row" style="display:flex;gap:8px;align-items:center">
+        <div class="lib-btn-group">
+          <button class="lb" onclick="libNew()" title="New">New</button>
+          <button class="lb primary" onclick="libSave()" title="Save">Save</button>
+          <span class="autosave-indicator" id="autosave-indicator">Autosaved</span>
+          <button class="lb" id="lib-duplicate" onclick="libDuplicate()" title="Duplicate" style="display:none">Duplicate</button>
+          <button class="lb danger" id="lib-delete" onclick="libDelete()" title="Delete" style="display:none">Delete</button>
+        </div>
+        <button class="lb" onclick="openContacts()" title="Contacts" style="border-color:#bbb;color:#555">&#9742; Contacts</button>
+        <button class="lb" onclick="openAgencyManager()" title="Agencies" style="border-color:#bbb;color:#555">&#127970; Agencies</button>
+        <button class="lb" onclick="toggleSidebar()" title="Rundown" style="border-color:#bbb;color:#555">&#128203; Rundown</button>
+      </div>
+      <div id="agency-logo-wrap" style="display:none;margin-left:4px">
+        <img id="agency-li" alt="Agency" style="width:36px;height:36px;object-fit:contain;border-radius:6px">
+      </div>
     </div>
-  </div>
 
-  
+    <!-- Content + Rundown side by side -->
+    <div class="app-body">
+
+      <!-- Scrollable main content -->
+      <div class="app-content">
+
+        <!-- Hidden tab bar kept for st() JS compatibility -->
+        <div class="tabs" style="display:none">
+          <button class="tab active" onclick="st('project')">Project</button>
+          <button class="tab" onclick="st('schedule')">Schedule</button>
+          <button class="tab" onclick="st('crew')">Crew</button>
+          <button class="tab" onclick="st('talent')">Talent</button>
+          <button class="tab" onclick="st('workback')">Workback</button>
+          <button class="tab" onclick="st('urls')">URLs</button>
+          <button class="tab" onclick="st('notes')">Notes</button>
+          <button class="tab" onclick="st('expenses')">Expenses</button>
+        </div>
+
+        <div id="tab-project" class="sec active">
+          <div class="sh">Project details</div>
+          <div class="g2" style="margin-bottom:1.25rem">
+            <div class="fl">
+              <label>Project type</label>
+              <div class="select-wrap"><select id="project_type" onchange="offerDefaultTemplate(this.value); rebuildScheduleDays(); updateVideoDueVisibility()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
+              <option value="post_production">Post Production</option>
+              <option value="location_shoot">Location Shoot</option>
+              <option value="live_broadcast_location">Live Broadcast: On Location</option>
+              <option value="live_broadcast_studio">Live Broadcast: In Studio</option>
+              <option value="webinar">Webinar</option>
+              </select></div>
+            </div>
+            <div class="fl"><label>Billing code</label><input type="text" id="billing_code" placeholder="Project Billing Code" autocomplete="new-password"></div>
+          </div>
+          <div class="fl" style="margin-bottom:8px">
+            <label>Agency</label>
+            <div class="select-wrap"><select id="project_agency_id" onchange="autosaveTrigger();updateBrandingWarning()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
+              <option value="">— No agency —</option>
+            </select></div>
+          </div>
+          <div class="fl"><label>Project / video title</label><input type="text" id="project_title" placeholder="e.g. Microsoft Unified Security Operations"></div>
+          <div class="g2">
+            <div class="fl"><label>Company</label><input type="text" id="client_company" placeholder="Company name" autocomplete="new-password" oninput="updateBrandingWarning()"></div>
+            <div class="fl"><label>Client name</label><input type="text" id="client_name" placeholder="First Last" autocomplete="new-password"></div>
+          </div>
+          <div style="margin-bottom:1.25rem">
+            <label style="font-size:12px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Document branding</label>
+            <div style="display:flex;gap:16px;align-items:center">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="doc_branding" id="doc_branding_agency" value="agency" checked onchange="updateBrandingWarning()"> Agency</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="doc_branding" id="doc_branding_client" value="client" onchange="updateBrandingWarning()"> Client</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="doc_branding" id="doc_branding_slater" value="slater" onchange="updateBrandingWarning()"> Slater</label>
+              <img id="branding-logo-preview" style="display:none;width:32px;height:32px;object-fit:contain;border-radius:4px;border:1px solid var(--border);background:#fff;margin-left:4px">
+            </div>
+            <div id="branding-warning" style="display:none;color:var(--accent);font-size:12px;margin-top:6px"></div>
+          </div>
+          <div class="sh" style="margin-top:1.5rem">Key personnel</div>
+          <div id="kp-list"></div>
+          <button id="add-kp-btn" class="ab" style="margin-top:8px" onclick="addKP();autosaveTrigger()">+ Add key personnel</button>
+        </div>
+
+        <div id="tab-schedule" class="sec">
+          <div class="fl" style="margin-bottom:1.25rem">
+            <label>Time zone</label>
+            <div class="select-wrap"><select id="timezone" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
+              <option value="none">— No timezone —</option>
+              <option value="ET">Eastern Time</option>
+              <option value="CT">Central Time</option>
+              <option value="MT">Mountain Time</option>
+              <option value="PT" selected>Pacific Time</option>
+              <option value="AKT">Alaska Time</option>
+              <option value="HT">Hawaii Time</option>
+              <option value="GMT">Greenwich Mean Time</option>
+              <option value="CET">Central European Time</option>
+            </select></div>
+          </div>
+          <datalist id="day-label-suggestions">
+            <option value="Setup / Rehearsal">
+            <option value="Shoot Day">
+            <option value="Recording Day">
+            <option value="Live Event">
+            <option value="Edit Day">
+            <option value="Color / Audio">
+            <option value="Delivery Day">
+            <option value="Travel Day">
+            <option value="Pre-Production">
+            <option value="Strike / Load Out">
+          </datalist>
+          <div id="kickoff-block" class="sday-block" style="border-color:#2a3a5a;background:#111b2e">
+            <div class="sday-header" style="background:#162040;border-color:#2a3a5a">
+              <span class="sday-title" style="color:#5B9BD5">&#128204; Client Kickoff</span>
+              <span style="font-size:10px;color:#5B9BD5;padding:2px 8px;border:1px solid #2a3a5a;border-radius:4px">pinned</span>
+            </div>
+            <div class="sday-body">
+              <div class="g2">
+                <div class="fl"><label>Kickoff date</label><input type="date" id="kickoff_date_iso" oninput="syncKickoffDate()" autocomplete="new-password"></div>
+                <div class="fl"><label>Time</label><input type="text" id="kickoff_time" placeholder="e.g. 9:00 AM" autocomplete="new-password" oninput="wbRebuildPins()"></div>
+              </div>
+            </div>
+          </div>
+          <div id="schedule-kickoff-divider" class="sday-insert" style="display:none" onclick="insertScheduleDay(null)"><div class="sday-insert-line"></div><div class="sday-insert-btn">+</div><div class="sday-insert-line"></div></div>
+          <div id="video-due-block" class="sday-block" style="border-color:#2a3a5a;background:#111b2e;display:none">
+            <div class="sday-header" style="background:#162040;border-color:#2a3a5a">
+              <span class="sday-title" style="color:#5B9BD5">&#127916; Project Due Date</span>
+              <span style="font-size:10px;color:#5B9BD5;padding:2px 8px;border:1px solid #2a3a5a;border-radius:4px">pinned</span>
+            </div>
+            <div class="sday-body">
+              <div class="g2">
+                <div class="fl"><label>Due date</label><input type="date" id="video_due_date_iso" oninput="syncVideoDueDate()" autocomplete="new-password"></div>
+                <div class="fl"><label>Time</label><input type="text" id="video_due_time" placeholder="e.g. 5:00 PM" autocomplete="new-password" oninput="wbRebuildPins()"></div>
+              </div>
+            </div>
+          </div>
+          <div id="schedule-days-list"></div>
+        </div>
+
+        <div id="tab-crew" class="sec">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+            <div class="sh" style="margin-bottom:0">Crew</div>
+            <div style="display:flex;gap:8px">
+              <button class="lb" onclick="saveCrewConfig()" style="font-size:12px">&#128190; Save config</button>
+              <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px">&#128193; Configs</button>
+            </div>
+          </div>
+          <div id="crew-status-bar">
+            <div class="crew-status-bar-row1">
+              <div class="crew-status-count"><span class="crew-status-dot" style="background:#9D9D99"></span><span id="csb-tbd-label">TBD</span>&nbsp;<strong id="csb-tbd-count">0</strong></div>
+              <div class="crew-status-count"><span class="crew-status-dot" style="background:#E8B84B"></span><span id="csb-pencil-label">Pencil</span>&nbsp;<strong id="csb-pencil-count">0</strong></div>
+              <div class="crew-status-count"><span class="crew-status-dot" style="background:#E07B39"></span><span id="csb-hold-label">1st Hold</span>&nbsp;<strong id="csb-hold-count">0</strong></div>
+              <div class="crew-status-count"><span class="crew-status-dot" style="background:#4A9E6B"></span><span id="csb-confirmed-label">Confirmed</span>&nbsp;<strong id="csb-confirmed-count">0</strong></div>
+            </div>
+            <div class="crew-status-bar-row2">
+              <div class="crew-progress-track"><div class="crew-progress-fill" id="csb-progress-fill" style="width:0%"></div></div>
+              <div class="crew-progress-label" id="csb-summary"></div>
+            </div>
+          </div>
+          <div id="crew-list"></div>
+          <button class="ab" onclick="addCrew()">+ Add crew member</button>
+        </div>
+
+        <div id="tab-talent" class="sec">
+          <div class="sh">Talent</div>
+          <div id="talent-status-bar" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:none">
+            <div class="crew-status-bar-row1">
+              <div class="crew-status-count"><span class="crew-status-dot" style="background:#9D9D99"></span><span>TBD</span>&nbsp;<strong id="tsb-tbd-count">0</strong></div>
+              <div class="crew-status-count"><span class="crew-status-dot" style="background:#E8B84B"></span><span>Pencil</span>&nbsp;<strong id="tsb-pencil-count">0</strong></div>
+              <div class="crew-status-count"><span class="crew-status-dot" style="background:#E07B39"></span><span>1st Hold</span>&nbsp;<strong id="tsb-hold-count">0</strong></div>
+              <div class="crew-status-count"><span class="crew-status-dot" style="background:#4A9E6B"></span><span>Confirmed</span>&nbsp;<strong id="tsb-confirmed-count">0</strong></div>
+            </div>
+            <div class="crew-status-bar-row2">
+              <div class="crew-progress-track"><div class="crew-progress-fill" id="tsb-progress-fill" style="width:0%"></div></div>
+              <div class="crew-progress-label" id="tsb-summary"></div>
+            </div>
+          </div>
+          <div id="talent-list"></div>
+          <button class="ab" onclick="addTalent()">+ Add talent</button>
+        </div>
+
+        <div id="tab-workback" class="sec">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+            <div class="sh" style="margin-bottom:0">Workback schedule</div>
+            <div style="display:flex;gap:8px">
+              <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px">&#128190; Save as template</button>
+              <button class="lb" onclick="openTemplateManager()" style="font-size:12px">&#128193; Templates</button>
+            </div>
+          </div>
+          <div style="margin-bottom:1rem">
+            <div class="fl">
+              <label>Anchor date</label>
+              <div class="select-wrap"><select id="wb_day_select" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
+                <option value="last" selected>Last day</option>
+              </select></div>
+            </div>
+            <div class="fl">
+              <label>Direction</label>
+              <div class="select-wrap"><select id="wb_direction" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
+                <option value="back" selected>Work back from anchor</option>
+                <option value="forward">Work forward from anchor</option>
+              </select></div>
+            </div>
+          </div>
+          <div id="wb-list"></div>
+        </div>
+
+        <div id="tab-expenses" class="sec">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+            <div class="sh" style="margin-bottom:0">Expenses</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="lb" onclick="addExpense()" style="font-size:12px">+ Add expense</button>
+            </div>
+          </div>
+          <div id="exp-download-row" style="display:none;gap:10px;margin-bottom:1rem">
+            <button class="gb" id="exp-docx-btn" onclick="generateExpenseDoc()" style="margin-top:0;font-size:13px">&#8595; Download expense report (.docx)</button>
+          </div>
+          <div id="expense-totals" style="margin-bottom:1rem;padding:12px 16px;background:var(--tape);border:1px solid var(--border);border-radius:8px;display:none">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);margin-bottom:4px">Total Spent</div>
+                <div id="exp-total" style="font-size:20px;font-weight:700;color:var(--charcoal)">$0.00</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);margin-bottom:4px">Reimbursable</div>
+                <div id="exp-reimbursable" style="font-size:20px;font-weight:700;color:var(--charcoal)">$0.00</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);margin-bottom:4px">By Category</div>
+                <div id="exp-by-cat" style="font-size:11px;color:var(--text-muted);line-height:1.8"></div>
+              </div>
+            </div>
+          </div>
+          <div id="expense-list"></div>
+        </div>
+
+        <div id="tab-urls" class="sec">
+          <div class="sh">URLs</div>
+          <div id="url-list"></div>
+          <button class="ab" onclick="addUrl()" style="margin-top:4px">+ Add URL</button>
+        </div>
+
+        <div id="tab-notes" class="sec">
+          <div class="sh">Notes</div>
+          <div id="notes-editor-wrap" style="margin-bottom:10px">
+            <div class="notes-toolbar" id="notes-toolbar">
+              <button onclick="noteCmd('bold')" title="Bold"><b>B</b></button>
+              <button onclick="noteCmd('italic')" title="Italic"><i>I</i></button>
+              <button onclick="noteCmd('underline')" title="Underline"><u>U</u></button>
+              <button onclick="noteCmd('insertUnorderedList')" title="Bullet list">&#8226; List</button>
+              <button onclick="noteCmd('insertOrderedList')" title="Numbered list">1. List</button>
+            </div>
+            <div class="note-draft-indicator" id="note-draft-indicator">Draft restored -- hit Save note when ready</div>
+            <div id="note-editor" contenteditable="true" class="note-editor" placeholder="Write a note..." oninput="updateNoteDraftIndicator(this.innerHTML)"></div>
+          </div>
+          <div id="notes-save-row" style="display:flex;gap:8px;margin-bottom:1.5rem">
+            <button class="ab" id="note-save-btn" onclick="noteSave()">&#128190; Save note</button>
+            <button class="lb" id="note-cancel-btn" onclick="noteCancelEdit()" style="display:none">Cancel</button>
+          </div>
+          <div id="notes-search-wrap" style="margin-bottom:12px;position:relative">
+            <input type="text" id="notes-search" placeholder="Search notes..." style="width:100%;padding:8px 32px 8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--surface)">
+            <span id="notes-search-clear" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--film-can);display:none;font-size:16px">&#x2715;</span>
+          </div>
+          <div id="notes-search-results" style="display:none"></div>
+          <div id="notes-history-hdr" class="sh" style="margin-top:0">Note history</div>
+          <div id="note-ticker"></div>
+        </div>
+
+        <div id="gen-btn-wrap" style="margin-top:1.5rem">
+          <button class="gb" id="gen-btn" onclick="generateDoc()">Download call sheet (.docx)</button>
+          <button class="gb" id="wb-btn" onclick="generateWorkback()">Download workback (.docx)</button>
+        </div>
+        <div class="sb" id="status-bar"></div>
+
+        <div class="slater-footer">
+          <strong>Slater</strong> &nbsp;&middot;&nbsp; &copy; <script>document.write(new Date().getFullYear())</script> Production Labs LLC. All rights reserved.
+          <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:12px">
+            <button onclick="exportLibrary()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Export all projects to JSON">&#8595; Export backup</button>
+            <span style="color:var(--border)">&middot;</span>
+            <button onclick="document.getElementById('import-file').click()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Import projects from JSON">&#8593; Import backup</button>
+            <input type="file" id="import-file" accept=".json" style="display:none" onchange="importLibrary(this)">
+          </div>
+          <div class="note-img-modal" id="note-img-modal">
+            <button onclick="closeNoteImgModal()">&#x2715;</button>
+            <img id="note-img-fullsize" src="" alt="">
+          </div>
+          <div class="exp-receipt-modal" id="exp-receipt-modal">
+            <button onclick="closeReceiptModal()">&#x2715;</button>
+            <img id="exp-receipt-fullsize" src="" alt="Receipt">
+          </div>
+        </div>
+
+      </div><!-- /.app-content -->
+
+      <!-- Inline Rundown panel -->
+      <div id="daily-sidebar" class="hidden">
+        <div id="daily-resize"></div>
+        <div class="daily-head">
+          <div><h3>&#128203; Rundown</h3><div class="daily-head-date" id="daily-date"></div></div>
+          <button class="daily-close" onclick="toggleSidebar()">&#x2715;</button>
+        </div>
+        <div class="daily-tabs">
+          <div class="daily-tab active" id="dtab-pending" onclick="switchDailyTab('pending')">Pending</div>
+          <div class="daily-tab" id="dtab-completed" onclick="switchDailyTab('completed')">Completed</div>
+          <div class="daily-tab" id="dtab-crew" onclick="switchDailyTab('crew')">Crew</div>
+        </div>
+        <div class="daily-body" id="daily-body"></div>
+      </div>
+
+    </div><!-- /.app-body -->
+
+  </div><!-- /.app-main -->
+
+</div><!-- /.app-shell -->
+
+<!-- Modals (position:fixed) -->
 <div class="tmpl-modal" id="tmpl-modal">
   <div class="tmpl-box">
     <div class="tmpl-head">
@@ -87,7 +391,6 @@
   </div>
 </div>
 
-
 <div class="contacts-modal" id="crop-modal" style="z-index:3000">
   <div class="contacts-box" style="width:520px;max-height:90vh">
     <div class="contacts-head">
@@ -95,7 +398,7 @@
       <button class="rb" onclick="closeCropModal()" style="font-size:18px">&#x2715;</button>
     </div>
     <div class="contacts-body" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px">
-      <p style="font-size:12px;color:var(--film-can);margin:0">Drag to reposition · Resize with corner handle</p>
+      <p style="font-size:12px;color:var(--film-can);margin:0">Drag to reposition &middot; Resize with corner handle</p>
       <div id="crop-container" style="position:relative;overflow:hidden;background:#222;border-radius:8px;cursor:move;user-select:none">
         <img id="crop-img" style="display:block;max-width:100%">
         <div id="crop-box" style="position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.5);cursor:move">
@@ -110,7 +413,8 @@
     </div>
   </div>
 </div>
-<!-- My Info modal (gear icon) -->
+
+<!-- My Info modal -->
 <div class="contacts-modal" id="agency-modal">
   <div class="contacts-box" style="width:420px">
     <div class="contacts-head">
@@ -156,302 +460,40 @@
     <div class="contacts-foot" id="agency-manager-foot"></div>
   </div>
 </div>
+
 <div class="contacts-modal" id="contacts-modal">
-    <div class="contacts-box">
-      <div class="contacts-head">
-        <h3>Contact Directory</h3>
-        <button class="rb" onclick="closeContacts()" style="font-size:18px">&#x2715;</button>
-      </div>
-      <div class="contacts-tabs">
-        <div class="contacts-tab active" onclick="showContactsTab('staff')">Production Staff</div>
-        <div class="contacts-tab" onclick="showContactsTab('crew')">Crew</div>
-        <div class="contacts-tab" onclick="showContactsTab('talent')">Talent</div>
-        <div class="contacts-tab" onclick="showContactsTab('locations')">Locations</div>
-        <div class="contacts-tab" onclick="showContactsTab('companies')">Companies</div>
-      </div>
-      <div class="contacts-body" id="contacts-body"></div>
-      <div class="contacts-foot">
-        <button class="lb" onclick="addContactRow()">+ Add</button>
-        <button class="lb primary" onclick="saveContacts()">Save contacts</button>
-        <button class="lb" onclick="closeContacts()">Close</button>
-      </div>
+  <div class="contacts-box">
+    <div class="contacts-head">
+      <h3>Contact Directory</h3>
+      <button class="rb" onclick="closeContacts()" style="font-size:18px">&#x2715;</button>
+    </div>
+    <div class="contacts-tabs">
+      <div class="contacts-tab active" onclick="showContactsTab('staff')">Production Staff</div>
+      <div class="contacts-tab" onclick="showContactsTab('crew')">Crew</div>
+      <div class="contacts-tab" onclick="showContactsTab('talent')">Talent</div>
+      <div class="contacts-tab" onclick="showContactsTab('locations')">Locations</div>
+      <div class="contacts-tab" onclick="showContactsTab('companies')">Companies</div>
+    </div>
+    <div class="contacts-body" id="contacts-body"></div>
+    <div class="contacts-foot">
+      <button class="lb" onclick="addContactRow()">+ Add</button>
+      <button class="lb primary" onclick="saveContacts()">Save contacts</button>
+      <button class="lb" onclick="closeContacts()">Close</button>
     </div>
   </div>
-
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal">
-      <h3 id="modal-title">Confirm</h3>
-      <p id="modal-msg"></p>
-      <div class="modal-btns">
-        <button class="lb" onclick="modalCancel()">Cancel</button>
-        <button class="lb primary" id="modal-ok" onclick="modalOk()">OK</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="tabs">
-    <button class="tab active" onclick="st('project')">Project</button>
-    <button class="tab" onclick="st('schedule')">Schedule</button>
-    <button class="tab" onclick="st('crew')">Crew</button>
-    <button class="tab" onclick="st('talent')">Talent</button>
-    <button class="tab" onclick="st('workback')">Workback</button>
-    <button class="tab" onclick="st('urls')">URLs</button>
-    <button class="tab" onclick="st('notes')">Notes</button>
-    <button class="tab" onclick="st('expenses')">Expenses</button>
-  </div>
-
-  <div id="tab-project" class="sec active">
-    <div class="sh">Project details</div>
-    <div class="g2" style="margin-bottom:1.25rem">
-      <div class="fl">
-        <label>Project type</label>
-        <div class="select-wrap"><select id="project_type" onchange="offerDefaultTemplate(this.value); rebuildScheduleDays(); updateVideoDueVisibility()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-        <option value="post_production">Post Production</option>
-        <option value="location_shoot">Location Shoot</option>
-        <option value="live_broadcast_location">Live Broadcast: On Location</option>
-        <option value="live_broadcast_studio">Live Broadcast: In Studio</option>
-        <option value="webinar">Webinar</option>
-        </select></div>
-      </div>
-      <div class="fl"><label>Billing code</label><input type="text" id="billing_code" placeholder="Project Billing Code" autocomplete="new-password"></div>
-    </div>
-    <div class="fl" style="margin-bottom:8px">
-      <label>Agency</label>
-      <div class="select-wrap"><select id="project_agency_id" onchange="autosaveTrigger();updateBrandingWarning()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-        <option value="">— No agency —</option>
-      </select></div>
-    </div>
-    <div class="fl"><label>Project / video title</label><input type="text" id="project_title" placeholder="e.g. Microsoft Unified Security Operations"></div>
-    <div class="g2">
-      <div class="fl"><label>Company</label><input type="text" id="client_company" placeholder="Company name" autocomplete="new-password" oninput="updateBrandingWarning()"></div>
-      <div class="fl"><label>Client name</label><input type="text" id="client_name" placeholder="First Last" autocomplete="new-password"></div>
-    </div>
-    <div style="margin-bottom:1.25rem">
-      <label style="font-size:12px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Document branding</label>
-      <div style="display:flex;gap:16px;align-items:center">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="doc_branding" id="doc_branding_agency" value="agency" checked onchange="updateBrandingWarning()"> Agency</label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="doc_branding" id="doc_branding_client" value="client" onchange="updateBrandingWarning()"> Client</label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="doc_branding" id="doc_branding_slater" value="slater" onchange="updateBrandingWarning()"> Slater</label>
-        <img id="branding-logo-preview" style="display:none;width:32px;height:32px;object-fit:contain;border-radius:4px;border:1px solid var(--border);background:#fff;margin-left:4px">
-      </div>
-      <div id="branding-warning" style="display:none;color:var(--accent);font-size:12px;margin-top:6px"></div>
-    </div>
-    <div class="sh" style="margin-top:1.5rem">Key personnel</div>
-    <div id="kp-list"></div>
-    <button id="add-kp-btn" class="ab" style="margin-top:8px" onclick="addKP();autosaveTrigger()">+ Add key personnel</button>
-  </div>
-
-  <div id="tab-schedule" class="sec">
-    <div class="fl" style="margin-bottom:1.25rem">
-      <label>Time zone</label>
-      <div class="select-wrap"><select id="timezone" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-        <option value="none">— No timezone —</option>
-        <option value="ET">Eastern Time</option>
-        <option value="CT">Central Time</option>
-        <option value="MT">Mountain Time</option>
-        <option value="PT" selected>Pacific Time</option>
-        <option value="AKT">Alaska Time</option>
-        <option value="HT">Hawaii Time</option>
-        <option value="GMT">Greenwich Mean Time</option>
-        <option value="CET">Central European Time</option>
-      </select></div>
-    </div>
-    <datalist id="day-label-suggestions">
-      <option value="Setup / Rehearsal">
-      <option value="Shoot Day">
-      <option value="Recording Day">
-      <option value="Live Event">
-      <option value="Edit Day">
-      <option value="Color / Audio">
-      <option value="Delivery Day">
-      <option value="Travel Day">
-      <option value="Pre-Production">
-      <option value="Strike / Load Out">
-    </datalist>
-    <div id="kickoff-block" class="sday-block" style="border-color:#2a3a5a;background:#111b2e">
-      <div class="sday-header" style="background:#162040;border-color:#2a3a5a">
-        <span class="sday-title" style="color:#5B9BD5">&#128204; Client Kickoff</span>
-        <span style="font-size:10px;color:#5B9BD5;padding:2px 8px;border:1px solid #2a3a5a;border-radius:4px">pinned</span>
-      </div>
-      <div class="sday-body">
-        <div class="g2">
-          <div class="fl"><label>Kickoff date</label><input type="date" id="kickoff_date_iso" oninput="syncKickoffDate()" autocomplete="new-password"></div>
-          <div class="fl"><label>Time</label><input type="text" id="kickoff_time" placeholder="e.g. 9:00 AM" autocomplete="new-password" oninput="wbRebuildPins()"></div>
-        </div>
-      </div>
-    </div>
-    <div id="schedule-kickoff-divider" class="sday-insert" style="display:none" onclick="insertScheduleDay(null)"><div class="sday-insert-line"></div><div class="sday-insert-btn">+</div><div class="sday-insert-line"></div></div>
-    <div id="video-due-block" class="sday-block" style="border-color:#2a3a5a;background:#111b2e;display:none">
-      <div class="sday-header" style="background:#162040;border-color:#2a3a5a">
-        <span class="sday-title" style="color:#5B9BD5">&#127916; Project Due Date</span>
-        <span style="font-size:10px;color:#5B9BD5;padding:2px 8px;border:1px solid #2a3a5a;border-radius:4px">pinned</span>
-      </div>
-      <div class="sday-body">
-        <div class="g2">
-          <div class="fl"><label>Due date</label><input type="date" id="video_due_date_iso" oninput="syncVideoDueDate()" autocomplete="new-password"></div>
-          <div class="fl"><label>Time</label><input type="text" id="video_due_time" placeholder="e.g. 5:00 PM" autocomplete="new-password" oninput="wbRebuildPins()"></div>
-        </div>
-      </div>
-    </div>
-    <div id="schedule-days-list"></div>
-  </div>
-
-  <div id="tab-crew" class="sec">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-      <div class="sh" style="margin-bottom:0">Crew</div>
-      <div style="display:flex;gap:8px">
-        <button class="lb" onclick="saveCrewConfig()" style="font-size:12px">&#128190; Save config</button>
-        <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px">&#128193; Configs</button>
-      </div>
-    </div>
-    <div id="crew-status-bar">
-      <div class="crew-status-bar-row1">
-        <div class="crew-status-count"><span class="crew-status-dot" style="background:#9D9D99"></span><span id="csb-tbd-label">TBD</span>&nbsp;<strong id="csb-tbd-count">0</strong></div>
-        <div class="crew-status-count"><span class="crew-status-dot" style="background:#E8B84B"></span><span id="csb-pencil-label">Pencil</span>&nbsp;<strong id="csb-pencil-count">0</strong></div>
-        <div class="crew-status-count"><span class="crew-status-dot" style="background:#E07B39"></span><span id="csb-hold-label">1st Hold</span>&nbsp;<strong id="csb-hold-count">0</strong></div>
-        <div class="crew-status-count"><span class="crew-status-dot" style="background:#4A9E6B"></span><span id="csb-confirmed-label">Confirmed</span>&nbsp;<strong id="csb-confirmed-count">0</strong></div>
-      </div>
-      <div class="crew-status-bar-row2">
-        <div class="crew-progress-track"><div class="crew-progress-fill" id="csb-progress-fill" style="width:0%"></div></div>
-        <div class="crew-progress-label" id="csb-summary"></div>
-      </div>
-    </div>
-    <div id="crew-list"></div>
-    <button class="ab" onclick="addCrew()">+ Add crew member</button>
-  </div>
-
-  <div id="tab-talent" class="sec">
-    <div class="sh">Talent</div>
-    <div id="talent-status-bar" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:none">
-      <div class="crew-status-bar-row1">
-        <div class="crew-status-count"><span class="crew-status-dot" style="background:#9D9D99"></span><span>TBD</span>&nbsp;<strong id="tsb-tbd-count">0</strong></div>
-        <div class="crew-status-count"><span class="crew-status-dot" style="background:#E8B84B"></span><span>Pencil</span>&nbsp;<strong id="tsb-pencil-count">0</strong></div>
-        <div class="crew-status-count"><span class="crew-status-dot" style="background:#E07B39"></span><span>1st Hold</span>&nbsp;<strong id="tsb-hold-count">0</strong></div>
-        <div class="crew-status-count"><span class="crew-status-dot" style="background:#4A9E6B"></span><span>Confirmed</span>&nbsp;<strong id="tsb-confirmed-count">0</strong></div>
-      </div>
-      <div class="crew-status-bar-row2">
-        <div class="crew-progress-track"><div class="crew-progress-fill" id="tsb-progress-fill" style="width:0%"></div></div>
-        <div class="crew-progress-label" id="tsb-summary"></div>
-      </div>
-    </div>
-    <div id="talent-list"></div>
-    <button class="ab" onclick="addTalent()">+ Add talent</button>
-  </div>
-
-  <div id="tab-workback" class="sec">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-      <div class="sh" style="margin-bottom:0">Workback schedule</div>
-      <div style="display:flex;gap:8px">
-        <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px">&#128190; Save as template</button>
-        <button class="lb" onclick="openTemplateManager()" style="font-size:12px">&#128193; Templates</button>
-      </div>
-    </div>
-    <div style="margin-bottom:1rem">
-      <div class="fl">
-        <label>Anchor date</label>
-        <div class="select-wrap"><select id="wb_day_select" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-          <option value="last" selected>Last day</option>
-        </select></div>
-      </div>
-      <div class="fl">
-        <label>Direction</label>
-        <div class="select-wrap"><select id="wb_direction" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-          <option value="back" selected>Work back from anchor</option>
-          <option value="forward">Work forward from anchor</option>
-        </select></div>
-      </div>
-
-    </div>
-    <div id="wb-list"></div>
-  </div>
-
-  <div id="tab-expenses" class="sec">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-    <div class="sh" style="margin-bottom:0">Expenses</div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="lb" onclick="addExpense()" style="font-size:12px">+ Add expense</button>
-    </div>
-  </div>
-  <div id="exp-download-row" style="display:none;gap:10px;margin-bottom:1rem">
-    <button class="gb" id="exp-docx-btn" onclick="generateExpenseDoc()" style="margin-top:0;font-size:13px">&#8595; Download expense report (.docx)</button>
-  </div>
-  <div id="expense-totals" style="margin-bottom:1rem;padding:12px 16px;background:var(--tape);border:1px solid var(--border);border-radius:8px;display:none">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);margin-bottom:4px">Total Spent</div>
-        <div id="exp-total" style="font-size:20px;font-weight:700;color:var(--charcoal)">$0.00</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);margin-bottom:4px">Reimbursable</div>
-        <div id="exp-reimbursable" style="font-size:20px;font-weight:700;color:var(--charcoal)">$0.00</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);margin-bottom:4px">By Category</div>
-        <div id="exp-by-cat" style="font-size:11px;color:var(--text-muted);line-height:1.8"></div>
-      </div>
-    </div>
-  </div>
-  <div id="expense-list"></div>
 </div>
 
-<div id="tab-urls" class="sec">
-    <div class="sh">URLs</div>
-    <div id="url-list"></div>
-    <button class="ab" onclick="addUrl()" style="margin-top:4px">+ Add URL</button>
-  </div>
-
-  <div id="tab-notes" class="sec">
-    <div class="sh">Notes</div>
-    <div id="notes-editor-wrap" style="margin-bottom:10px">
-      <div class="notes-toolbar" id="notes-toolbar">
-        <button onclick="noteCmd('bold')" title="Bold"><b>B</b></button>
-        <button onclick="noteCmd('italic')" title="Italic"><i>I</i></button>
-        <button onclick="noteCmd('underline')" title="Underline"><u>U</u></button>
-        <button onclick="noteCmd('insertUnorderedList')" title="Bullet list">&#8226; List</button>
-        <button onclick="noteCmd('insertOrderedList')" title="Numbered list">1. List</button>
-      </div>
-      <div class="note-draft-indicator" id="note-draft-indicator">Draft restored — hit Save note when ready</div>
-      <div id="note-editor" contenteditable="true" class="note-editor" placeholder="Write a note..." oninput="updateNoteDraftIndicator(this.innerHTML)"></div>
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-title">Confirm</h3>
+    <p id="modal-msg"></p>
+    <div class="modal-btns">
+      <button class="lb" onclick="modalCancel()">Cancel</button>
+      <button class="lb primary" id="modal-ok" onclick="modalOk()">OK</button>
     </div>
-    <div id="notes-save-row" style="display:flex;gap:8px;margin-bottom:1.5rem">
-      <button class="ab" id="note-save-btn" onclick="noteSave()">&#128190; Save note</button>
-      <button class="lb" id="note-cancel-btn" onclick="noteCancelEdit()" style="display:none">Cancel</button>
-    </div>
-    <div id="notes-search-wrap" style="margin-bottom:12px;position:relative">
-      <input type="text" id="notes-search" placeholder="Search notes..." style="width:100%;padding:8px 32px 8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--surface)">
-      <span id="notes-search-clear" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--film-can);display:none;font-size:16px">&#x2715;</span>
-    </div>
-    <div id="notes-search-results" style="display:none"></div>
-    <div id="notes-history-hdr" class="sh" style="margin-top:0">Note history</div>
-    <div id="note-ticker"></div>
   </div>
-
-  <div id="gen-btn-wrap" style="margin-top:1.5rem">
-    <button class="gb" id="gen-btn" onclick="generateDoc()">Download call sheet (.docx)</button>
-    <button class="gb" id="wb-btn" onclick="generateWorkback()">Download workback (.docx)</button>
-  </div>
-  <div class="sb" id="status-bar"></div>
 </div>
 
-<script src="/lib/vendors.js"></script>
-<script src="/app.js"></script>
-<div class="slater-footer">
-  <strong>Slater</strong> &nbsp;&middot;&nbsp; &copy; <script>document.write(new Date().getFullYear())</script> Production Labs LLC. All rights reserved.
-  <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:12px">
-    <button onclick="exportLibrary()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Export all projects to JSON">&#8595; Export backup</button>
-    <span style="color:var(--border)">&middot;</span>
-    <button onclick="document.getElementById('import-file').click()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Import projects from JSON">&#8593; Import backup</button>
-    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importLibrary(this)">
-  </div>
-  <div class="note-img-modal" id="note-img-modal">
-  <button onclick="closeNoteImgModal()">&#x2715;</button>
-  <img id="note-img-fullsize" src="" alt="">
-</div>
-<div class="exp-receipt-modal" id="exp-receipt-modal">
-    <button onclick="closeReceiptModal()">&#x2715;</button>
-    <img id="exp-receipt-fullsize" src="" alt="Receipt">
-  </div>
-</div>
 <div id="day-staff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeDayStaffModal()">
   <div style="background:var(--surface);border-radius:12px;width:520px;max-width:92vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)">
     <div style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
@@ -539,9 +581,14 @@
   <button onclick="mobileNavGo('urls')">URLs</button>
   <button onclick="mobileNavGo('notes')">Notes</button>
 </div>
+
 <div style="text-align:center;padding:12px;font-size:11px;color:var(--film-can);border-top:1px solid var(--border)">
   <a href="#" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Privacy Policy</a>
   <a href="#" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Terms of Service</a>
   <a href="#" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Refund Policy</a>
 </div>
+
+<script src="/lib/vendors.js"></script>
+<script src="/app.js"></script>
 </body>
+</html>

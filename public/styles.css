@@ -463,3 +463,47 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 ::-webkit-scrollbar-thumb:hover{background:var(--film-can)}
 
 ::selection{background:var(--accent);color:#fff}
+
+/* ── App Shell ── */
+.app-shell{display:grid;grid-template-columns:220px 1fr;height:100vh;overflow:hidden}
+.app-sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.app-sidebar-logo{padding:16px 14px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.app-sidebar-logo img{width:36px;height:36px;object-fit:contain;border-radius:6px;flex-shrink:0}
+.app-sidebar-logo-text{font-size:13px;font-weight:700;color:var(--text-primary);letter-spacing:.06em;text-transform:uppercase}
+.app-nav{flex:1;padding:8px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.app-nav-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;border:none;background:none;color:var(--text-muted);font-size:13px;font-family:'Inter',sans-serif;font-weight:500;cursor:pointer;text-align:left;width:100%;transition:background .15s,color .15s;min-height:unset}
+.app-nav-item:hover{background:var(--surface-2);color:var(--text-primary)}
+.app-nav-item.active{background:var(--surface-3);color:var(--text-primary);font-weight:600}
+.app-sidebar-user{padding:12px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0;transition:background .15s}
+.app-sidebar-user:hover{background:var(--surface-2)}
+.app-sidebar-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:.02em}
+.app-sidebar-userinfo{min-width:0;flex:1}
+.app-sidebar-name{font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app-sidebar-dba{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app-main{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.app-topbar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:nowrap;min-height:52px;overflow-x:auto}
+.app-body{display:flex;flex:1;overflow:hidden}
+.app-content{flex:1;overflow-y:auto;padding:20px 28px 40px;max-width:800px;width:100%;box-sizing:border-box;margin:0 auto}
+
+/* Override daily-sidebar: inline panel instead of fixed overlay */
+#daily-sidebar{position:relative;height:auto;width:300px;flex-shrink:0;transform:none;transition:none;box-shadow:none;z-index:auto;border-left:1px solid var(--border);border-right:none}
+#daily-sidebar.hidden{display:none!important}
+#daily-sidebar.open{transform:none}
+
+/* Suppress replaced layout elements */
+.hdr{display:none!important}
+.lib-bar{display:none!important}
+#daily-toggle{display:none!important}
+body.sidebar-open{padding-right:0!important;transition:none!important}
+
+/* App shell mobile overrides */
+@media(max-width:768px){
+  .app-shell{grid-template-columns:1fr;height:auto;overflow:visible}
+  .app-sidebar{display:none}
+  .app-main{height:auto;overflow:visible}
+  .app-body{flex-direction:column;overflow:visible;height:auto}
+  .app-content{overflow-y:visible;max-width:100%;padding:8px 8px 80px;margin:0}
+  .app-topbar{overflow-x:hidden}
+  #topbar-select-wrap{display:none!important}
+  #daily-sidebar{width:100%!important;position:relative;border-left:none;border-top:1px solid var(--border)}
+}
