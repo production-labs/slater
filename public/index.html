@@ -138,6 +138,9 @@
         </div>
 
         <div id="tab-schedule" class="sec">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+            <button class="gb" id="gen-btn" onclick="generateDoc()" style="margin-top:0;font-size:13px">&#8595; Download call sheet (.docx)</button>
+          </div>
           <div class="fl" style="margin-bottom:1.25rem">
             <label>Time zone</label>
             <div class="select-wrap"><select id="timezone" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
@@ -237,7 +240,8 @@
         <div id="tab-workback" class="sec">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
             <div class="sh" style="margin-bottom:0">Workback schedule</div>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="gb" id="wb-btn" onclick="generateWorkback()" style="margin-top:0;font-size:13px">&#8595; Download workback (.docx)</button>
               <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px">&#128190; Save as template</button>
               <button class="lb" onclick="openTemplateManager()" style="font-size:12px">&#128193; Templates</button>
             </div>
@@ -321,10 +325,6 @@
           <div id="note-ticker"></div>
         </div>
 
-        <div id="gen-btn-wrap">
-          <button class="gb" id="gen-btn" onclick="generateDoc()">Download call sheet (.docx)</button>
-          <button class="gb" id="wb-btn" onclick="generateWorkback()">Download workback (.docx)</button>
-        </div>
         <div class="sb" id="status-bar"></div>
 
         <div class="slater-footer">
