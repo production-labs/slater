@@ -30,7 +30,10 @@
       <button class="app-nav-item" data-tab="urls" onclick="st('urls')">&#128279; URLs</button>
       <button class="app-nav-item" data-tab="notes" onclick="st('notes')">&#128221; Notes</button>
       <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')">&#128176; Expenses</button>
-      <button class="app-nav-item app-nav-toggle" id="sidebar-rundown-btn" onclick="toggleSidebar()">&#128203; Rundown</button>
+      <button class="app-nav-item app-nav-toggle" id="sidebar-rundown-btn" onclick="toggleSidebar()">
+        <span>&#128203; Rundown</span>
+        <span class="nav-toggle-switch" aria-hidden="true"><span class="nav-toggle-thumb"></span></span>
+      </button>
       <div class="app-nav-separator"></div>
       <button class="app-nav-util" onclick="openContacts()">Contacts</button>
       <button class="app-nav-util" onclick="openAgencyManager()">Agencies</button>
