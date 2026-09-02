@@ -466,7 +466,7 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 
 /* ── App Shell ── */
 .app-shell{display:grid;grid-template-columns:220px 1fr;height:100vh;overflow:hidden}
-.app-sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.app-sidebar{background:linear-gradient(to bottom,#2E2E2E 0%,#141414 100%);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .app-sidebar-logo{padding:24px 14px 16px;display:flex;flex-direction:column;align-items:center;gap:4px;border-bottom:1px solid var(--border);flex-shrink:0}
 .app-sidebar-logo img{width:52px;height:52px;object-fit:contain;border-radius:10px;margin-bottom:6px}
 .app-sidebar-logo-text{font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-.01em;line-height:1}
@@ -474,7 +474,7 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .app-nav{flex:1;padding:8px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
 .app-nav-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;border:none;border-left:3px solid transparent;background:none;color:var(--text-muted);font-size:13px;font-family:'Inter',sans-serif;font-weight:500;cursor:pointer;text-align:left;width:100%;transition:background .15s,color .15s;min-height:unset}
 .app-nav-item:hover{background:var(--surface-2);color:var(--text-primary)}
-.app-nav-item.active{background:rgba(255,77,0,.08);color:var(--accent);font-weight:600;border-left-color:var(--accent)}
+.app-nav-item.active{background:rgba(255,255,255,.1);color:var(--text-primary);font-weight:600;border-left-color:var(--accent)}
 .nav-toggle-switch{margin-left:auto;flex-shrink:0;width:28px;height:16px;background:var(--border-strong);border-radius:8px;position:relative;transition:background .2s}
 .nav-toggle-thumb{position:absolute;top:2px;left:2px;width:12px;height:12px;background:var(--text-muted);border-radius:50%;transition:transform .2s,background .2s}
 .app-nav-toggle.active .nav-toggle-switch{background:var(--accent)}
