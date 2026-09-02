@@ -4,21 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Slater Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Geist', sans-serif;
-      background: #f3f0ed;
-      color: #222;
+      font-family: 'Inter', sans-serif;
+      background: #111111;
+      color: #F7F5EF;
       min-height: 100vh;
     }
 
     /* Top bar */
     .topbar {
-      background: #222;
-      color: #fff;
+      background: #1A1A1A;
+      color: #F7F5EF;
       padding: 0 28px;
       height: 52px;
       display: flex;
@@ -27,17 +27,18 @@
       position: sticky;
       top: 0;
       z-index: 100;
+      border-bottom: 1px solid #2E2E2E;
     }
     .topbar-left { display: flex; align-items: baseline; gap: 12px; }
     .topbar-left h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-    .topbar-left span { font-size: 12px; color: #9D9D99; }
+    .topbar-left span { font-size: 12px; color: #6E747B; }
     .topbar-right a {
-      color: #9D9D99;
+      color: #6E747B;
       text-decoration: none;
       font-size: 13px;
       transition: color .15s;
     }
-    .topbar-right a:hover { color: #fff; }
+    .topbar-right a:hover { color: #F7F5EF; }
 
     /* Content wrapper */
     .content { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
@@ -50,30 +51,30 @@
       margin-bottom: 28px;
     }
     .stat-box {
-      background: #fff;
-      border: 1px solid #e5e0d8;
+      background: #1A1A1A;
+      border: 1px solid #2E2E2E;
       border-radius: 10px;
       padding: 20px 20px 16px;
     }
-    .stat-box .stat-label { font-size: 11px; font-weight: 500; color: #9D9D99; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-    .stat-box .stat-value { font-size: 32px; font-weight: 600; color: #222; line-height: 1; }
+    .stat-box .stat-label { font-size: 11px; font-weight: 500; color: #6E747B; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .stat-box .stat-value { font-size: 32px; font-weight: 600; color: #F7F5EF; line-height: 1; }
 
     /* Section cards */
     .section {
-      background: #fff;
-      border: 1px solid #e5e0d8;
+      background: #1A1A1A;
+      border: 1px solid #2E2E2E;
       border-radius: 10px;
       margin-bottom: 24px;
       overflow: hidden;
     }
     .section-header {
       padding: 16px 20px;
-      border-bottom: 1px solid #e5e0d8;
+      border-bottom: 1px solid #2E2E2E;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .section-header h2 { font-size: 14px; font-weight: 600; color: #222; }
+    .section-header h2 { font-size: 14px; font-weight: 600; color: #F7F5EF; }
     .section-body { padding: 20px; }
 
     /* Generate keys form */
@@ -84,18 +85,19 @@
       flex-wrap: wrap;
     }
     .gen-form .field { display: flex; flex-direction: column; gap: 5px; }
-    .gen-form label { font-size: 11px; font-weight: 500; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+    .gen-form label { font-size: 11px; font-weight: 500; color: #6E747B; text-transform: uppercase; letter-spacing: 0.05em; }
     .gen-form input, .gen-form select {
       padding: 8px 10px;
-      border: 1px solid #ddd;
+      border: 1px solid #2E2E2E;
       border-radius: 6px;
       font-size: 13px;
       font-family: inherit;
-      background: #fff;
+      background: #222222;
+      color: #F7F5EF;
       outline: none;
       transition: border-color .15s;
     }
-    .gen-form input:focus, .gen-form select:focus { border-color: #222; }
+    .gen-form input:focus, .gen-form select:focus { border-color: #FF4D00; }
     .gen-form input[type=number] { width: 72px; }
     .gen-form input[type=date] { width: 150px; }
     .btn {
@@ -108,30 +110,30 @@
       cursor: pointer;
       transition: background .15s;
     }
-    .btn-primary { background: #222; color: #fff; }
-    .btn-primary:hover { background: #333; }
-    .btn-danger { background: transparent; color: #D94B43; border: 1px solid #D94B43; padding: 5px 10px; font-size: 12px; }
-    .btn-danger:hover { background: #D94B43; color: #fff; }
+    .btn-primary { background: #FF4D00; color: #fff; }
+    .btn-primary:hover { background: #e04000; }
+    .btn-danger { background: transparent; color: #FF4D00; border: 1px solid #FF4D00; padding: 5px 10px; font-size: 12px; }
+    .btn-danger:hover { background: #FF4D00; color: #fff; }
 
     .gen-results {
       margin-top: 16px;
       display: none;
     }
-    .gen-results .result-label { font-size: 12px; color: #9D9D99; margin-bottom: 8px; }
+    .gen-results .result-label { font-size: 12px; color: #6E747B; margin-bottom: 8px; }
     .key-list {
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
     .key-item {
-      font-family: 'Geist', monospace;
+      font-family: 'Inter', monospace;
       font-size: 13px;
-      background: #f3f0ed;
-      border: 1px solid #e5e0d8;
+      background: #222222;
+      border: 1px solid #2E2E2E;
       border-radius: 6px;
       padding: 8px 12px;
       letter-spacing: 0.08em;
-      color: #222;
+      color: #F7F5EF;
       user-select: all;
     }
 
@@ -143,24 +145,24 @@
       font-size: 13px;
     }
     thead th {
-      background: #F5F0E8;
+      background: #222222;
       padding: 9px 14px;
       text-align: left;
       font-size: 11px;
       font-weight: 600;
-      color: #555;
+      color: #6E747B;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      border-bottom: 1px solid #e5e0d8;
+      border-bottom: 1px solid #2E2E2E;
       white-space: nowrap;
     }
-    tbody tr { border-bottom: 1px solid #f0ece6; }
+    tbody tr { border-bottom: 1px solid #2E2E2E; }
     tbody tr:last-child { border-bottom: none; }
-    tbody tr:nth-child(even) { background: #faf8f5; }
-    tbody tr.expired { background: #fff2f2; }
-    tbody tr.expired:nth-child(even) { background: #ffe8e8; }
-    tbody td { padding: 10px 14px; vertical-align: middle; color: #333; }
-    tbody td.muted { color: #9D9D99; font-size: 12px; }
+    tbody tr:nth-child(even) { background: #1E1E1E; }
+    tbody tr.expired { background: rgba(255,77,0,.07); }
+    tbody tr.expired:nth-child(even) { background: rgba(255,77,0,.12); }
+    tbody td { padding: 10px 14px; vertical-align: middle; color: #F7F5EF; }
+    tbody td.muted { color: #6E747B; font-size: 12px; }
 
     .badge {
       display: inline-block;
@@ -170,13 +172,13 @@
       font-weight: 600;
       letter-spacing: 0.04em;
     }
-    .badge-beta { background: #E9DFC8; color: #6b5a35; }
-    .badge-solo { background: #d4e8d4; color: #2a5a2a; }
-    .badge-team { background: #d4dff5; color: #1a3080; }
+    .badge-beta { background: #3a2a10; color: #FFC107; }
+    .badge-solo { background: #1a3a2a; color: #4CAF77; }
+    .badge-team { background: #1a2a4a; color: #5B9BD5; }
 
-    .mono { font-family: 'Geist', monospace; letter-spacing: 0.05em; font-size: 12px; }
+    .mono { font-family: 'Inter', monospace; letter-spacing: 0.05em; font-size: 12px; }
 
-    .empty-row td { text-align: center; color: #9D9D99; padding: 28px; font-size: 13px; }
+    .empty-row td { text-align: center; color: #6E747B; padding: 28px; font-size: 13px; }
 
     /* Feedback banner */
     .banner {
@@ -184,15 +186,16 @@
       bottom: 24px;
       left: 50%;
       transform: translateX(-50%);
-      background: #222;
-      color: #fff;
+      background: #1A1A1A;
+      color: #F7F5EF;
       padding: 10px 20px;
       border-radius: 8px;
       font-size: 13px;
       display: none;
       z-index: 999;
+      border: 1px solid #2E2E2E;
     }
-    .banner.error { background: #D94B43; }
+    .banner.error { background: #FF4D00; border-color: #FF4D00; }
 
     @media (max-width: 700px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr); }
@@ -319,6 +322,17 @@
             <tr class="empty-row"><td colspan="7">Loading...</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div class="section" id="dev-tools-section" style="display:none; border: 2px dashed #FF4D00;">
+      <div class="section-header" style="background:rgba(255,77,0,.08);">
+        <h2 style="color:#FF4D00;">Dev Tools (local only)</h2>
+      </div>
+      <div class="section-body">
+        <p style="margin:0 0 12px; font-size:13px; color:#6E747B;">Syncs the production database down to your local <code>slater_dev</code>. Only works when running locally -- blocked in production.</p>
+        <button class="btn btn-danger" onclick="syncProdDb()">Sync Production DB to Local</button>
+        <pre id="sync-log" style="display:none; margin-top:16px; background:#222222; padding:12px; border-radius:6px; font-size:12px; white-space:pre-wrap; max-height:300px; overflow:auto; color:#F7F5EF;"></pre>
       </div>
     </div>
 
@@ -484,10 +498,34 @@
       }
     }
 
+    async function syncProdDb() {
+      if (!confirm('This will WIPE your local slater_dev database and replace it with production data. Continue?')) return;
+      var logEl = document.getElementById('sync-log');
+      logEl.style.display = 'block';
+      logEl.textContent = 'Running sync...';
+      try {
+        var r = await fetch('/api/admin/sync-prod-db', { method: 'POST' });
+        var text = await r.text();
+        var data;
+        try { data = JSON.parse(text); } catch (_) {
+          throw new Error('Server returned unexpected response (HTTP ' + r.status + '):\n' + text.slice(0, 500));
+        }
+        if (!r.ok) throw new Error(data.error || 'Failed');
+        logEl.textContent = data.log;
+        showBanner('Sync complete');
+      } catch (e) {
+        logEl.textContent = 'ERROR: ' + e.message;
+        showBanner('Sync failed', true);
+      }
+    }
+
     // Init
     loadStats();
     loadUsers();
     loadLicenses();
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      document.getElementById('dev-tools-section').style.display = 'block';
+    }
   </script>
 </body>
 </html>

@@ -6,7 +6,7 @@
 <title>Slater</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -121,7 +121,7 @@
       <div class="fl" style="margin-bottom:12px"><label>Your name</label><input type="text" id="myinfo_name" placeholder="Full name" autocomplete="new-password" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%"></div>
       <div class="fl" style="margin-bottom:12px"><label>DBA / LLC name</label><input type="text" id="myinfo_dba" placeholder="Production company name (optional)" autocomplete="new-password" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%"></div>
       <div class="fl" style="margin-bottom:12px"><label>Phone</label><input type="text" id="myinfo_phone" class="fmt-phone" placeholder="(206) 555-0100" autocomplete="new-password" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%"></div>
-      <div class="fl" style="margin-bottom:12px"><label>Email</label><input type="text" id="myinfo_email" disabled style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%;background:#f8f8f8;color:#888"></div>
+      <div class="fl" style="margin-bottom:12px"><label>Email</label><input type="text" id="myinfo_email" disabled style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%;background:var(--surface-2);color:var(--text-muted)"></div>
       <div class="fl" style="margin-bottom:16px">
         <label>Timezone</label>
         <div class="select-wrap"><select id="myinfo_timezone" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface);width:100%">
@@ -205,7 +205,7 @@
     <div class="g2" style="margin-bottom:1.25rem">
       <div class="fl">
         <label>Project type</label>
-        <div class="select-wrap"><select id="project_type" onchange="offerDefaultTemplate(this.value); rebuildScheduleDays(); updateVideoDueVisibility()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff">
+        <div class="select-wrap"><select id="project_type" onchange="offerDefaultTemplate(this.value); rebuildScheduleDays(); updateVideoDueVisibility()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
         <option value="post_production">Post Production</option>
         <option value="location_shoot">Location Shoot</option>
         <option value="live_broadcast_location">Live Broadcast: On Location</option>
@@ -217,7 +217,7 @@
     </div>
     <div class="fl" style="margin-bottom:8px">
       <label>Agency</label>
-      <div class="select-wrap"><select id="project_agency_id" onchange="autosaveTrigger();updateBrandingWarning()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff">
+      <div class="select-wrap"><select id="project_agency_id" onchange="autosaveTrigger();updateBrandingWarning()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
         <option value="">— No agency —</option>
       </select></div>
     </div>
@@ -234,7 +234,7 @@
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="doc_branding" id="doc_branding_slater" value="slater" onchange="updateBrandingWarning()"> Slater</label>
         <img id="branding-logo-preview" style="display:none;width:32px;height:32px;object-fit:contain;border-radius:4px;border:1px solid var(--border);background:#fff;margin-left:4px">
       </div>
-      <div id="branding-warning" style="display:none;color:#D94B43;font-size:12px;margin-top:6px"></div>
+      <div id="branding-warning" style="display:none;color:var(--accent);font-size:12px;margin-top:6px"></div>
     </div>
     <div class="sh" style="margin-top:1.5rem">Key personnel</div>
     <div id="kp-list"></div>
@@ -244,7 +244,7 @@
   <div id="tab-schedule" class="sec">
     <div class="fl" style="margin-bottom:1.25rem">
       <label>Time zone</label>
-      <div class="select-wrap"><select id="timezone" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff">
+      <div class="select-wrap"><select id="timezone" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
         <option value="none">— No timezone —</option>
         <option value="ET">Eastern Time</option>
         <option value="CT">Central Time</option>
@@ -268,10 +268,10 @@
       <option value="Pre-Production">
       <option value="Strike / Load Out">
     </datalist>
-    <div id="kickoff-block" class="sday-block" style="border-color:#c5d5f5;background:#f0f4ff">
-      <div class="sday-header" style="background:#e8effe;border-color:#c5d5f5">
-        <span class="sday-title" style="color:#2d5fa6">&#128204; Client Kickoff</span>
-        <span style="font-size:10px;color:#8aabdf;padding:2px 8px;border:1px solid #c5d5f5;border-radius:4px">pinned</span>
+    <div id="kickoff-block" class="sday-block" style="border-color:#2a3a5a;background:#111b2e">
+      <div class="sday-header" style="background:#162040;border-color:#2a3a5a">
+        <span class="sday-title" style="color:#5B9BD5">&#128204; Client Kickoff</span>
+        <span style="font-size:10px;color:#5B9BD5;padding:2px 8px;border:1px solid #2a3a5a;border-radius:4px">pinned</span>
       </div>
       <div class="sday-body">
         <div class="g2">
@@ -281,10 +281,10 @@
       </div>
     </div>
     <div id="schedule-kickoff-divider" class="sday-insert" style="display:none" onclick="insertScheduleDay(null)"><div class="sday-insert-line"></div><div class="sday-insert-btn">+</div><div class="sday-insert-line"></div></div>
-    <div id="video-due-block" class="sday-block" style="border-color:#c5d5f5;background:#f0f4ff;display:none">
-      <div class="sday-header" style="background:#e8effe;border-color:#c5d5f5">
-        <span class="sday-title" style="color:#2d5fa6">&#127916; Project Due Date</span>
-        <span style="font-size:10px;color:#8aabdf;padding:2px 8px;border:1px solid #c5d5f5;border-radius:4px">pinned</span>
+    <div id="video-due-block" class="sday-block" style="border-color:#2a3a5a;background:#111b2e;display:none">
+      <div class="sday-header" style="background:#162040;border-color:#2a3a5a">
+        <span class="sday-title" style="color:#5B9BD5">&#127916; Project Due Date</span>
+        <span style="font-size:10px;color:#5B9BD5;padding:2px 8px;border:1px solid #2a3a5a;border-radius:4px">pinned</span>
       </div>
       <div class="sday-body">
         <div class="g2">
@@ -322,7 +322,7 @@
 
   <div id="tab-talent" class="sec">
     <div class="sh">Talent</div>
-    <div id="talent-status-bar" style="background:#F5F0E8;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:none">
+    <div id="talent-status-bar" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:none">
       <div class="crew-status-bar-row1">
         <div class="crew-status-count"><span class="crew-status-dot" style="background:#9D9D99"></span><span>TBD</span>&nbsp;<strong id="tsb-tbd-count">0</strong></div>
         <div class="crew-status-count"><span class="crew-status-dot" style="background:#E8B84B"></span><span>Pencil</span>&nbsp;<strong id="tsb-pencil-count">0</strong></div>
@@ -349,13 +349,13 @@
     <div style="margin-bottom:1rem">
       <div class="fl">
         <label>Anchor date</label>
-        <div class="select-wrap"><select id="wb_day_select" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff">
+        <div class="select-wrap"><select id="wb_day_select" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
           <option value="last" selected>Last day</option>
         </select></div>
       </div>
       <div class="fl">
         <label>Direction</label>
-        <div class="select-wrap"><select id="wb_direction" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff">
+        <div class="select-wrap"><select id="wb_direction" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
           <option value="back" selected>Work back from anchor</option>
           <option value="forward">Work forward from anchor</option>
         </select></div>
@@ -438,9 +438,9 @@
 <div class="slater-footer">
   <strong>Slater</strong> &nbsp;&middot;&nbsp; &copy; <script>document.write(new Date().getFullYear())</script> Production Labs LLC. All rights reserved.
   <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:12px">
-    <button onclick="exportLibrary()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Geist',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Export all projects to JSON">&#8595; Export backup</button>
+    <button onclick="exportLibrary()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Export all projects to JSON">&#8595; Export backup</button>
     <span style="color:var(--border)">&middot;</span>
-    <button onclick="document.getElementById('import-file').click()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Geist',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Import projects from JSON">&#8593; Import backup</button>
+    <button onclick="document.getElementById('import-file').click()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Import projects from JSON">&#8593; Import backup</button>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importLibrary(this)">
   </div>
   <div class="note-img-modal" id="note-img-modal">
@@ -539,9 +539,9 @@
   <button onclick="mobileNavGo('urls')">URLs</button>
   <button onclick="mobileNavGo('notes')">Notes</button>
 </div>
-<div style="text-align:center;padding:12px;font-size:11px;color:#9D9D99;border-top:1px solid #e5e0d8">
-  <a href="#" target="_blank" style="color:#9D9D99;text-decoration:underline;margin:0 8px">Privacy Policy</a>
-  <a href="#" target="_blank" style="color:#9D9D99;text-decoration:underline;margin:0 8px">Terms of Service</a>
-  <a href="#" target="_blank" style="color:#9D9D99;text-decoration:underline;margin:0 8px">Refund Policy</a>
+<div style="text-align:center;padding:12px;font-size:11px;color:var(--film-can);border-top:1px solid var(--border)">
+  <a href="#" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Privacy Policy</a>
+  <a href="#" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Terms of Service</a>
+  <a href="#" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Refund Policy</a>
 </div>
 </body>
