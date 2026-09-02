@@ -30,7 +30,7 @@
       <button class="app-nav-item" data-tab="urls" onclick="st('urls')">&#128279; URLs</button>
       <button class="app-nav-item" data-tab="notes" onclick="st('notes')">&#128221; Notes</button>
       <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')">&#128176; Expenses</button>
-      <button class="app-nav-item app-nav-toggle" id="sidebar-rundown-btn" onclick="toggleSidebar()">
+      <button class="app-nav-item app-nav-toggle active" id="sidebar-rundown-btn" onclick="toggleSidebar()">
         <span>&#128203; Rundown</span>
         <span class="nav-toggle-switch" aria-hidden="true"><span class="nav-toggle-thumb"></span></span>
       </button>
@@ -348,7 +348,7 @@
       </div><!-- /.app-content -->
 
       <!-- Inline Rundown panel -->
-      <div id="daily-sidebar" class="hidden">
+      <div id="daily-sidebar">
         <div id="daily-resize"></div>
         <div class="daily-head">
           <div><h3>&#128203; Rundown</h3><div class="daily-head-date" id="daily-date"></div></div>

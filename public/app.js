@@ -2596,7 +2596,7 @@ function loadUrls(items) {
 
 
 // ── Daily sidebar ─────────────────────────────────────────────────────────────
-var sidebarOpen = false;
+var sidebarOpen = true;
 var sidebarRefreshTimer = null;
 
 function toggleSidebar() {
@@ -7163,6 +7163,7 @@ async function generateDoc() {
 loadSavedLogo();
 refreshSchedLocDropdowns();
 libSetSort(_libSortMode);  // applies active class to sort buttons and populates dropdown
+refreshSidebar();
 
 function updateSidebarUser(data) {
   var name = (data && data.name) || "";
