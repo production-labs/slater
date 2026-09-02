@@ -504,8 +504,8 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 #gen-btn-wrap{position:sticky;bottom:0;background:var(--bg);padding:12px 0 16px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;margin-top:1.5rem}
 
 /* Override daily-sidebar: inline panel instead of fixed overlay */
-#daily-sidebar{position:relative;height:auto;width:300px;flex-shrink:0;transform:none;transition:none;box-shadow:none;z-index:auto;border-left:1px solid var(--border);border-right:none}
-#daily-sidebar.hidden{display:none!important}
+#daily-sidebar{position:relative;height:auto;width:300px;flex-shrink:0;transform:none;box-shadow:none;z-index:auto;border-left:1px solid var(--border);border-right:none;overflow:hidden;transition:width 1s cubic-bezier(0.16,1,0.3,1),border-left-width 1s cubic-bezier(0.16,1,0.3,1)}
+#daily-sidebar.hidden{width:0!important;border-left-width:0}
 #daily-sidebar.open{transform:none}
 
 /* Suppress replaced layout elements */
@@ -523,5 +523,6 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
   .app-content{overflow-y:visible;max-width:100%;padding:8px 8px 80px;margin:0}
   .app-topbar{overflow-x:hidden}
   #topbar-select-wrap{display:none!important}
-  #daily-sidebar{width:100%!important;position:relative;border-left:none;border-top:1px solid var(--border)}
+  #daily-sidebar{width:100%!important;max-width:100%!important;position:relative;border-left:none;border-top:1px solid var(--border);transition:none}
+  #daily-sidebar.hidden{width:0!important;border-top-width:0}
 }
