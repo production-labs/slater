@@ -17,26 +17,28 @@
   <!-- Left sidebar -->
   <aside class="app-sidebar">
     <div class="app-sidebar-logo">
-      <img id="li" alt="Slater" style="width:52px;height:52px;object-fit:contain;border-radius:10px">
-      <div class="app-sidebar-logo-text">slater</div>
+      <div class="app-sidebar-logo-top">
+        <img id="li" alt="Slater" style="width:44px;height:44px;object-fit:contain;border-radius:9px">
+        <div class="app-sidebar-logo-text">slater</div>
+      </div>
       <div class="app-sidebar-logo-sub">The Producers Toolbox</div>
     </div>
     <nav class="app-nav">
-      <button class="app-nav-item active" data-tab="project" onclick="st('project')">&#128203; Project</button>
-      <button class="app-nav-item" data-tab="schedule" onclick="st('schedule')">&#128197; Schedule</button>
-      <button class="app-nav-item" data-tab="crew" onclick="st('crew')">&#128101; Crew</button>
-      <button class="app-nav-item" data-tab="talent" onclick="st('talent')">&#127775; Talent</button>
-      <button class="app-nav-item" data-tab="workback" onclick="st('workback')">&#128198; Workback</button>
-      <button class="app-nav-item" data-tab="urls" onclick="st('urls')">&#128279; URLs</button>
-      <button class="app-nav-item" data-tab="notes" onclick="st('notes')">&#128221; Notes</button>
-      <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')">&#128176; Expenses</button>
+      <button class="app-nav-item active" data-tab="project" onclick="st('project')"><img class="nav-icon" src="/images/slater-ui-icons/svg/project.svg" alt=""> Project</button>
+      <button class="app-nav-item" data-tab="schedule" onclick="st('schedule')"><img class="nav-icon" src="/images/slater-ui-icons/svg/schedule.svg" alt=""> Schedule</button>
+      <button class="app-nav-item" data-tab="workback" onclick="st('workback')"><img class="nav-icon" src="/images/slater-ui-icons/svg/workback.svg" alt=""> Workback</button>
+      <button class="app-nav-item" data-tab="crew" onclick="st('crew')"><img class="nav-icon" src="/images/slater-ui-icons/svg/crew.svg" alt=""> Crew</button>
+      <button class="app-nav-item" data-tab="talent" onclick="st('talent')"><img class="nav-icon" src="/images/slater-ui-icons/svg/talent.svg" alt=""> Talent</button>
+      <button class="app-nav-item" data-tab="urls" onclick="st('urls')"><img class="nav-icon" src="/images/slater-ui-icons/svg/urls.svg" alt=""> URLs</button>
+      <button class="app-nav-item" data-tab="notes" onclick="st('notes')"><img class="nav-icon" src="/images/slater-ui-icons/svg/notes.svg" alt=""> Notes</button>
+      <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')"><img class="nav-icon" src="/images/slater-ui-icons/svg/expenses.svg" alt=""> Expenses</button>
       <button class="app-nav-item app-nav-toggle active" id="sidebar-rundown-btn" onclick="toggleSidebar()">
-        <span>&#128203; Rundown</span>
+        <span style="display:flex;align-items:center;gap:8px"><img class="nav-icon" src="/images/slater-ui-icons/svg/rundown.svg" alt=""> Rundown</span>
         <span class="nav-toggle-switch" aria-hidden="true"><span class="nav-toggle-thumb"></span></span>
       </button>
       <div class="app-nav-separator"></div>
-      <button class="app-nav-util" onclick="openContacts()">Contacts</button>
-      <button class="app-nav-util" onclick="openAgencyManager()">Agencies</button>
+      <button class="app-nav-util" onclick="openContacts()"><img class="nav-icon" src="/images/slater-ui-icons/svg/contacts.svg" alt=""> Contacts</button>
+      <button class="app-nav-util" onclick="openAgencyManager()"><img class="nav-icon" src="/images/slater-ui-icons/svg/agencies.svg" alt=""> Agencies</button>
     </nav>
     <div class="app-sidebar-user" onclick="openMyInfo()">
       <div class="app-sidebar-avatar" id="sidebar-avatar"></div>
@@ -50,39 +52,44 @@
   <!-- Main area -->
   <div class="app-main">
 
-    <!-- Top bar -->
+    <!-- Top bar (mobile only) -->
     <div class="app-topbar">
       <button class="hamburger-btn" onclick="openMobileDrawer()">&#9776;</button>
       <span class="mobile-brand">SLATER</span>
-      <div id="lib-sort-row" style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:11px;color:var(--film-can);white-space:nowrap">Sort:</span>
-        <div class="lib-sort-btns">
-          <button class="lib-sort-btn" id="sort-recent" onclick="libSetSort('recent')">Recent</button>
-          <button class="lib-sort-btn" id="sort-date" onclick="libSetSort('date')">Date</button>
-          <button class="lib-sort-btn" id="sort-company" onclick="libSetSort('company')">Company</button>
-        </div>
-      </div>
-      <div class="select-wrap" id="topbar-select-wrap" style="flex:1;min-width:140px;max-width:280px">
-        <select id="lib-select" onchange="libSelect()">
-          <option value="">— New project —</option>
-        </select>
-      </div>
-      <div id="lib-action-row" style="display:flex;gap:8px;align-items:center">
-        <div class="lib-btn-group">
-          <button class="lb accent" onclick="libNew()" title="New">+ New Project</button>
-          <button class="lb primary" onclick="libSave()" title="Save">Save</button>
-          <span class="autosave-indicator" id="autosave-indicator">Autosaved</span>
-          <button class="lb" id="lib-duplicate" onclick="libDuplicate()" title="Duplicate" style="display:none">Duplicate</button>
-          <button class="lb danger" id="lib-delete" onclick="libDelete()" title="Delete" style="display:none">Delete</button>
-        </div>
-      </div>
     </div>
 
     <!-- Content + Rundown side by side -->
     <div class="app-body">
 
-      <!-- Scrollable main content -->
-      <div class="app-content">
+      <!-- Content column: project bar + scrollable content -->
+      <div class="app-content-col">
+
+        <!-- Project bar (between sidebars, always visible) -->
+        <div class="project-bar">
+          <div class="project-bar-select" id="topbar-select-wrap">
+            <div class="select-wrap" style="width:100%">
+              <select id="lib-select" onchange="libSelect()">
+                <option value="">— New project —</option>
+              </select>
+            </div>
+          </div>
+          <div class="project-bar-actions" id="lib-action-row">
+            <button class="lb accent" onclick="libNew()"><img class="btn-icon" src="/images/slater-ui-icons/svg/add.svg" alt=""> New Project</button>
+            <button class="lb" onclick="libSave()"><img class="btn-icon" src="/images/slater-ui-icons/svg/save.svg" alt=""> Save</button>
+            <button class="lb" id="lib-duplicate" onclick="libDuplicate()" style="display:none"><img class="btn-icon" src="/images/slater-ui-icons/svg/duplicate.svg" alt=""> Duplicate</button>
+            <button class="lb danger" id="lib-delete" onclick="libDelete()" style="display:none"><img class="btn-icon" src="/images/slater-ui-icons/svg/delete.svg" alt=""> Delete</button>
+            <span class="autosave-indicator" id="autosave-indicator">Autosaved</span>
+            <div class="sort-radio-group">
+              <span class="sort-radio-label-text">Sort by:</span>
+              <label class="sort-radio-label"><input type="radio" name="lib-sort" id="sort-date" value="date" onchange="libSetSort(this.value)"> Date</label>
+              <label class="sort-radio-label"><input type="radio" name="lib-sort" id="sort-recent" value="recent" onchange="libSetSort(this.value)"> Recent</label>
+              <label class="sort-radio-label"><input type="radio" name="lib-sort" id="sort-company" value="company" onchange="libSetSort(this.value)"> Company</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scrollable main content -->
+        <div class="app-content">
 
         <!-- Hidden tab bar kept for st() JS compatibility -->
         <div class="tabs" style="display:none">
@@ -347,12 +354,14 @@
 
       </div><!-- /.app-content -->
 
+      </div><!-- /.app-content-col -->
+
       <!-- Inline Rundown panel -->
       <div id="daily-sidebar">
         <div id="daily-resize"></div>
         <div class="daily-head">
-          <div><h3>&#128203; Rundown</h3><div class="daily-head-date" id="daily-date"></div></div>
-          <button class="daily-close" onclick="toggleSidebar()">&#x2715;</button>
+          <div><h3 style="display:flex;align-items:center;gap:6px"><img class="nav-icon" src="/images/slater-ui-icons/svg/rundown.svg" alt="" style="opacity:.75"> Rundown</h3><div class="daily-head-date" id="daily-date"></div></div>
+          <button class="daily-close" onclick="toggleSidebar()"><img src="/images/slater-ui-icons/svg/close.svg" alt="Close" style="width:14px;height:14px;filter:brightness(0) invert(1);opacity:.6"></button>
         </div>
         <div class="daily-tabs">
           <div class="daily-tab active" id="dtab-pending" onclick="switchDailyTab('pending')">Pending</div>
@@ -568,23 +577,23 @@
 
 <div id="mobile-bottom-nav">
   <button class="mobile-nav-btn" data-tab="project" onclick="mobileNavGo('project')">
-    <span class="mobile-nav-icon">&#128203;</span>
+    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/project.svg" alt="" class="mobile-nav-svg"></span>
     <span class="mobile-nav-label">Project</span>
   </button>
   <button class="mobile-nav-btn" data-tab="schedule" onclick="mobileNavGo('schedule')">
-    <span class="mobile-nav-icon">&#128197;</span>
+    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/schedule.svg" alt="" class="mobile-nav-svg"></span>
     <span class="mobile-nav-label">Schedule</span>
   </button>
   <button class="mobile-nav-btn" data-tab="crew" onclick="mobileNavGo('crew')">
-    <span class="mobile-nav-icon">&#128101;</span>
+    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/crew.svg" alt="" class="mobile-nav-svg"></span>
     <span class="mobile-nav-label">Crew</span>
   </button>
   <button class="mobile-nav-btn" data-tab="expenses" onclick="mobileNavGo('expenses')">
-    <span class="mobile-nav-icon">&#128176;</span>
+    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/expenses.svg" alt="" class="mobile-nav-svg"></span>
     <span class="mobile-nav-label">Expenses</span>
   </button>
   <button class="mobile-nav-btn" id="mobile-nav-more" onclick="toggleMobileMoreMenu()">
-    <span class="mobile-nav-icon" style="letter-spacing:-2px">&#8226;&#8226;&#8226;</span>
+    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/more-horizontal.svg" alt="" class="mobile-nav-svg"></span>
     <span class="mobile-nav-label">More</span>
   </button>
 </div>
