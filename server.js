@@ -4,6 +4,7 @@ const path = require('path');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
+const { execFile } = require('child_process');
 require('dotenv').config();
 
 const app = express();
@@ -23,7 +24,7 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 
 app.use(session({
-  store: new pgSession({ pool, tableName: 'sessions' }),
+  store: new pgSession({ pool, tableName: 'sessions', createTableIfMissing: true }),
   secret: process.env.SESSION_SECRET || 'slater-dev-secret',
   resave: false,
   saveUninitialized: false,
@@ -37,6 +38,7 @@ app.use(session({
 pool.query('SELECT 1').then(async () => {
   console.log('Database connected');
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS contacts JSONB DEFAULT '{}'`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS logo TEXT`);
   console.log('Migrations complete');
 }).catch(err => {
   console.error('Database connection failed:', err.message);
@@ -181,6 +183,20 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/sync-prod-db', requireAdmin, (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Not available in production' });
+  }
+  const scriptPath = path.join(__dirname, 'scripts', 'sync-prod-db.sh');
+  execFile('bash', [scriptPath], { timeout: 120000 }, (err, stdout, stderr) => {
+    if (err) {
+      console.error('sync-prod-db error:', stderr);
+      return res.status(500).json({ error: stderr || err.message });
+    }
+    res.json({ ok: true, log: stdout });
+  });
 });
 
 // --- End admin ---

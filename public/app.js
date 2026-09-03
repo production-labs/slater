@@ -4294,7 +4294,10 @@ function applyAgencyDefaults(agency) {
 }
 
 // ── My Info modal ─────────────────────────────────────────────────────────────
+var _myInfoAvatarDirty = false;
+
 function openMyInfo() {
+  _myInfoAvatarDirty = false;
   document.getElementById("agency-modal").classList.add("open");
   API.getMe().then(function(data) {
     if (!data) return;
@@ -4303,8 +4306,10 @@ function openMyInfo() {
     document.getElementById("myinfo_phone").value    = formatPhone(data.phone || "");
     document.getElementById("myinfo_email").value    = data.email || "";
     document.getElementById("myinfo_timezone").value = data.timezone || "none";
-    window._myInfoAvatar = data.avatar || null;
-    _refreshMyInfoAvatar(data.name || "", data.avatar || null);
+    if (!_myInfoAvatarDirty) {
+      window._myInfoAvatar = data.avatar || null;
+      _refreshMyInfoAvatar(data.name || "", data.avatar || null);
+    }
   });
 }
 
@@ -4336,6 +4341,7 @@ function triggerAvatarUpload() {
 function handleAvatarUpload(input) {
   var file = input.files[0];
   if (!file) return;
+  _myInfoAvatarDirty = true;
   var reader = new FileReader();
   reader.onload = function(ev) {
     openCropModal(ev.target.result, function(cropped) {
@@ -4369,11 +4375,15 @@ function saveMyInfo() {
     timezone: document.getElementById("myinfo_timezone").value,
     avatar:   window._myInfoAvatar || null,
   };
-  API.saveMe(data).then(function(result) {
-    if (result) updateSidebarUser(data);
-  });
   closeAgencySettings();
-  setStatus("My Info saved.", "ok");
+  API.saveMe(data).then(function(result) {
+    if (result) {
+      updateSidebarUser(data);
+      setStatus("My Info saved.", "ok");
+    } else {
+      setStatus("Failed to save. Please try again.", "err");
+    }
+  });
 }
 
 // Legacy stub — kept so old callers don't break
