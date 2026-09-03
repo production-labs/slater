@@ -24,21 +24,21 @@
       <div class="app-sidebar-logo-sub">The Producers Toolbox</div>
     </div>
     <nav class="app-nav">
-      <button class="app-nav-item active" data-tab="project" onclick="st('project')"><img class="nav-icon" src="/images/slater-ui-icons/svg/project.svg" alt=""> Project</button>
-      <button class="app-nav-item" data-tab="schedule" onclick="st('schedule')"><img class="nav-icon" src="/images/slater-ui-icons/svg/schedule.svg" alt=""> Schedule</button>
-      <button class="app-nav-item" data-tab="workback" onclick="st('workback')"><img class="nav-icon" src="/images/slater-ui-icons/svg/workback.svg" alt=""> Workback</button>
-      <button class="app-nav-item" data-tab="crew" onclick="st('crew')"><img class="nav-icon" src="/images/slater-ui-icons/svg/crew.svg" alt=""> Crew</button>
-      <button class="app-nav-item" data-tab="talent" onclick="st('talent')"><img class="nav-icon" src="/images/slater-ui-icons/svg/talent.svg" alt=""> Talent</button>
-      <button class="app-nav-item" data-tab="urls" onclick="st('urls')"><img class="nav-icon" src="/images/slater-ui-icons/svg/urls.svg" alt=""> URLs</button>
-      <button class="app-nav-item" data-tab="notes" onclick="st('notes')"><img class="nav-icon" src="/images/slater-ui-icons/svg/notes.svg" alt=""> Notes</button>
-      <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')"><img class="nav-icon" src="/images/slater-ui-icons/svg/expenses.svg" alt=""> Expenses</button>
+      <button class="app-nav-item active" data-tab="project" onclick="st('project')"><i data-lucide="clapperboard" class="lucide nav-icon"></i> Project</button>
+      <button class="app-nav-item" data-tab="schedule" onclick="st('schedule')"><i data-lucide="calendar" class="lucide nav-icon"></i> Schedule</button>
+      <button class="app-nav-item" data-tab="workback" onclick="st('workback')"><i data-lucide="list-checks" class="lucide nav-icon"></i> Workback</button>
+      <button class="app-nav-item" data-tab="crew" onclick="st('crew')"><i data-lucide="users" class="lucide nav-icon"></i> Crew</button>
+      <button class="app-nav-item" data-tab="talent" onclick="st('talent')"><i data-lucide="star" class="lucide nav-icon"></i> Talent</button>
+      <button class="app-nav-item" data-tab="urls" onclick="st('urls')"><i data-lucide="link" class="lucide nav-icon"></i> URLs</button>
+      <button class="app-nav-item" data-tab="notes" onclick="st('notes')"><i data-lucide="file-text" class="lucide nav-icon"></i> Notes</button>
+      <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')"><i data-lucide="receipt" class="lucide nav-icon"></i> Expenses</button>
       <button class="app-nav-item app-nav-toggle active" id="sidebar-rundown-btn" onclick="toggleSidebar()">
-        <span style="display:flex;align-items:center;gap:8px"><img class="nav-icon" src="/images/slater-ui-icons/svg/rundown.svg" alt=""> Rundown</span>
+        <span style="display:flex;align-items:center;gap:8px"><i data-lucide="clipboard-list" class="lucide nav-icon"></i> Rundown</span>
         <span class="nav-toggle-switch" aria-hidden="true"><span class="nav-toggle-thumb"></span></span>
       </button>
       <div class="app-nav-separator"></div>
-      <button class="app-nav-util" onclick="openContacts()"><img class="nav-icon" src="/images/slater-ui-icons/svg/contacts.svg" alt=""> Contacts</button>
-      <button class="app-nav-util" onclick="openAgencyManager()"><img class="nav-icon" src="/images/slater-ui-icons/svg/agencies.svg" alt=""> Agencies</button>
+      <button class="app-nav-util" onclick="openContacts()"><i data-lucide="book-user" class="lucide nav-icon"></i> Contacts</button>
+      <button class="app-nav-util" onclick="openAgencyManager()"><i data-lucide="building-2" class="lucide nav-icon"></i> Agencies</button>
     </nav>
     <div class="app-sidebar-user" onclick="openMyInfo()">
       <div class="app-sidebar-avatar" id="sidebar-avatar"></div>
@@ -54,7 +54,7 @@
 
     <!-- Top bar (mobile only) -->
     <div class="app-topbar">
-      <button class="hamburger-btn" onclick="openMobileDrawer()">&#9776;</button>
+      <button class="hamburger-btn" onclick="openMobileDrawer()"><i data-lucide="menu" class="lucide"></i></button>
       <span class="mobile-brand">SLATER</span>
     </div>
 
@@ -74,10 +74,10 @@
             </div>
           </div>
           <div class="project-bar-actions" id="lib-action-row">
-            <button class="lb accent" onclick="libNew()"><img class="btn-icon" src="/images/slater-ui-icons/svg/add.svg" alt=""> New Project</button>
-            <button class="lb" onclick="libSave()"><img class="btn-icon" src="/images/slater-ui-icons/svg/save.svg" alt=""> Save</button>
-            <button class="lb" id="lib-duplicate" onclick="libDuplicate()" style="display:none"><img class="btn-icon" src="/images/slater-ui-icons/svg/duplicate.svg" alt=""> Duplicate</button>
-            <button class="lb danger" id="lib-delete" onclick="libDelete()" style="display:none"><img class="btn-icon" src="/images/slater-ui-icons/svg/delete.svg" alt=""> Delete</button>
+            <button class="lb accent" onclick="libNew()"><i data-lucide="plus" class="lucide btn-icon"></i> New Project</button>
+            <button class="lb" onclick="libSave()"><i data-lucide="save" class="lucide btn-icon"></i> Save</button>
+            <button class="lb" id="lib-duplicate" onclick="libDuplicate()" style="display:none"><i data-lucide="copy" class="lucide btn-icon"></i> Duplicate</button>
+            <button class="lb danger" id="lib-delete" onclick="libDelete()" style="display:none"><i data-lucide="trash-2" class="lucide btn-icon"></i> Delete</button>
             <span class="autosave-indicator" id="autosave-indicator">Autosaved</span>
             <div class="sort-radio-group">
               <span class="sort-radio-label-text">Sort by:</span>
@@ -146,7 +146,7 @@
 
         <div id="tab-schedule" class="sec">
           <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
-            <button class="gb" id="gen-btn" onclick="generateDoc()" style="margin-top:0;font-size:13px">&#8595; Download call sheet (.docx)</button>
+            <button class="gb" id="gen-btn" onclick="generateDoc()" style="margin-top:0;font-size:13px"><i data-lucide="download" class="lucide"></i> Download call sheet (.docx)</button>
           </div>
           <div class="fl" style="margin-bottom:1.25rem">
             <label>Time zone</label>
@@ -176,7 +176,7 @@
           </datalist>
           <div id="kickoff-block" class="sday-block" style="border-color:#2a3a5a;background:#111b2e">
             <div class="sday-header" style="background:#162040;border-color:#2a3a5a">
-              <span class="sday-title" style="color:#5B9BD5">&#128204; Client Kickoff</span>
+              <span class="sday-title" style="color:#5B9BD5"><i data-lucide="flag" class="lucide" style="margin-right:4px"></i>Client Kickoff</span>
               <span style="font-size:10px;color:#5B9BD5;padding:2px 8px;border:1px solid #2a3a5a;border-radius:4px">pinned</span>
             </div>
             <div class="sday-body">
@@ -189,7 +189,7 @@
           <div id="schedule-kickoff-divider" class="sday-insert" style="display:none" onclick="insertScheduleDay(null)"><div class="sday-insert-line"></div><div class="sday-insert-btn">+</div><div class="sday-insert-line"></div></div>
           <div id="video-due-block" class="sday-block" style="border-color:#2a3a5a;background:#111b2e;display:none">
             <div class="sday-header" style="background:#162040;border-color:#2a3a5a">
-              <span class="sday-title" style="color:#5B9BD5">&#127916; Project Due Date</span>
+              <span class="sday-title" style="color:#5B9BD5"><i data-lucide="film" class="lucide" style="margin-right:4px"></i>Project Due Date</span>
               <span style="font-size:10px;color:#5B9BD5;padding:2px 8px;border:1px solid #2a3a5a;border-radius:4px">pinned</span>
             </div>
             <div class="sday-body">
@@ -206,8 +206,8 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
             <div class="sh" style="margin-bottom:0">Crew</div>
             <div style="display:flex;gap:8px">
-              <button class="lb" onclick="saveCrewConfig()" style="font-size:12px">&#128190; Save config</button>
-              <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px">&#128193; Configs</button>
+              <button class="lb" onclick="saveCrewConfig()" style="font-size:12px"><i data-lucide="save" class="lucide"></i> Save config</button>
+              <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px"><i data-lucide="folder" class="lucide"></i> Configs</button>
             </div>
           </div>
           <div id="crew-status-bar">
@@ -248,9 +248,9 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
             <div class="sh" style="margin-bottom:0">Workback schedule</div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="gb" id="wb-btn" onclick="generateWorkback()" style="margin-top:0;font-size:13px">&#8595; Download workback (.docx)</button>
-              <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px">&#128190; Save as template</button>
-              <button class="lb" onclick="openTemplateManager()" style="font-size:12px">&#128193; Templates</button>
+              <button class="gb" id="wb-btn" onclick="generateWorkback()" style="margin-top:0;font-size:13px"><i data-lucide="download" class="lucide"></i> Download workback (.docx)</button>
+              <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px"><i data-lucide="save" class="lucide"></i> Save as template</button>
+              <button class="lb" onclick="openTemplateManager()" style="font-size:12px"><i data-lucide="folder" class="lucide"></i> Templates</button>
             </div>
           </div>
           <div style="margin-bottom:1rem">
@@ -279,7 +279,7 @@
             </div>
           </div>
           <div id="exp-download-row" style="display:none;gap:10px;margin-bottom:1rem">
-            <button class="gb" id="exp-docx-btn" onclick="generateExpenseDoc()" style="margin-top:0;font-size:13px">&#8595; Download expense report (.docx)</button>
+            <button class="gb" id="exp-docx-btn" onclick="generateExpenseDoc()" style="margin-top:0;font-size:13px"><i data-lucide="download" class="lucide"></i> Download expense report (.docx)</button>
           </div>
           <div id="expense-totals" style="margin-bottom:1rem;padding:12px 16px;background:var(--tape);border:1px solid var(--border);border-radius:8px;display:none">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
@@ -320,7 +320,7 @@
             <div id="note-editor" contenteditable="true" class="note-editor" placeholder="Write a note..." oninput="updateNoteDraftIndicator(this.innerHTML)"></div>
           </div>
           <div id="notes-save-row" style="display:flex;gap:8px;margin-bottom:1.5rem">
-            <button class="ab" id="note-save-btn" onclick="noteSave()">&#128190; Save note</button>
+            <button class="ab" id="note-save-btn" onclick="noteSave()"><i data-lucide="save" class="lucide"></i> Save note</button>
             <button class="lb" id="note-cancel-btn" onclick="noteCancelEdit()" style="display:none">Cancel</button>
           </div>
           <div id="notes-search-wrap" style="margin-bottom:12px;position:relative">
@@ -337,9 +337,9 @@
         <div class="slater-footer">
           <strong>Slater</strong> &nbsp;&middot;&nbsp; &copy; <script>document.write(new Date().getFullYear())</script> Production Labs LLC. All rights reserved.
           <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:12px">
-            <button onclick="exportLibrary()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Export all projects to JSON">&#8595; Export backup</button>
+            <button onclick="exportLibrary()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Export all projects to JSON"><i data-lucide="download" class="lucide"></i> Export backup</button>
             <span style="color:var(--border)">&middot;</span>
-            <button onclick="document.getElementById('import-file').click()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Import projects from JSON">&#8593; Import backup</button>
+            <button onclick="document.getElementById('import-file').click()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--film-can);font-family:'Inter',sans-serif;padding:0;text-decoration:underline;text-underline-offset:3px" title="Import projects from JSON"><i data-lucide="upload" class="lucide"></i> Import backup</button>
             <input type="file" id="import-file" accept=".json" style="display:none" onchange="importLibrary(this)">
           </div>
           <div class="note-img-modal" id="note-img-modal">
@@ -360,8 +360,8 @@
       <div id="daily-sidebar">
         <div id="daily-resize"></div>
         <div class="daily-head">
-          <div><h3 style="display:flex;align-items:center;gap:6px"><img class="nav-icon" src="/images/slater-ui-icons/svg/rundown.svg" alt="" style="opacity:.75"> Rundown</h3><div class="daily-head-date" id="daily-date"></div></div>
-          <button class="daily-close" onclick="toggleSidebar()"><img src="/images/slater-ui-icons/svg/close.svg" alt="Close" style="width:14px;height:14px;filter:brightness(0) invert(1);opacity:.6"></button>
+          <div><h3 style="display:flex;align-items:center;gap:6px"><i data-lucide="clipboard-list" class="lucide nav-icon" style="opacity:.75"></i> Rundown</h3><div class="daily-head-date" id="daily-date"></div></div>
+          <button class="daily-close" onclick="toggleSidebar()"><i data-lucide="x" class="lucide"></i></button>
         </div>
         <div class="daily-tabs">
           <div class="daily-tab active" id="dtab-pending" onclick="switchDailyTab('pending')">Pending</div>
@@ -571,29 +571,29 @@
     <div style="margin-bottom:12px" id="mobile-lib-select-wrap"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px" id="mobile-lib-buttons"></div>
     <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
-    <button onclick="openMyInfo();closeMobileDrawer()" style="background:none;border:none;text-align:left;font-size:14px;color:var(--film-can);cursor:pointer;padding:8px 0;min-height:unset">&#9881; My Info</button>
+    <button onclick="openMyInfo();closeMobileDrawer()" style="background:none;border:none;text-align:left;font-size:14px;color:var(--film-can);cursor:pointer;padding:8px 0;min-height:unset"><i data-lucide="settings" class="lucide"></i> My Info</button>
   </div>
 </div>
 
 <div id="mobile-bottom-nav">
   <button class="mobile-nav-btn" data-tab="project" onclick="mobileNavGo('project')">
-    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/project.svg" alt="" class="mobile-nav-svg"></span>
+    <span class="mobile-nav-icon"><i data-lucide="clapperboard" class="lucide mobile-nav-svg"></i></span>
     <span class="mobile-nav-label">Project</span>
   </button>
   <button class="mobile-nav-btn" data-tab="schedule" onclick="mobileNavGo('schedule')">
-    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/schedule.svg" alt="" class="mobile-nav-svg"></span>
+    <span class="mobile-nav-icon"><i data-lucide="calendar" class="lucide mobile-nav-svg"></i></span>
     <span class="mobile-nav-label">Schedule</span>
   </button>
   <button class="mobile-nav-btn" data-tab="crew" onclick="mobileNavGo('crew')">
-    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/crew.svg" alt="" class="mobile-nav-svg"></span>
+    <span class="mobile-nav-icon"><i data-lucide="users" class="lucide mobile-nav-svg"></i></span>
     <span class="mobile-nav-label">Crew</span>
   </button>
   <button class="mobile-nav-btn" data-tab="expenses" onclick="mobileNavGo('expenses')">
-    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/expenses.svg" alt="" class="mobile-nav-svg"></span>
+    <span class="mobile-nav-icon"><i data-lucide="receipt" class="lucide mobile-nav-svg"></i></span>
     <span class="mobile-nav-label">Expenses</span>
   </button>
   <button class="mobile-nav-btn" id="mobile-nav-more" onclick="toggleMobileMoreMenu()">
-    <span class="mobile-nav-icon"><img src="/images/slater-ui-icons/svg/more-horizontal.svg" alt="" class="mobile-nav-svg"></span>
+    <span class="mobile-nav-icon"><i data-lucide="more-horizontal" class="lucide mobile-nav-svg"></i></span>
     <span class="mobile-nav-label">More</span>
   </button>
 </div>
@@ -611,6 +611,7 @@
   <a href="#" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Refund Policy</a>
 </div>
 
+<script src="/lib/lucide.min.js"></script>
 <script src="/lib/vendors.js"></script>
 <script src="/app.js"></script>
 </body>

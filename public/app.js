@@ -159,6 +159,24 @@ function loadSavedLogo() {
   if(img) img.src = "data:image/png;base64," + LB64;
 }
 
+// Returns an inline SVG string for a Lucide icon, usable in innerHTML templates.
+// name: kebab-case icon name (e.g. 'pencil', 'chevron-right')
+// extraClass: optional extra CSS classes for the svg element
+function icon(name, extraClass) {
+  if (typeof lucide === 'undefined') return '';
+  var key = name.replace(/-([a-z0-9])/g, function(_, c) { return c.toUpperCase(); });
+  key = key.charAt(0).toUpperCase() + key.slice(1);
+  var nodes = lucide[key];
+  if (!nodes || !Array.isArray(nodes)) return '';
+  var cls = 'lucide' + (extraClass ? ' ' + extraClass : '');
+  var inner = nodes.map(function(n) {
+    var tag = n[0], attrs = n[1];
+    var attrStr = Object.keys(attrs).map(function(k) { return k + '="' + attrs[k] + '"'; }).join(' ');
+    return '<' + tag + ' ' + attrStr + '/>';
+  }).join('');
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="' + cls + '">' + inner + '</svg>';
+}
+
 let crew = [], talent = [], kp = [], lt = null, _uid = 0;
 
 function st(n) {
@@ -508,7 +526,7 @@ function addCrew(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, crew));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role"><img src="/images/slater-ui-icons/svg/edit-pencil.svg" alt="" class="pencil-icon"></span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateCrewStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateCrewStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -523,7 +541,7 @@ function addTalent(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title"><img src="/images/slater-ui-icons/svg/edit-pencil.svg" alt="" class="pencil-icon"></span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateTalentStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateTalentStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -555,7 +573,7 @@ function addKP(cardData) {
   cardData = cardData || {};
   var id = "kp_"+(++_uid);
   var d = document.createElement("div"); d.className="card"; d.id=id;
-  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role"><img src="/images/slater-ui-icons/svg/edit-pencil.svg" alt="" class="pencil-icon"></span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" onchange="updateCrewStatusPill(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>';
+  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role">'+icon('pencil','pencil-icon')+'</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" onchange="updateCrewStatusPill(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>';
   kp.push(id);
   document.getElementById("kp-list").appendChild(d);
   var sv = function(eid, val) { var e=document.getElementById(eid); if(e && val!==undefined) e.value=val||""; };
@@ -625,7 +643,7 @@ function addScheduleDay(data, insertAfterDayId) {
   titleInp.oninput = function() { wbRebuildPins(); autosaveTrigger(); };
   const titlePencil = document.createElement("span");
   titlePencil.className = "contact-card-pencil";
-  titlePencil.innerHTML = '<img src="/images/slater-ui-icons/svg/edit-pencil.svg" alt="" class="pencil-icon">';
+  titlePencil.innerHTML = icon('pencil', 'pencil-icon');
   titlePencil.title = "Edit day label";
   titlePencil.onclick = function() { titleInp.focus(); };
   titleRow.appendChild(titleInp); titleRow.appendChild(titlePencil);
@@ -660,7 +678,7 @@ function addScheduleDay(data, insertAfterDayId) {
     showModal("Remove activity", "Remove \""+_lbl+"\"? This cannot be undone.", function() { removeScheduleDay(dayId); });
   };
   var sdayChevron = document.createElement("span");
-  sdayChevron.className = "sday-chevron"; sdayChevron.textContent = "▸";
+  sdayChevron.className = "sday-chevron"; sdayChevron.innerHTML = icon('chevron-right');
   hdr.appendChild(calWidget); hdr.appendChild(titleWrap); hdr.appendChild(sdayChevron); hdr.appendChild(removeBtn);
   // Populate directly here — getElementById won't work until el is in the DOM
   if (data.date_iso) {
@@ -672,18 +690,18 @@ function addScheduleDay(data, insertAfterDayId) {
   el.appendChild(hdr);
 
   // ── Crew link + counts (built early so they live in checkRow) ────────────────
-  function makeDayLink(icon, label, onclick) {
+  function makeDayLink(iconHtml, label, onclick) {
     var lnk = document.createElement("div");
     lnk.style.cssText = "font-size:11px;color:var(--film-can);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:color .15s";
     lnk.onmouseenter = function() { this.style.color = 'var(--charcoal)'; };
     lnk.onmouseleave = function() { this.style.color = 'var(--film-can)'; };
-    var ico = document.createElement("span"); ico.textContent = icon;
-    ico.style.cssText = "font-size:14px;line-height:1;flex-shrink:0;padding-right:4px";
+    var ico = document.createElement("span"); ico.innerHTML = iconHtml;
+    ico.style.cssText = "flex-shrink:0;display:inline-flex;align-items:center";
     var txt = document.createElement("span"); txt.textContent = label;
     lnk.appendChild(ico); lnk.appendChild(txt); lnk.onclick = onclick;
     return lnk;
   }
-  var editStaffLink = makeDayLink("👥", "Edit cast & crew for this day", function() { openDayStaffModal(dayId); });
+  var editStaffLink = makeDayLink(icon('users'), "Edit cast & crew for this day", function() { openDayStaffModal(dayId); });
   editStaffLink.id = dayId+"_staff_link";
   var staffCountEl = document.createElement("div");
   staffCountEl.id = dayId+"_staff_counts";
@@ -855,7 +873,7 @@ function addScheduleDay(data, insertAfterDayId) {
     var ddToggle = document.createElement("div");
     ddToggle.className = "day-details-toggle";
     var ddLabel = document.createElement("span"); ddLabel.textContent = "Day Details";
-    var ddChevron = document.createElement("span"); ddChevron.className = "day-details-chevron"; ddChevron.textContent = "▸";
+    var ddChevron = document.createElement("span"); ddChevron.className = "day-details-chevron"; ddChevron.innerHTML = icon('chevron-right');
     ddToggle.appendChild(ddLabel); ddToggle.appendChild(ddChevron);
 
     var ddBody = document.createElement("div");
@@ -2370,7 +2388,7 @@ function noteSave() {
       entry.ts = ts + " (edited)";
     }
     noteEditingId = null;
-    document.getElementById("note-save-btn").innerHTML = "&#128190; Save note";
+    document.getElementById("note-save-btn").innerHTML = icon('save') + " Save note";
   } else {
     // New note
     const entry = {ts:ts, content:content, id: ++_uid};
@@ -2393,7 +2411,7 @@ function noteEdit(id) {
   editor.innerHTML = entry.content;
   editor.focus();
   noteEditingId = id;
-  document.getElementById("note-save-btn").innerHTML = "&#128190; Update note";
+  document.getElementById("note-save-btn").innerHTML = icon('save') + " Update note";
   const cancelBtn = document.getElementById("note-cancel-btn");
   if (cancelBtn) cancelBtn.style.display = "";
   editor.scrollIntoView({behavior:"smooth", block:"center"});
@@ -2402,7 +2420,7 @@ function noteEdit(id) {
 function noteCancelEdit() {
   noteEditingId = null;
   document.getElementById("note-editor").innerHTML = "";
-  document.getElementById("note-save-btn").innerHTML = "&#128190; Save note";
+  document.getElementById("note-save-btn").innerHTML = icon('save') + " Save note";
   const cancelBtn = document.getElementById("note-cancel-btn");
   if (cancelBtn) cancelBtn.style.display = "none";
 }
@@ -2533,7 +2551,7 @@ function addUrl(data) {
   const btnLabel = data.name ? data.name : "Open";
   el.innerHTML =
     '<div class="url-top-row">' +
-      '<button class="url-toggle' + (data.collapsed ? '' : ' open') + '" id="' + id + '_toggle" onclick="toggleUrl(\'' + id + '\')" title="Expand/collapse">&#9654;</button>' +
+      '<button class="url-toggle' + (data.collapsed ? '' : ' open') + '" id="' + id + '_toggle" onclick="toggleUrl(\'' + id + '\')" title="Expand/collapse">' + icon('chevron-right') + '</button>' +
       '<button class="url-open" id="' + id + '_btn" onclick="openUrl(\'' + id + '\')" title="Open in new window">&#x1F517; ' + btnLabel + '</button>' +
       '<button class="rb" onclick="removeUrl(\'' + id + '\')">&#x2715;</button>' +
     '</div>' +
@@ -7172,6 +7190,7 @@ async function generateDoc() {
 
 
 loadSavedLogo();
+if (typeof lucide !== 'undefined') lucide.createIcons();
 refreshSchedLocDropdowns();
 libSetSort(_libSortMode);  // applies active class to sort buttons and populates dropdown
 refreshSidebar();
