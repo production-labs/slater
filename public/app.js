@@ -787,7 +787,7 @@ function addScheduleDay(data, insertAfterDayId) {
   var catSel = document.createElement("select");
   catSel.id = dayId+"_category";
   catSel.required = true;
-  catSel.style.cssText = "width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--surface)";
+  catSel.style.cssText = "width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)";
   var _placeholder = document.createElement("option"); _placeholder.value = ""; _placeholder.textContent = "Select"; _placeholder.disabled = true;
   catSel.appendChild(_placeholder);
   var _catGroups = [
@@ -1636,6 +1636,138 @@ function wbCalcDue(id, anchorIso, prevDue) {
   return dir === "forward" ? wbBusinessDaysAfter(anchorIso, days) : wbBusinessDaysBefore(anchorIso, days);
 }
 
+function wbDrawTimeline() {
+  var container = document.getElementById("wb-timeline");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Collect workback items with dates
+  var items = wbItems.map(function(id) {
+    var dueEl = document.getElementById(id+"_due");
+    var iso = (dueEl && dueEl.dataset.iso) || "";
+    var name = (document.getElementById(id+"_item")||{}).value || "Untitled";
+    var cls = (dueEl && dueEl.className.replace("wb-due","").trim()) || "";
+    return {iso: iso, label: name, isPin: false, cls: cls};
+  }).filter(function(d) { return !!d.iso; });
+
+  // Collect schedule pins
+  var pins = getSchedMilestones().filter(function(m) { return !!m.date_iso; })
+    .map(function(m) { return {iso: m.date_iso, label: m.label, isPin: true, cls: ""}; });
+
+  var all = items.concat(pins);
+  if (all.length < 2) { container.style.display = "none"; return; }
+
+  container.style.display = "block";
+
+  // Date bounds with 4% padding
+  var isos = all.map(function(d) { return d.iso; }).sort();
+  var minIso = isos[0], maxIso = isos[isos.length-1];
+  function isoParse(s) { var p = s.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+  var minMs = isoParse(minIso).getTime();
+  var maxMs = isoParse(maxIso).getTime();
+  var pad = Math.max((maxMs - minMs) * 0.04, 86400000 * 2);
+  minMs -= pad; maxMs += pad;
+  var range = maxMs - minMs;
+  function pct(iso) { return ((isoParse(iso).getTime() - minMs) / range) * 100; }
+
+  // Today
+  var now = new Date();
+  var todayIso = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+  var todayPct = Math.max(0, Math.min(100, ((now.getTime() - minMs) / range) * 100));
+
+  // Track: past (muted) + future (accent)
+  var track = document.createElement("div");
+  track.className = "wb-tl-track";
+  track.style.background = "linear-gradient(to right, var(--border-strong) 0%, var(--border-strong) "+todayPct+"%, var(--accent) "+todayPct+"%, var(--accent) 100%)";
+  container.appendChild(track);
+
+  // Today marker
+  var todayEl = document.createElement("div");
+  todayEl.className = "wb-tl-today";
+  todayEl.style.left = todayPct+"%";
+  todayEl.style.height = "20px";
+  container.appendChild(todayEl);
+  var todayLbl = document.createElement("div");
+  todayLbl.className = "wb-tl-today-label";
+  todayLbl.style.left = todayPct+"%";
+  todayLbl.textContent = "Today";
+  container.appendChild(todayLbl);
+
+  // Tooltip element (shared)
+  var tip = document.createElement("div");
+  tip.className = "wb-tl-tip";
+  document.body.appendChild(tip);
+  var _tipTimer;
+  function showTip(e, html) {
+    tip.innerHTML = html;
+    tip.classList.add("visible");
+    moveTip(e);
+  }
+  function moveTip(e) {
+    var x = e.clientX, y = e.clientY;
+    tip.style.left = (x + 12)+"px";
+    tip.style.top = (y - 36)+"px";
+    // Nudge left if near right edge
+    var rect = tip.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) tip.style.left = (x - rect.width - 12)+"px";
+  }
+  function hideTip() { tip.classList.remove("visible"); }
+
+  // Dot collision: bucket by rounded percentage (1% buckets), stagger vertically
+  var buckets = {};
+  all.forEach(function(d) {
+    var p = Math.round(pct(d.iso));
+    if (!buckets[p]) buckets[p] = [];
+    buckets[p].push(d);
+  });
+
+  Object.keys(buckets).forEach(function(p) {
+    var group = buckets[p];
+    var count = group.length;
+    var offsets = [];
+    if (count === 1) { offsets = [0]; }
+    else {
+      // spread vertically: 0 stays centered, extra items alternate above/below
+      for (var i = 0; i < count; i++) {
+        var sign = (i % 2 === 0) ? 1 : -1;
+        var mag = Math.ceil(i / 2) * 13;
+        offsets.push(sign * mag);
+      }
+    }
+    group.forEach(function(d, i) {
+      var dot = document.createElement("div");
+      var isPast = d.iso < todayIso;
+      dot.className = "wb-tl-dot" + (d.isPin ? " pin" : "");
+      dot.style.left = pct(d.iso)+"%";
+      var yOffset = offsets[i];
+      dot.style.top = "calc(50% + "+yOffset+"px)";
+      if (d.isPin) {
+        dot.style.background = isPast ? "var(--text-muted)" : "var(--charcoal)";
+      } else if (d.cls === "overdue") {
+        dot.style.background = "var(--accent)";
+      } else if (d.cls === "soon") {
+        dot.style.background = "var(--accent-yellow)";
+      } else if (d.cls === "ok") {
+        dot.style.background = "#4CAF77";
+      } else {
+        dot.style.background = isPast ? "var(--text-muted)" : "var(--film-can)";
+      }
+      // Tooltip
+      var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      var pp = d.iso.split("-");
+      var dateStr = months[+pp[1]-1]+" "+parseInt(pp[2])+", "+pp[0];
+      var tipHtml = "<strong>"+d.label+"</strong><br><span style='color:var(--text-muted);font-size:11px'>"+(d.isPin?"Milestone":"Task")+" &middot; "+dateStr+"</span>";
+      dot.addEventListener("mouseenter", function(e) { showTip(e, tipHtml); });
+      dot.addEventListener("mousemove", moveTip);
+      dot.addEventListener("mouseleave", hideTip);
+      container.appendChild(dot);
+    });
+  });
+
+  // Clean up tooltip when timeline is redrawn
+  container._cleanup = function() { if (tip.parentNode) tip.parentNode.removeChild(tip); hideTip(); };
+}
+
 function wbRecalc() {
   const anchorIso = getAnchorIso();
   const kickoffIso = getKickoffIso();
@@ -1683,6 +1815,9 @@ function wbRecalc() {
   var _wbScroll = window.scrollY;
   var _wbFocused = document.activeElement;
   wbRebuildPins();
+  var _tl = document.getElementById("wb-timeline");
+  if (_tl && _tl._cleanup) _tl._cleanup();
+  wbDrawTimeline();
   window.scrollTo(0, _wbScroll);
   if (_wbFocused && document.body.contains(_wbFocused)) _wbFocused.focus({preventScroll: true});
 }
