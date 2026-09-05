@@ -676,15 +676,23 @@ function refreshAllTimeHints() {
   var localIana = Intl.DateTimeFormat().resolvedOptions().timeZone;
   var projAbbr = projIana ? getTzAbbr(projIana) : "";
 
-  // Apply/clear data-tz on all time-field .fl wrappers
+  // Update TZ abbreviation span inside each time-field label
   var tzFlIds = ["kickoff_time_fl","video_due_time_fl"];
   scheduleDays.forEach(function(id) {
     tzFlIds.push(id+"_f1_wrap",id+"_f2_wrap",id+"_f3_wrap",id+"_breakfast_wrap",id+"_lunch_wrap");
   });
   tzFlIds.forEach(function(flId) {
-    var el = document.getElementById(flId);
-    if (!el) return;
-    if (projAbbr) el.dataset.tz = projAbbr; else delete el.dataset.tz;
+    var fl = document.getElementById(flId);
+    if (!fl) return;
+    var lbl = fl.querySelector("label");
+    if (!lbl) return;
+    var sp = lbl.querySelector(".tz-abbr");
+    if (projAbbr) {
+      if (!sp) { sp = document.createElement("span"); sp.className = "tz-abbr"; lbl.appendChild(sp); }
+      sp.textContent = " · " + projAbbr;
+    } else {
+      if (sp) sp.remove();
+    }
   });
 
   // Update hints for pinned fields
