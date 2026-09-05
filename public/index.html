@@ -150,7 +150,7 @@
           </div>
           <div class="fl" style="margin-bottom:1.25rem">
             <label>Time zone</label>
-            <div class="select-wrap"><select id="timezone" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
+            <div class="select-wrap"><select id="timezone" onchange="refreshAllTimeHints()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
               <option value="none">— No timezone —</option>
               <option value="ET">Eastern Time</option>
               <option value="CT">Central Time</option>

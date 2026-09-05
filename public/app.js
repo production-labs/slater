@@ -614,6 +614,73 @@ function updateAddKPButton() {
 let scheduleDays = [];
 let daySchedItems = {};
 
+var TZ_IANA = {
+  PT:"America/Los_Angeles", ET:"America/New_York", CT:"America/Chicago",
+  MT:"America/Denver", AKT:"America/Anchorage", HT:"Pacific/Honolulu",
+  GMT:"Europe/London", CET:"Europe/Paris"
+};
+
+function normalizeTimeStr(s) {
+  if (!s) return s;
+  var m = s.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s+\S+)?$/i);
+  if (!m) return s;
+  var h = parseInt(m[1]), mn = m[2] ? parseInt(m[2]) : 0, ap = (m[3]||"").toLowerCase();
+  if (!ap) {
+    if (h >= 13 && h <= 23) return (h-12)+":"+String(mn).padStart(2,"0")+" PM";
+    if (h === 0) return "12:"+String(mn).padStart(2,"0")+" AM";
+    if (h === 12) return "12:"+String(mn).padStart(2,"0")+" PM";
+    return s;
+  }
+  var h24 = h; if (ap==="pm"&&h!==12) h24=h+12; if (ap==="am"&&h===12) h24=0;
+  return (h24%12||12)+":"+String(mn).padStart(2,"0")+" "+(h24>=12?"PM":"AM");
+}
+
+function getTzAbbr(ianaName) {
+  try {
+    return new Intl.DateTimeFormat("en-US",{timeZone:ianaName,timeZoneName:"short"})
+      .formatToParts(new Date()).find(function(p){return p.type==="timeZoneName";}).value;
+  } catch(e) { return ""; }
+}
+
+function convertTimeAcrossTz(h24, mn, fromIana, toIana, refIso) {
+  var ref = refIso ? new Date(refIso+"T12:00:00") : new Date();
+  var base = Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate(), h24, mn, 0);
+  var sp = new Intl.DateTimeFormat("en-US",{timeZone:fromIana,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(base)).split(":");
+  var fh = parseInt(sp[0])%24, fm = parseInt(sp[1]);
+  var utc = base + ((h24-fh)*60+(mn-fm))*60000;
+  return new Intl.DateTimeFormat("en-US",{timeZone:toIana,hour:"numeric",minute:"2-digit",hour12:true}).format(new Date(utc));
+}
+
+function updateTimeHint(inputEl, hintEl, dayId) {
+  if (!hintEl) return;
+  var val = (inputEl||{}).value||"";
+  if (!val) { hintEl.textContent=""; return; }
+  var projTzCode = (document.getElementById("timezone")||{}).value||"";
+  if (!projTzCode||projTzCode==="none"||!TZ_IANA[projTzCode]) { hintEl.textContent=""; return; }
+  var projIana = TZ_IANA[projTzCode];
+  var m = val.trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  if (!m) { hintEl.textContent=""; return; }
+  var h=parseInt(m[1]),mn=parseInt(m[2]),ap=m[3].toLowerCase();
+  var h24=h; if(ap==="pm"&&h!==12) h24=h+12; if(ap==="am"&&h===12) h24=0;
+  var projAbbr = getTzAbbr(projIana);
+  var localIana = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (localIana===projIana) { hintEl.textContent=projAbbr; return; }
+  var refIso = dayId ? ((document.getElementById(dayId+"_date_iso")||{}).value||"") : "";
+  var localStr = convertTimeAcrossTz(h24, mn, projIana, localIana, refIso);
+  var localAbbr = getTzAbbr(localIana);
+  hintEl.textContent = projAbbr+" · "+localStr+" "+localAbbr;
+}
+
+function refreshAllTimeHints() {
+  scheduleDays.forEach(function(dayId) {
+    ["call_time","golive","wrap","breakfast","lunch"].forEach(function(f) {
+      var inp = document.getElementById(dayId+"_"+f);
+      var hint = document.getElementById(dayId+"_"+f+"_tz_hint");
+      if (inp && hint) updateTimeHint(inp, hint, dayId);
+    });
+  });
+}
+
 function addScheduleDay(data, insertAfterDayId) {
   data = data || {};
   const dayId = "sday_" + (++_uid);
@@ -841,7 +908,9 @@ function addScheduleDay(data, insertAfterDayId) {
   var f1Lbl = document.createElement("label"); f1Lbl.id = dayId+"_f1_lbl"; f1Lbl.textContent = "Call Time";
   const callTime = makeInput("text", dayId+"_call_time", "e.g. 7:00 AM", data.call_time||"");
   callTime.onchange = function() { sortScheduleDays(); };
-  f1Wrap.appendChild(f1Lbl); f1Wrap.appendChild(callTime);
+  const callTimeHint = document.createElement("span"); callTimeHint.id = dayId+"_call_time_tz_hint"; callTimeHint.className = "as";
+  callTime.onblur = function() { var n=normalizeTimeStr(this.value); if(n&&n!==this.value){this.value=n;autosaveTrigger();} updateTimeHint(this,callTimeHint,dayId); };
+  f1Wrap.appendChild(f1Lbl); f1Wrap.appendChild(callTime); f1Wrap.appendChild(callTimeHint);
 
   body.appendChild(makeGrid("g2", [startDateField, f1Wrap]));
 
@@ -850,7 +919,9 @@ function addScheduleDay(data, insertAfterDayId) {
   var f2Wrap = document.createElement("div"); f2Wrap.id = dayId+"_f2_wrap"; f2Wrap.className = "fl";
   var f2Lbl = document.createElement("label"); f2Lbl.id = dayId+"_f2_lbl"; f2Lbl.textContent = "Go Live";
   const goLive = makeInput("text", dayId+"_golive", "e.g. 2:00 PM", data.golive||"");
-  f2Wrap.appendChild(f2Lbl); f2Wrap.appendChild(goLive);
+  const goLiveHint = document.createElement("span"); goLiveHint.id = dayId+"_golive_tz_hint"; goLiveHint.className = "as";
+  goLive.onblur = function() { var n=normalizeTimeStr(this.value); if(n&&n!==this.value){this.value=n;autosaveTrigger();} updateTimeHint(this,goLiveHint,dayId); };
+  f2Wrap.appendChild(f2Lbl); f2Wrap.appendChild(goLive); f2Wrap.appendChild(goLiveHint);
   var dateTimeRow2 = makeGrid("g2", [f2EmptyCol, f2Wrap]);
   dateTimeRow2.id = dayId+"_f2_row";
   body.appendChild(dateTimeRow2);
@@ -863,12 +934,18 @@ function addScheduleDay(data, insertAfterDayId) {
   var f3Wrap = document.createElement("div"); f3Wrap.id = dayId+"_f3_wrap"; f3Wrap.className = "fl";
   var f3Lbl = document.createElement("label"); f3Lbl.id = dayId+"_f3_lbl"; f3Lbl.textContent = "Wrap";
   const wrap = makeInput("text", dayId+"_wrap", "e.g. 6:00 PM", data.wrap||"");
-  f3Wrap.appendChild(f3Lbl); f3Wrap.appendChild(wrap);
+  const wrapHint = document.createElement("span"); wrapHint.id = dayId+"_wrap_tz_hint"; wrapHint.className = "as";
+  wrap.onblur = function() { var n=normalizeTimeStr(this.value); if(n&&n!==this.value){this.value=n;autosaveTrigger();} updateTimeHint(this,wrapHint,dayId); };
+  f3Wrap.appendChild(f3Lbl); f3Wrap.appendChild(wrap); f3Wrap.appendChild(wrapHint);
 
   body.appendChild(makeGrid("g2", [endDateField, f3Wrap]));
 
   const bfast = makeInput("text",dayId+"_breakfast","8:00 AM",data.breakfast||"");
+  const bfastHint = document.createElement("span"); bfastHint.id = dayId+"_breakfast_tz_hint"; bfastHint.className = "as";
+  bfast.onblur = function() { var n=normalizeTimeStr(this.value); if(n&&n!==this.value){this.value=n;autosaveTrigger();} updateTimeHint(this,bfastHint,dayId); };
   const lunch = makeInput("text",dayId+"_lunch","12:00 PM",data.lunch||"");
+  const lunchHint = document.createElement("span"); lunchHint.id = dayId+"_lunch_tz_hint"; lunchHint.className = "as";
+  lunch.onblur = function() { var n=normalizeTimeStr(this.value); if(n&&n!==this.value){this.value=n;autosaveTrigger();} updateTimeHint(this,lunchHint,dayId); };
   if (!isPost) {
     var ddToggle = document.createElement("div");
     ddToggle.className = "day-details-toggle";
@@ -880,8 +957,8 @@ function addScheduleDay(data, insertAfterDayId) {
     ddBody.className = "day-details-body";
     ddBody.style.display = "none";
 
-    var breakfastWrap = makeField("Breakfast", bfast); breakfastWrap.id = dayId+"_breakfast_wrap";
-    var lunchWrap = makeField("Lunch", lunch); lunchWrap.id = dayId+"_lunch_wrap";
+    var breakfastWrap = makeField("Breakfast", bfast); breakfastWrap.id = dayId+"_breakfast_wrap"; breakfastWrap.appendChild(bfastHint);
+    var lunchWrap = makeField("Lunch", lunch); lunchWrap.id = dayId+"_lunch_wrap"; lunchWrap.appendChild(lunchHint);
     const mealGrid = makeGrid("g2",[breakfastWrap, lunchWrap]);
     mealGrid.style.marginBottom = "4px";
     ddBody.appendChild(mealGrid);
@@ -1055,6 +1132,11 @@ function addScheduleDay(data, insertAfterDayId) {
     if (data.f2_label) { var _rl2 = document.getElementById(dayId+"_f2_lbl"); if (_rl2) _rl2.value = data.f2_label; }
     if (data.f3_label) { var _rl3 = document.getElementById(dayId+"_f3_lbl"); if (_rl3) _rl3.value = data.f3_label; }
   }
+  if (data.call_time) updateTimeHint(callTime, callTimeHint, dayId);
+  if (data.golive) updateTimeHint(goLive, goLiveHint, dayId);
+  if (data.wrap) updateTimeHint(wrap, wrapHint, dayId);
+  if (data.breakfast) updateTimeHint(bfast, bfastHint, dayId);
+  if (data.lunch) updateTimeHint(lunch, lunchHint, dayId);
   return dayId;
 }
 
