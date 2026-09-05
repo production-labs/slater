@@ -769,14 +769,14 @@ function addScheduleDay(data, insertAfterDayId) {
 
   const dateIso = makeInput("date", dayId+"_date_iso", "", data.date_iso||"");
   dateIso.dataset.prevIso = data.date_iso || "";
-  dateIso.oninput = function() { syncSchedDayDate(dayId); };
+  dateIso.onchange = function() { syncSchedDayDate(dayId); };
   dateIso.onblur = function() { sortScheduleDays(); rebuildInsertDividers(); autosaveTrigger(); };
   body.appendChild(blacksCb);
   const dateFmt = makeInput("text", dayId+"_date", "", data.date||"");
   dateFmt.style.display = "none";
   body.appendChild(dateFmt);
   const endDateIso = makeInput("date", dayId+"_end_date_iso", "", data.end_date_iso||"");
-  endDateIso.oninput = function() { syncSchedDayEndDate(dayId); autosaveTrigger(); };
+  endDateIso.onchange = function() { syncSchedDayEndDate(dayId); autosaveTrigger(); };
   const endDateFmt = makeInput("text", dayId+"_end_date", "", data.end_date||"");
   endDateFmt.style.display = "none";
   body.appendChild(endDateFmt);
@@ -5250,7 +5250,7 @@ function addExpense(data) {
   dateInp.id = id+"_date"; dateInp.value = data.date||"";
   dateInp.className = "exp-date";
   dateInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;color:var(--film-can)";
-  dateInp.oninput = function() { updateExpTotals(); };
+  dateInp.onchange = function() { updateExpTotals(); };
 
   const vendorInp = document.createElement("input"); vendorInp.type = "text";
   vendorInp.id = id+"_vendor"; vendorInp.placeholder = "Vendor / description";
