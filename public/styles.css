@@ -37,7 +37,8 @@ body{font-family:"Inter",system-ui,-apple-system,sans-serif;background:var(--bg)
 .fl label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
 .fl input,.fl textarea,.fl select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)}
 .fl input:focus,.fl textarea:focus,.fl select:focus{outline:none;border-color:var(--border-strong)}
-input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:pointer}
+input[type="date"]{color-scheme:dark}
+input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:0.6}
 .fl textarea{min-height:64px;resize:vertical}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
@@ -418,8 +419,8 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
   .page{padding:1rem 6px 4rem!important}
   .sec{padding:8px!important}
   .sday-block{width:100%;box-sizing:border-box}
-  .sday-body input,.sday-body textarea{width:100%;max-width:100%;box-sizing:border-box;text-align:left;-webkit-appearance:none;appearance:none}
-  input[type="date"]{text-align:left;-webkit-appearance:none;appearance:none;width:100%;max-width:100%;box-sizing:border-box}
+  .sday-body input:not([type="date"]),.sday-body textarea{width:100%;max-width:100%;box-sizing:border-box;text-align:left;-webkit-appearance:none;appearance:none}
+  input[type="date"]{text-align:left;width:100%;max-width:100%;box-sizing:border-box}
   input[type="date"]::-webkit-date-and-time-value{text-align:left}
   .g2>*,.g3>*,.g4>*{min-width:0}
   html,body{overflow-x:hidden;max-width:100%}
