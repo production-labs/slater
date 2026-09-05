@@ -658,28 +658,51 @@ function updateTimeHint(inputEl, hintEl, dayId) {
   var projTzCode = (document.getElementById("timezone")||{}).value||"";
   if (!projTzCode||projTzCode==="none"||!TZ_IANA[projTzCode]) { hintEl.textContent=""; return; }
   var projIana = TZ_IANA[projTzCode];
+  var localIana = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (localIana===projIana) { hintEl.textContent=""; return; }
   var m = val.trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)/i);
   if (!m) { hintEl.textContent=""; return; }
   var h=parseInt(m[1]),mn=parseInt(m[2]),ap=m[3].toLowerCase();
   var h24=h; if(ap==="pm"&&h!==12) h24=h+12; if(ap==="am"&&h===12) h24=0;
-  var projAbbr = getTzAbbr(projIana);
-  var localIana = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (localIana===projIana) { hintEl.textContent=projAbbr; return; }
   var refIso = dayId ? ((document.getElementById(dayId+"_date_iso")||{}).value||"") : "";
   var localStr = convertTimeAcrossTz(h24, mn, projIana, localIana, refIso);
   var localAbbr = getTzAbbr(localIana);
-  hintEl.textContent = projAbbr+" · "+localStr+" "+localAbbr;
+  hintEl.textContent = localStr+" "+localAbbr;
 }
 
 function refreshAllTimeHints() {
-  [["kickoff_time","kickoff_time_tz_hint"],["video_due_time","video_due_time_tz_hint"]].forEach(function(p) {
-    var inp = document.getElementById(p[0]), hint = document.getElementById(p[1]);
-    if (inp && hint) updateTimeHint(inp, hint, null);
+  var projTzCode = (document.getElementById("timezone")||{}).value||"";
+  var projIana = TZ_IANA[projTzCode]||"";
+  var localIana = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  var projAbbr = projIana ? getTzAbbr(projIana) : "";
+
+  // Apply/clear data-tz on all time-field .fl wrappers
+  var tzFlIds = ["kickoff_time_fl","video_due_time_fl"];
+  scheduleDays.forEach(function(id) {
+    tzFlIds.push(id+"_f1_wrap",id+"_f2_wrap",id+"_f3_wrap",id+"_breakfast_wrap",id+"_lunch_wrap");
   });
+  tzFlIds.forEach(function(flId) {
+    var el = document.getElementById(flId);
+    if (!el) return;
+    if (projAbbr) el.dataset.tz = projAbbr; else delete el.dataset.tz;
+  });
+
+  // Update hints for pinned fields
+  [["kickoff_time","kickoff_time_tz_hint",null],["video_due_time","video_due_time_tz_hint",null]].forEach(function(p) {
+    var inp = document.getElementById(p[0]), hint = document.getElementById(p[1]);
+    if (inp && hint) updateTimeHint(inp, hint, p[2]);
+  });
+
+  // Update hints for schedule day fields and schedule entries
   scheduleDays.forEach(function(dayId) {
     ["call_time","golive","wrap","breakfast","lunch"].forEach(function(f) {
       var inp = document.getElementById(dayId+"_"+f);
       var hint = document.getElementById(dayId+"_"+f+"_tz_hint");
+      if (inp && hint) updateTimeHint(inp, hint, dayId);
+    });
+    (daySchedItems[dayId]||[]).forEach(function(entryId) {
+      var inp = document.getElementById(entryId+"_time");
+      var hint = document.getElementById(entryId+"_time_tz_hint");
       if (inp && hint) updateTimeHint(inp, hint, dayId);
     });
   });
@@ -1136,11 +1159,7 @@ function addScheduleDay(data, insertAfterDayId) {
     if (data.f2_label) { var _rl2 = document.getElementById(dayId+"_f2_lbl"); if (_rl2) _rl2.value = data.f2_label; }
     if (data.f3_label) { var _rl3 = document.getElementById(dayId+"_f3_lbl"); if (_rl3) _rl3.value = data.f3_label; }
   }
-  if (data.call_time) updateTimeHint(callTime, callTimeHint, dayId);
-  if (data.golive) updateTimeHint(goLive, goLiveHint, dayId);
-  if (data.wrap) updateTimeHint(wrap, wrapHint, dayId);
-  if (data.breakfast) updateTimeHint(bfast, bfastHint, dayId);
-  if (data.lunch) updateTimeHint(lunch, lunchHint, dayId);
+  refreshAllTimeHints();
   return dayId;
 }
 
@@ -1462,6 +1481,10 @@ function addScheduleEntry2(dayId, time, desc, afterId) {
   timeInp.type = "text"; timeInp.id = entryId+"_time"; timeInp.placeholder = "9:00 AM";
   timeInp.value = time; timeInp.autocomplete = "new-password";
   timeInp.oninput = function() { wbRebuildPins(); };
+  const timeHint = document.createElement("span"); timeHint.id = entryId+"_time_tz_hint"; timeHint.className = "as";
+  timeInp.onblur = function() { var n=normalizeTimeStr(this.value); if(n&&n!==this.value){this.value=n;wbRebuildPins();autosaveTrigger();} updateTimeHint(this,timeHint,dayId); };
+  const timeWrap = document.createElement("div"); timeWrap.style.cssText = "display:flex;flex-direction:column;gap:2px";
+  timeWrap.appendChild(timeInp); timeWrap.appendChild(timeHint);
 
   const descInp = document.createElement("input");
   descInp.type = "text"; descInp.id = entryId+"_desc"; descInp.placeholder = "Camera setup begins";
@@ -1476,7 +1499,7 @@ function addScheduleEntry2(dayId, time, desc, afterId) {
   delBtn.className = "rb"; delBtn.innerHTML = "&#x2715;";
   delBtn.onclick = function() { removeSchedEntry2(dayId, entryId); };
 
-  el.appendChild(timeInp); el.appendChild(descInp);
+  el.appendChild(timeWrap); el.appendChild(descInp);
   el.appendChild(insBtn); el.appendChild(delBtn);
 
   const list = document.getElementById(dayId+"_sched_list");
@@ -6395,10 +6418,9 @@ function loadFormData(data) {
   var _kt = document.getElementById("kickoff_time"); if(_kt) _kt.value = data.kickoff_time||"";
   var _vd = document.getElementById("video_due_date_iso"); if(_vd) _vd.value = data.video_due_date_iso||"";
   var _vt = document.getElementById("video_due_time"); if(_vt) _vt.value = data.video_due_time||"";
-  if (_kt) updateTimeHint(_kt, document.getElementById("kickoff_time_tz_hint"), null);
-  if (_vt) updateTimeHint(_vt, document.getElementById("video_due_time_tz_hint"), null);
   setTimeout(updateVideoDueVisibility, 50);
   loadScheduleDays(data.schedule_days||[], data);
+  refreshAllTimeHints();
 
   refreshWbDaySelector();
   const wbDayEl = document.getElementById("wb_day_select");
