@@ -1820,7 +1820,7 @@ function wbRecalc() {
   if (_tl && _tl._cleanup) _tl._cleanup();
   wbDrawTimeline();
   window.scrollTo(0, _wbScroll);
-  if (_wbFocused && document.body.contains(_wbFocused)) _wbFocused.focus({preventScroll: true});
+  if (_wbFocused && document.body.contains(_wbFocused) && document.activeElement !== _wbFocused) _wbFocused.focus({preventScroll: true});
 }
 
 function wbSortAnimated() {
