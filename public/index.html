@@ -182,7 +182,7 @@
             <div class="sday-body">
               <div class="g2">
                 <div class="fl"><label>Kickoff date</label><input type="date" id="kickoff_date_iso" onchange="syncKickoffDate()" autocomplete="new-password"></div>
-                <div class="fl"><label>Time</label><input type="text" id="kickoff_time" placeholder="e.g. 9:00 AM" autocomplete="new-password" oninput="wbRebuildPins()"></div>
+                <div class="fl"><label>Time</label><input type="text" id="kickoff_time" placeholder="e.g. 9:00 AM" autocomplete="new-password" oninput="wbRebuildPins()" onblur="var n=normalizeTimeStr(this.value);if(n&&n!==this.value){this.value=n;wbRebuildPins();autosaveTrigger();}updateTimeHint(this,document.getElementById('kickoff_time_tz_hint'),null)"><span class="as" id="kickoff_time_tz_hint"></span></div>
               </div>
             </div>
           </div>
@@ -195,7 +195,7 @@
             <div class="sday-body">
               <div class="g2">
                 <div class="fl"><label>Due date</label><input type="date" id="video_due_date_iso" onchange="syncVideoDueDate()" autocomplete="new-password"></div>
-                <div class="fl"><label>Time</label><input type="text" id="video_due_time" placeholder="e.g. 5:00 PM" autocomplete="new-password" oninput="wbRebuildPins()"></div>
+                <div class="fl"><label>Time</label><input type="text" id="video_due_time" placeholder="e.g. 5:00 PM" autocomplete="new-password" oninput="wbRebuildPins()" onblur="var n=normalizeTimeStr(this.value);if(n&&n!==this.value){this.value=n;wbRebuildPins();autosaveTrigger();}updateTimeHint(this,document.getElementById('video_due_time_tz_hint'),null)"><span class="as" id="video_due_time_tz_hint"></span></div>
               </div>
             </div>
           </div>

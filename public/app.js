@@ -672,6 +672,10 @@ function updateTimeHint(inputEl, hintEl, dayId) {
 }
 
 function refreshAllTimeHints() {
+  [["kickoff_time","kickoff_time_tz_hint"],["video_due_time","video_due_time_tz_hint"]].forEach(function(p) {
+    var inp = document.getElementById(p[0]), hint = document.getElementById(p[1]);
+    if (inp && hint) updateTimeHint(inp, hint, null);
+  });
   scheduleDays.forEach(function(dayId) {
     ["call_time","golive","wrap","breakfast","lunch"].forEach(function(f) {
       var inp = document.getElementById(dayId+"_"+f);
@@ -6387,6 +6391,8 @@ function loadFormData(data) {
   var _kt = document.getElementById("kickoff_time"); if(_kt) _kt.value = data.kickoff_time||"";
   var _vd = document.getElementById("video_due_date_iso"); if(_vd) _vd.value = data.video_due_date_iso||"";
   var _vt = document.getElementById("video_due_time"); if(_vt) _vt.value = data.video_due_time||"";
+  if (_kt) updateTimeHint(_kt, document.getElementById("kickoff_time_tz_hint"), null);
+  if (_vt) updateTimeHint(_vt, document.getElementById("video_due_time_tz_hint"), null);
   setTimeout(updateVideoDueVisibility, 50);
   loadScheduleDays(data.schedule_days||[], data);
 
