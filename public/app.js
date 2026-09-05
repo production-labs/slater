@@ -770,7 +770,7 @@ function addScheduleDay(data, insertAfterDayId) {
   const dateIso = makeInput("date", dayId+"_date_iso", "", data.date_iso||"");
   dateIso.dataset.prevIso = data.date_iso || "";
   dateIso.onchange = function() { syncSchedDayDate(dayId); };
-  dateIso.onblur = function() { sortScheduleDays(); rebuildInsertDividers(); autosaveTrigger(); };
+  dateIso.onblur = function() { autosaveTrigger(); };
   body.appendChild(blacksCb);
   const dateFmt = makeInput("text", dayId+"_date", "", data.date||"");
   dateFmt.style.display = "none";
@@ -1305,6 +1305,7 @@ function syncSchedDayDate(dayId) {
   if (fmtEl) fmtEl.value = fmtStr;
   updateDayCalWidget(dayId, iso);
   updateSchedDayDateDisplay(dayId);
+  sortScheduleDays();
   wbRecalc();
   wbRebuildPins();
   triggerSunLookup(dayId);
