@@ -1280,6 +1280,10 @@ function sortVideoDueBlock() {
     var _dayIso = (document.getElementById(scheduleDays[_i] + "_date_iso")||{}).value || "9999-99-99";
     if (_dayIso >= videoDueIso) { insertBefore = document.getElementById(scheduleDays[_i]); break; }
   }
+  // Skip DOM move if already in correct position (avoids resetting Chrome date input state)
+  var nextBlock = block.nextElementSibling;
+  while (nextBlock && !nextBlock.classList.contains("sday-block")) nextBlock = nextBlock.nextElementSibling;
+  if (nextBlock === insertBefore) return;
   if (insertBefore) { listEl.insertBefore(block, insertBefore); } else { listEl.appendChild(block); }
 }
 
