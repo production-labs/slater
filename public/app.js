@@ -664,10 +664,24 @@ function updateTimeHint(inputEl, hintEl, dayId) {
   if (!m) { hintEl.textContent=""; return; }
   var h=parseInt(m[1]),mn=parseInt(m[2]),ap=m[3].toLowerCase();
   var h24=h; if(ap==="pm"&&h!==12) h24=h+12; if(ap==="am"&&h===12) h24=0;
-  var refIso = dayId ? ((document.getElementById(dayId+"_date_iso")||{}).value||"") : "";
-  var localStr = convertTimeAcrossTz(h24, mn, projIana, localIana, refIso);
+  var refIso = (dayId ? (document.getElementById(dayId+"_date_iso")||{}).value||"" : "") ||
+               new Intl.DateTimeFormat("en-CA",{timeZone:projIana}).format(new Date());
+  // Compute UTC moment for h24:mn in projIana on refIso
+  var ref = new Date(refIso+"T12:00:00");
+  var base = Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate(), h24, mn, 0);
+  var sp = new Intl.DateTimeFormat("en-US",{timeZone:projIana,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(base)).split(":");
+  var fh=parseInt(sp[0])%24, fm=parseInt(sp[1]);
+  var utc = base + ((h24-fh)*60+(mn-fm))*60000;
+  var utcDate = new Date(utc);
+  var localTimeStr = new Intl.DateTimeFormat("en-US",{timeZone:localIana,hour:"numeric",minute:"2-digit",hour12:true}).format(utcDate);
   var localAbbr = getTzAbbr(localIana);
-  hintEl.textContent = localStr+" "+localAbbr;
+  var localDateIso = new Intl.DateTimeFormat("en-CA",{timeZone:localIana}).format(utcDate);
+  var hint = localTimeStr+" "+localAbbr;
+  if (localDateIso !== refIso) {
+    var diff = Math.round((new Date(localDateIso+"T12:00:00") - new Date(refIso+"T12:00:00")) / 86400000);
+    hint += diff === 1 ? " (next day)" : diff === -1 ? " (prev day)" : " ("+(diff>0?"+":"")+diff+" days)";
+  }
+  hintEl.textContent = hint;
 }
 
 function refreshAllTimeHints() {
