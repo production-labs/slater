@@ -636,9 +636,12 @@ function normalizeTimeStr(s) {
 }
 
 function getTzAbbr(ianaName) {
+  if (!ianaName) return "";
   try {
-    return new Intl.DateTimeFormat("en-US",{timeZone:ianaName,timeZoneName:"short"})
-      .formatToParts(new Date()).find(function(p){return p.type==="timeZoneName";}).value;
+    var parts = new Intl.DateTimeFormat("en-US",{timeZone:ianaName,timeZoneName:"short",hour:"numeric"})
+      .formatToParts(new Date());
+    var p = parts.find(function(x){return x.type==="timeZoneName";});
+    return p ? p.value : "";
   } catch(e) { return ""; }
 }
 
@@ -6442,7 +6445,6 @@ function loadFormData(data) {
   var _vt = document.getElementById("video_due_time"); if(_vt) _vt.value = data.video_due_time||"";
   setTimeout(updateVideoDueVisibility, 50);
   loadScheduleDays(data.schedule_days||[], data);
-  refreshAllTimeHints();
 
   refreshWbDaySelector();
   const wbDayEl = document.getElementById("wb_day_select");
@@ -6452,6 +6454,7 @@ function loadFormData(data) {
   wbLoadItems(Array.isArray(data.wb_items) ? data.wb_items : []);
   wbRecalc();
   wbRebuildPins();
+  refreshAllTimeHints();
   loadUrls(data.urls||[]);
   loadExpenses(currentSheetKey ? loadReceipts(currentSheetKey, data.expenses||[]) : (data.expenses||[]));
   notesLoadData(data.notes||[]);
