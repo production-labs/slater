@@ -1778,9 +1778,13 @@ function wbCalcDue(id, anchorIso, prevDue) {
 function wbDrawTimeline() {
   var container = document.getElementById("wb-timeline");
   if (!container) return;
+
+  if (container._cleanup) { container._cleanup(); container._cleanup = null; }
   container.innerHTML = "";
 
-  // Collect workback items with dates
+  /* TIMELINE_LEGACY — original dot-based timeline — keep as fallback
+  container.innerHTML = "";
+
   var items = wbItems.map(function(id) {
     var dueEl = document.getElementById(id+"_due");
     var iso = (dueEl && dueEl.dataset.iso) || "";
@@ -1789,7 +1793,6 @@ function wbDrawTimeline() {
     return {iso: iso, label: name, isPin: false, cls: cls};
   }).filter(function(d) { return !!d.iso; });
 
-  // Collect schedule pins
   var pins = getSchedMilestones().filter(function(m) { return !!m.date_iso; })
     .map(function(m) { return {iso: m.date_iso, label: m.label, isPin: true, cls: ""}; });
 
@@ -1798,7 +1801,6 @@ function wbDrawTimeline() {
 
   container.style.display = "block";
 
-  // Date bounds with 4% padding
   var isos = all.map(function(d) { return d.iso; }).sort();
   var minIso = isos[0], maxIso = isos[isos.length-1];
   function isoParse(s) { var p = s.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
@@ -1809,18 +1811,15 @@ function wbDrawTimeline() {
   var range = maxMs - minMs;
   function pct(iso) { return ((isoParse(iso).getTime() - minMs) / range) * 100; }
 
-  // Today
   var now = new Date();
   var todayIso = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
   var todayPct = Math.max(0, Math.min(100, ((now.getTime() - minMs) / range) * 100));
 
-  // Track: past (muted) + future (accent)
   var track = document.createElement("div");
   track.className = "wb-tl-track";
   track.style.background = "linear-gradient(to right, var(--border-strong) 0%, var(--border-strong) "+todayPct+"%, var(--accent) "+todayPct+"%, var(--accent) 100%)";
   container.appendChild(track);
 
-  // Today marker
   var todayEl = document.createElement("div");
   todayEl.className = "wb-tl-today";
   todayEl.style.left = todayPct+"%";
@@ -1832,27 +1831,20 @@ function wbDrawTimeline() {
   todayLbl.textContent = "Today";
   container.appendChild(todayLbl);
 
-  // Tooltip element (shared)
   var tip = document.createElement("div");
   tip.className = "wb-tl-tip";
   document.body.appendChild(tip);
   var _tipTimer;
-  function showTip(e, html) {
-    tip.innerHTML = html;
-    tip.classList.add("visible");
-    moveTip(e);
-  }
+  function showTip(e, html) { tip.innerHTML = html; tip.classList.add("visible"); moveTip(e); }
   function moveTip(e) {
     var x = e.clientX, y = e.clientY;
     tip.style.left = (x + 12)+"px";
     tip.style.top = (y - 36)+"px";
-    // Nudge left if near right edge
     var rect = tip.getBoundingClientRect();
     if (rect.right > window.innerWidth - 8) tip.style.left = (x - rect.width - 12)+"px";
   }
   function hideTip() { tip.classList.remove("visible"); }
 
-  // Dot collision: bucket by rounded percentage (1% buckets), stagger vertically
   var buckets = {};
   all.forEach(function(d) {
     var p = Math.round(pct(d.iso));
@@ -1866,7 +1858,6 @@ function wbDrawTimeline() {
     var offsets = [];
     if (count === 1) { offsets = [0]; }
     else {
-      // spread vertically: 0 stays centered, extra items alternate above/below
       for (var i = 0; i < count; i++) {
         var sign = (i % 2 === 0) ? 1 : -1;
         var mag = Math.ceil(i / 2) * 13;
@@ -1891,7 +1882,6 @@ function wbDrawTimeline() {
       } else {
         dot.style.background = isPast ? "var(--text-muted)" : "var(--film-can)";
       }
-      // Tooltip
       var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       var pp = d.iso.split("-");
       var dateStr = months[+pp[1]-1]+" "+parseInt(pp[2])+", "+pp[0];
@@ -1903,7 +1893,222 @@ function wbDrawTimeline() {
     });
   });
 
-  // Clean up tooltip when timeline is redrawn
+  container._cleanup = function() { if (tip.parentNode) tip.parentNode.removeChild(tip); hideTip(); };
+  */
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function isoMs(s) {
+    if (!s) return null;
+    var p = s.split("-");
+    return new Date(+p[0], +p[1]-1, +p[2]).getTime();
+  }
+
+  function ownerColor(name) {
+    var palette = ["#2a78d6","#1baf7a","#eb6834","#6250d6","#d6502a","#2ab5d6","#9d50d6","#d6a82a"];
+    if (!name || !name.trim()) return "#888";
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = ((h * 31 + name.charCodeAt(i)) | 0);
+    return palette[Math.abs(h) % palette.length];
+  }
+
+  // ── Collect data ─────────────────────────────────────────────────────────
+
+  var kickoffIso = (document.getElementById("kickoff_date_iso")||{}).value || "";
+  var videoDueIso = (document.getElementById("video_due_date_iso")||{}).value || "";
+
+  var dueMap = {};
+  wbItems.forEach(function(id) {
+    var dueEl = document.getElementById(id+"_due");
+    dueMap[id] = (dueEl && dueEl.dataset.iso) || "";
+  });
+
+  var all = [];
+
+  wbItems.forEach(function(id) {
+    var dueEl = document.getElementById(id+"_due");
+    var dueIso = (dueEl && dueEl.dataset.iso) || "";
+    if (!dueIso) return;
+    var label = (document.getElementById(id+"_item")||{}).value || "Untitled";
+    var owner = (document.getElementById(id+"_owner")||{}).value || "";
+    var mode = (document.getElementById(id+"_mode")||{value:"anchor"}).value || "anchor";
+    var startIso;
+    if (mode === "sequential") {
+      var anchorSel = document.getElementById(id+"_seq_anchor");
+      var seqId = anchorSel ? anchorSel.value : "";
+      var base;
+      if (seqId === "kickoff") base = kickoffIso;
+      else if (seqId === "video_due") base = videoDueIso;
+      else if (seqId && seqId.indexOf("pin_") === 0) base = seqId.slice(4);
+      else if (seqId && dueMap[seqId]) base = dueMap[seqId];
+      else base = kickoffIso;
+      startIso = base || dueIso;
+    } else {
+      startIso = dueIso;
+    }
+    all.push({type:"task", label:label, owner:owner, startIso:startIso, endIso:dueIso});
+  });
+
+  getSchedMilestones().forEach(function(m) {
+    if (!m.date_iso) return;
+    all.push({type:"pin", label:m.label, owner:"", startIso:m.date_iso, endIso:m.date_iso});
+  });
+
+  if (all.length < 1) { container.style.display = "none"; return; }
+  container.style.display = "block";
+
+  // ── Timeline bounds ──────────────────────────────────────────────────────
+
+  var now = new Date();
+  var todayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  var todayIso = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+
+  var allMs = [];
+  all.forEach(function(d) {
+    var s = isoMs(d.startIso), e = isoMs(d.endIso);
+    if (s !== null) allMs.push(s);
+    if (e !== null) allMs.push(e);
+  });
+
+  var minMs = Math.min(todayMs - 5*86400000, Math.min.apply(null, allMs));
+  var maxMs = Math.max.apply(null, allMs) + 3*86400000;
+  var range = maxMs - minMs;
+
+  function pctOf(ms) { return (ms - minMs) / range * 100; }
+  function isoPct(iso) { return pctOf(isoMs(iso)); }
+  var todayPct = pctOf(todayMs);
+
+  // ── Row assignment ───────────────────────────────────────────────────────
+
+  var sorted = all.slice().sort(function(a,b) { return (isoMs(a.startIso)||0) - (isoMs(b.startIso)||0); });
+
+  var rowEnds = [];
+  sorted.forEach(function(d) {
+    var sMs = isoMs(d.startIso) || 0;
+    var eMs = isoMs(d.endIso) || sMs;
+    var r = -1;
+    for (var ri = 0; ri < rowEnds.length; ri++) {
+      if (sMs > rowEnds[ri]) { r = ri; rowEnds[ri] = eMs; break; }
+    }
+    if (r === -1) { r = rowEnds.length; rowEnds.push(eMs); }
+    d.row = r;
+  });
+
+  var numRows = Math.max(rowEnds.length, 1);
+
+  // ── Layout geometry ──────────────────────────────────────────────────────
+
+  var ROW_H = 28, TOP_PAD = 12, BOT_PAD = 20;
+  function rowY(r) { return TOP_PAD + r * ROW_H; }
+  var tickH = rowY(numRows - 1) + 14;
+  container.style.height = (tickH + BOT_PAD) + "px";
+
+  // ── Row track lines ──────────────────────────────────────────────────────
+
+  for (var r = 0; r < numRows; r++) {
+    var ry = rowY(r);
+    var op = r === 0 ? 1 : 0.3;
+    var pastLine = document.createElement("div");
+    pastLine.style.cssText = "position:absolute;top:"+ry+"px;left:0;width:"+todayPct+"%;height:2px;background:#444;transform:translateY(-50%);pointer-events:none;opacity:"+op+";z-index:1";
+    var futLine = document.createElement("div");
+    futLine.style.cssText = "position:absolute;top:"+ry+"px;left:"+todayPct+"%;right:0;height:2px;background:#FF4D00;transform:translateY(-50%);pointer-events:none;opacity:"+op+";z-index:1";
+    container.appendChild(pastLine);
+    container.appendChild(futLine);
+  }
+
+  // ── Past overlay ─────────────────────────────────────────────────────────
+
+  var overlay = document.createElement("div");
+  overlay.className = "wb-tl-overlay";
+  overlay.style.width = todayPct + "%";
+  container.appendChild(overlay);
+
+  // ── TODAY marker ─────────────────────────────────────────────────────────
+
+  var todayTick = document.createElement("div");
+  todayTick.className = "wb-tl-today-tick";
+  todayTick.style.cssText = "left:"+todayPct+"%;top:0;height:"+tickH+"px";
+  container.appendChild(todayTick);
+
+  var todayLbl = document.createElement("div");
+  todayLbl.className = "wb-tl-today-lbl";
+  todayLbl.textContent = "TODAY";
+  todayLbl.style.cssText = "left:"+todayPct+"%;top:"+(tickH+4)+"px";
+  container.appendChild(todayLbl);
+
+  // ── Tooltip ──────────────────────────────────────────────────────────────
+
+  var tip = document.createElement("div");
+  tip.className = "wb-tl-tip";
+  document.body.appendChild(tip);
+  function showTip(e, html) { tip.innerHTML = html; tip.classList.add("visible"); moveTip(e); }
+  function moveTip(e) {
+    tip.style.left = (e.clientX+12)+"px";
+    tip.style.top = (e.clientY-36)+"px";
+    var rect = tip.getBoundingClientRect();
+    if (rect.right > window.innerWidth-8) tip.style.left = (e.clientX-rect.width-12)+"px";
+  }
+  function hideTip() { tip.classList.remove("visible"); }
+
+  // ── Render items ─────────────────────────────────────────────────────────
+
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function fmtD(iso) { var p=iso.split("-"); return MONTHS[+p[1]-1]+" "+parseInt(p[2])+", "+p[0]; }
+
+  sorted.forEach(function(d) {
+    var y = rowY(d.row);
+    var isPast = d.endIso < todayIso;
+
+    if (d.type === "pin") {
+      var pinEl = document.createElement("div");
+      pinEl.className = "wb-tl-pin";
+      pinEl.style.left = isoPct(d.startIso)+"%";
+      pinEl.style.top = y+"px";
+      pinEl.style.zIndex = "10";
+      if (isPast) {
+        pinEl.style.background = "rgba(255,255,255,.22)";
+        pinEl.style.border = "2px solid rgba(255,255,255,.22)";
+      } else {
+        pinEl.style.background = "#fff";
+        pinEl.style.border = "2px solid #fff";
+      }
+      var pinTipHtml = "<strong>"+d.label+"</strong><br><span style='color:var(--text-muted);font-size:11px'>Milestone &middot; "+fmtD(d.startIso)+"</span>";
+      pinEl.addEventListener("mouseenter", function(e) {
+        pinEl.style.boxShadow = isPast
+          ? "0 0 0 4px rgba(255,255,255,.08), 0 0 10px 3px rgba(255,255,255,.05)"
+          : "0 0 0 4px rgba(255,255,255,.15), 0 0 10px 3px rgba(255,255,255,.1)";
+        showTip(e, pinTipHtml);
+      });
+      pinEl.addEventListener("mousemove", moveTip);
+      pinEl.addEventListener("mouseleave", function() { pinEl.style.boxShadow = ""; hideTip(); });
+      container.appendChild(pinEl);
+
+    } else {
+      var color = ownerColor(d.owner);
+      var leftPct = isoPct(d.startIso);
+      var widthPct = Math.max(0.5, isoPct(d.endIso) - leftPct);
+      var bar = document.createElement("div");
+      bar.className = "wb-tl-bar";
+      bar.style.left = leftPct+"%";
+      bar.style.width = widthPct+"%";
+      bar.style.top = y+"px";
+      bar.style.transform = "translateY(-50%)";
+      bar.style.background = color;
+      bar.style.zIndex = isPast ? "3" : "5";
+      var dateStr = d.startIso === d.endIso
+        ? fmtD(d.endIso)
+        : fmtD(d.startIso)+" &rarr; "+fmtD(d.endIso);
+      var barTipHtml = "<strong>"+d.label+"</strong><br><span style='color:var(--text-muted);font-size:11px'>"+(d.owner?d.owner+" &middot; ":"")+dateStr+"</span>";
+      bar.addEventListener("mouseenter", function(e) {
+        bar.style.boxShadow = "0 0 0 3px "+color+"44, 0 0 8px 2px "+color+"33";
+        showTip(e, barTipHtml);
+      });
+      bar.addEventListener("mousemove", moveTip);
+      bar.addEventListener("mouseleave", function() { bar.style.boxShadow = ""; hideTip(); });
+      container.appendChild(bar);
+    }
+  });
+
   container._cleanup = function() { if (tip.parentNode) tip.parentNode.removeChild(tip); hideTip(); };
 }
 
