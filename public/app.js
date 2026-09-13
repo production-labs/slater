@@ -7495,6 +7495,12 @@ API.getMe().then(function(data) {
 }).catch(function() {});
 
 function logout() {
+  var keysToRemove = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && (k.startsWith('slater_') || k.startsWith('sday_'))) keysToRemove.push(k);
+  }
+  keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
   fetch('/api/users/logout', {method:'POST'})
     .then(function() { window.location.href = '/login'; })
     .catch(function() { window.location.href = '/login'; });
@@ -7538,8 +7544,12 @@ setTimeout(refreshWbDaySelector, 200);
       if (result && result.data) {
         loadFormData(result.data);
       } else {
-        var db = libLoad();
-        if (db[lastKey]) loadFormData(db[lastKey]);
+        // Server returned nothing — project doesn't belong to this user. Reset state.
+        currentSheetKey = null;
+        localStorage.removeItem("slater_last_project");
+        if (sel) sel.value = "";
+        document.getElementById("lib-delete").style.display = "none";
+        document.getElementById("lib-duplicate").style.display = "none";
       }
     });
   }, 500);
