@@ -486,11 +486,11 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 /* ── App Shell ── */
 .app-shell{display:grid;grid-template-columns:220px 1fr;height:100vh;overflow:hidden}
 .app-sidebar{background:linear-gradient(to bottom,#3D3D3D 0%,#141414 100%);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-.app-sidebar-logo{padding:20px 14px 16px;display:flex;flex-direction:column;align-items:center;gap:6px;border-bottom:1px solid var(--border);flex-shrink:0}
-.app-sidebar-logo-top{display:flex;align-items:center;gap:10px}
-.app-sidebar-logo img{width:44px;height:44px;object-fit:contain;border-radius:9px}
-.app-sidebar-logo-text{font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-.01em;line-height:1}
-.app-sidebar-logo-sub{font-size:10px;font-weight:500;color:var(--accent);letter-spacing:.02em;text-transform:uppercase;text-align:center}
+.app-sidebar-logo{padding:20px 14px 16px;display:flex;flex-direction:row;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.app-sidebar-logo-top{display:flex;flex-direction:column;gap:2px}
+.app-sidebar-logo img{width:40px;height:40px;object-fit:contain;border-radius:6px}
+.app-sidebar-logo-text{font-size:22px;font-weight:600;color:var(--text-primary);line-height:1}
+.app-sidebar-logo-sub{font-size:12px;font-weight:400;color:#6E747B}
 .app-nav{flex:1;padding:8px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
 .app-nav-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;border:none;border-left:3px solid transparent;background:none;color:rgba(247,245,239,.6);font-size:13px;font-family:'Inter',sans-serif;font-weight:500;cursor:pointer;text-align:left;width:100%;transition:background .15s,color .15s;min-height:unset}
 .app-nav-item:hover{background:var(--surface-2);color:var(--text-primary)}
