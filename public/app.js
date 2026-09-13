@@ -1970,7 +1970,7 @@ function wbDrawTimeline() {
     if (e !== null) allMs.push(e);
   });
 
-  var minMs = Math.min(todayMs - 5*86400000, Math.min.apply(null, allMs));
+  var minMs = Math.min(todayMs - 3*86400000, Math.min.apply(null, allMs));
   var maxMs = Math.max.apply(null, allMs) + 3*86400000;
   var range = maxMs - minMs;
 
