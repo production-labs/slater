@@ -105,6 +105,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 	const user = result.rows[0];
 	const match = await bcrypt.compare(password, user.password_hash);
 	if (!match) return res.status(401).json({ error: 'Invalid email or password' });
+	if (user.is_suspended) return res.status(403).json({ error: 'Your account has been suspended. Please contact support at hello@productionlabs.io.' });
 	req.session.userId = user.id;
 	req.session.userEmail = user.email;
 	req.session.userName = user.name;

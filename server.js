@@ -39,6 +39,7 @@ pool.query('SELECT 1').then(async () => {
   console.log('Database connected');
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS contacts JSONB DEFAULT '{}'`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS logo TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT FALSE`);
   console.log('Migrations complete');
 }).catch(err => {
   console.error('Database connection failed:', err.message);
@@ -119,7 +120,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT u.id, u.name, u.email, u.created_at,
+      SELECT u.id, u.name, u.email, u.created_at, u.is_suspended,
              l.key as license_key, l.plan, l.expires_at,
              COUNT(ld.id) as device_count
       FROM users u
@@ -178,9 +179,29 @@ app.delete('/api/admin/licenses/:id', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.patch('/api/admin/users/:id/suspend', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE users SET is_suspended = NOT is_suspended WHERE id = $1 RETURNING is_suspended',
+      [req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+    const isSuspended = result.rows[0].is_suspended;
+    if (isSuspended) {
+      await pool.query("DELETE FROM sessions WHERE sess::jsonb->>'userId' = $1::text", [req.params.id]);
+    }
+    res.json({ success: true, is_suspended: isSuspended });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
   try {
-    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    const id = req.params.id;
+    await pool.query('DELETE FROM receipts WHERE owner_id = $1', [id]);
+    await pool.query('DELETE FROM projects WHERE owner_id = $1', [id]);
+    await pool.query('DELETE FROM agencies WHERE user_id = $1', [id]);
+    await pool.query("DELETE FROM sessions WHERE sess::jsonb->>'userId' = $1::text", [id]);
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

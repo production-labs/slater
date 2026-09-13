@@ -177,6 +177,10 @@
     .badge-beta { background: #3a2a10; color: #FFC107; }
     .badge-solo { background: #1a3a2a; color: #4CAF77; }
     .badge-team { background: #1a2a4a; color: #5B9BD5; }
+    .badge-suspended { background: #3a1010; color: #FF6B6B; }
+    .btn-warn { background: transparent; color: #FFC107; border: 1px solid #FFC107; padding: 5px 10px; font-size: 12px; }
+    .btn-warn:hover { background: #FFC107; color: #111; }
+    .action-btns { display: flex; gap: 6px; }
 
     .mono { font-family: 'Inter', monospace; letter-spacing: 0.05em; font-size: 12px; }
 
@@ -288,6 +292,7 @@
             <tr>
               <th>Name</th>
               <th>Email</th>
+              <th>Status</th>
               <th>Plan</th>
               <th>License Key</th>
               <th>Devices</th>
@@ -296,7 +301,7 @@
             </tr>
           </thead>
           <tbody id="users-tbody">
-            <tr class="empty-row"><td colspan="7">Loading...</td></tr>
+            <tr class="empty-row"><td colspan="8">Loading...</td></tr>
           </tbody>
         </table>
       </div>
@@ -391,22 +396,29 @@
         if (!r.ok) throw new Error('Failed');
         var rows = await r.json();
         if (rows.length === 0) {
-          tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No users found</td></tr>';
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No users found</td></tr>';
           return;
         }
         tbody.innerHTML = rows.map(function(u) {
-          return '<tr>' +
+          var suspended = !!u.is_suspended;
+          var statusCell = suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="muted">Active</span>';
+          var safeEmail = (u.email || '').replace(/'/g, '');
+          return '<tr' + (suspended ? ' style="opacity:.6"' : '') + '>' +
             '<td>' + (u.name || '<span class="muted">-</span>') + '</td>' +
             '<td>' + u.email + '</td>' +
+            '<td>' + statusCell + '</td>' +
             '<td>' + planBadge(u.plan) + '</td>' +
             '<td class="mono">' + (u.license_key || '<span class="muted">-</span>') + '</td>' +
             '<td>' + (u.device_count || 0) + '</td>' +
             '<td class="muted">' + fmtDate(u.created_at) + '</td>' +
-            '<td><button class="btn btn-danger" onclick="deleteUser(' + u.id + ', \'' + (u.email || '').replace(/'/g, '') + '\')">Delete</button></td>' +
+            '<td><div class="action-btns">' +
+              '<button class="btn btn-warn" onclick="suspendUser(' + u.id + ', \'' + safeEmail + '\', ' + suspended + ')">' + (suspended ? 'Unsuspend' : 'Suspend') + '</button>' +
+              '<button class="btn btn-danger" onclick="deleteUser(' + u.id + ', \'' + safeEmail + '\')">Delete</button>' +
+            '</div></td>' +
             '</tr>';
         }).join('');
       } catch (e) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Error loading users</td></tr>';
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Error loading users</td></tr>';
       }
     }
 
@@ -473,12 +485,27 @@
       }
     }
 
+    async function suspendUser(id, email, isSuspended) {
+      var action = isSuspended ? 'Unsuspend' : 'Suspend';
+      if (!confirm(action + ' user "' + email + '"?' + (!isSuspended ? ' They will be logged out immediately.' : ''))) return;
+      try {
+        var r = await fetch('/api/admin/users/' + id + '/suspend', { method: 'PATCH' });
+        if (!r.ok) throw new Error('Failed');
+        var d = await r.json();
+        showBanner(d.is_suspended ? 'User suspended' : 'User unsuspended');
+        loadUsers();
+      } catch (e) {
+        showBanner('Error updating user', true);
+      }
+    }
+
     async function deleteUser(id, email) {
-      if (!confirm('Delete user "' + email + '"? This cannot be undone.')) return;
+      if (!confirm('Permanently delete "' + email + '" and ALL their data (projects, agencies, receipts)?\n\nThis cannot be undone.')) return;
+      if (!confirm('Are you sure? This will delete everything for ' + email + '.')) return;
       try {
         var r = await fetch('/api/admin/users/' + id, { method: 'DELETE' });
         if (!r.ok) throw new Error('Failed');
-        showBanner('User deleted');
+        showBanner('User and all data deleted');
         loadUsers();
         loadStats();
       } catch (e) {
