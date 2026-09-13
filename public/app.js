@@ -2404,7 +2404,7 @@ function wbAdd(item, afterId) {
   seqAfterLbl.style.cssText = "font-size:12px;color:var(--film-can);margin-left:4px";
   const seqAnchorSel = document.createElement("select");
   seqAnchorSel.id = id+"_seq_anchor";
-  seqAnchorSel.style.cssText = "padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:12px;font-family:inherit;max-width:140px;color:#444;background:var(--bg)";
+  seqAnchorSel.style.cssText = "padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;max-width:140px;color:var(--text-primary);background:var(--surface)";
   seqAnchorSel.dataset.pendingUuid = item.seq_anchor_uuid || "";
   seqAnchorSel.onchange = function() { wbRecalc(); };
   seqCtrl.appendChild(seqInp); seqCtrl.appendChild(seqDaysSuffix);
