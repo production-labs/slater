@@ -2319,7 +2319,7 @@ function wbAdd(item, afterId) {
   const itemInp = document.createElement("input");
   itemInp.type = "text"; itemInp.id = id+"_item"; itemInp.placeholder = "Task or deliverable";
   itemInp.value = item.item||""; itemInp.autocomplete = "new-password";
-  itemInp.style.cssText = "padding:6px 8px;border:1px solid #ddd;border-radius:5px;font-size:13px;font-family:inherit;width:100%";
+  itemInp.style.cssText = "padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit;width:100%";
   itemInp.oninput = function() { refreshSeqAnchorDropdowns(); };
   const dueSpan = document.createElement("span");
   dueSpan.className = "wb-due"; dueSpan.id = id+"_due"; dueSpan.textContent = "\u2014";
@@ -2363,7 +2363,7 @@ function wbAdd(item, afterId) {
   const ownerInp = document.createElement("input");
   ownerInp.type = "text"; ownerInp.id = id+"_owner"; ownerInp.placeholder = "Owner";
   ownerInp.value = item.owner||""; ownerInp.autocomplete = "new-password";
-  ownerInp.style.cssText = "padding:5px 7px;border:1px solid #ddd;border-radius:5px;font-size:12px;font-family:inherit;width:100%";
+  ownerInp.style.cssText = "padding:5px 7px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;width:100%";
 
   const modeSel = document.createElement("select");
   modeSel.className = "wb-mode-sel"; modeSel.id = id+"_mode";
@@ -2430,7 +2430,7 @@ function wbAdd(item, afterId) {
 
   const statusSel = document.createElement("select");
   statusSel.id = id+"_status"; statusSel.className = "wb-status";
-  statusSel.style.cssText = "padding:5px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;font-family:inherit";
+  statusSel.style.cssText = "padding:5px 6px;border:1px solid var(--border);border-radius:5px;font-size:11px;font-family:inherit";
   ["Not Started","In Progress","Stuck","Complete","N/A"].forEach(function(s) {
     const opt = document.createElement("option");
     opt.value = s; opt.textContent = s;
@@ -3398,7 +3398,7 @@ function renderCompleted() {
   searchInp.type = "text";
   searchInp.placeholder = "🔍 Filter completed items...";
   searchInp.value = completedFilter;
-  searchInp.style.cssText = "width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--charcoal)";
+  searchInp.style.cssText = "width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text-primary)";
   searchInp.addEventListener("input", function() {
     completedFilter = searchInp.value;
     renderCompleted();
@@ -5593,18 +5593,18 @@ function addExpense(data) {
   const dateInp = document.createElement("input"); dateInp.type = "date";
   dateInp.id = id+"_date"; dateInp.value = data.date||"";
   dateInp.className = "exp-date";
-  dateInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;color:var(--film-can)";
+  dateInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;color:var(--text-primary);background:var(--surface)";
   dateInp.onchange = function() { updateExpTotals(); };
 
   const vendorInp = document.createElement("input"); vendorInp.type = "text";
   vendorInp.id = id+"_vendor"; vendorInp.placeholder = "Vendor / description";
   vendorInp.value = data.vendor||""; vendorInp.className = "exp-vendor";
-  vendorInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:14px;font-family:inherit;font-weight:600;flex:1";
+  vendorInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:14px;font-family:inherit;font-weight:600;flex:1;background:var(--surface);color:var(--text-primary)";
 
   const amtInp = document.createElement("input"); amtInp.type = "number";
   amtInp.id = id+"_amount"; amtInp.placeholder = "0.00"; amtInp.step = "0.01";
   amtInp.value = data.amount||""; amtInp.className = "exp-amount";
-  amtInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:16px;font-family:inherit;font-weight:700;width:90px;text-align:right";
+  amtInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:16px;font-family:inherit;font-weight:700;width:90px;text-align:right;background:var(--surface);color:var(--text-primary)";
   amtInp.oninput = function() { updateExpTotals(); };
 
   const removeBtn = document.createElement("button"); removeBtn.className = "rb";
