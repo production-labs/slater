@@ -352,7 +352,7 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .sday-loc-row{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
 .sday-loc-row label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
 .sday-loc-sel-row{display:flex;align-items:center;gap:6px;width:100%}
-.sday-loc-select{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:"Inter",sans-serif;color:var(--text-primary);background:var(--surface)}
+.sday-loc-select{width:100%;box-sizing:border-box;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:"Inter",sans-serif;color:var(--text-primary);background:var(--surface)}
 .sday-blacks{display:none;align-items:center;gap:6px;font-size:12px;color:var(--accent);font-weight:600;margin-bottom:8px}
 .sday-blacks input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent)}
 #schedule-days-list .sday-block{margin-bottom:0}
