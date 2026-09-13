@@ -1998,7 +1998,7 @@ function wbDrawTimeline() {
 
   // ── Layout geometry ──────────────────────────────────────────────────────
 
-  var ROW_H = 28, TOP_PAD = 12, BOT_PAD = 20;
+  var ROW_H = 18, TOP_PAD = 12, BOT_PAD = 20;
   function rowY(r) { return TOP_PAD + r * ROW_H; }
   var tickH = rowY(numRows - 1) + 14;
   container.style.height = (tickH + BOT_PAD) + "px";
@@ -2007,7 +2007,7 @@ function wbDrawTimeline() {
 
   for (var r = 0; r < numRows; r++) {
     var ry = rowY(r);
-    var op = r === 0 ? 1 : 0.3;
+    var op = 0.3;
     var pastLine = document.createElement("div");
     pastLine.style.cssText = "position:absolute;top:"+ry+"px;left:0;width:"+todayPct+"%;height:2px;background:#444;transform:translateY(-50%);pointer-events:none;opacity:"+op+";z-index:1";
     var futLine = document.createElement("div");
