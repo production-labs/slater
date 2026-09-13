@@ -5580,6 +5580,12 @@ function refreshSchedLocDropdowns() {
 var expenses = [];
 var EXP_CATS = ["Meals","Transportation","Equipment","Lodging","Supplies","Venue","Other"];
 
+function fmtCurrencyVal(val) {
+  var n = parseFloat(String(val).replace(/[^\d.]/g, "")) || 0;
+  if (!n) return "";
+  return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 function addExpense(data) {
   data = data || {};
   const id = "exp_"+(++_uid);
@@ -5601,11 +5607,13 @@ function addExpense(data) {
   vendorInp.value = data.vendor||""; vendorInp.className = "exp-vendor";
   vendorInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:14px;font-family:inherit;font-weight:600;flex:1;background:var(--surface);color:var(--text-primary)";
 
-  const amtInp = document.createElement("input"); amtInp.type = "number";
-  amtInp.id = id+"_amount"; amtInp.placeholder = "0.00"; amtInp.step = "0.01";
-  amtInp.value = data.amount||""; amtInp.className = "exp-amount";
+  const amtInp = document.createElement("input"); amtInp.type = "text";
+  amtInp.id = id+"_amount"; amtInp.placeholder = "0.00"; amtInp.inputMode = "decimal";
+  amtInp.value = data.amount ? fmtCurrencyVal(data.amount) : ""; amtInp.className = "exp-amount";
   amtInp.style.cssText = "padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:16px;font-family:inherit;font-weight:700;width:90px;text-align:right;background:var(--surface);color:var(--text-primary)";
   amtInp.oninput = function() { updateExpTotals(); };
+  amtInp.onfocus = function() { var raw = parseFloat(this.value.replace(/[^\d.]/g,""))||""; this.value = raw || ""; };
+  amtInp.onblur = function() { if (this.value) this.value = fmtCurrencyVal(this.value); updateExpTotals(); };
 
   const removeBtn = document.createElement("button"); removeBtn.className = "rb";
   removeBtn.innerHTML = "&#x2715;"; removeBtn.title = "Remove expense";
@@ -5744,7 +5752,7 @@ function ocrReceipt(id, imageData) {
     var catEl     = document.getElementById(id+"_cat");
     if (vendorEl  && !vendorEl.value  && data.vendor)   vendorEl.value  = data.vendor;
     if (dateEl    && !dateEl.value    && data.date)      dateEl.value    = data.date;
-    if (amountEl  && !amountEl.value  && data.amount)    amountEl.value  = data.amount;
+    if (amountEl  && !amountEl.value  && data.amount)    amountEl.value  = fmtCurrencyVal(data.amount);
     if (catEl     && data.category)                      catEl.value     = data.category;
     if (vendorEl) vendorEl.placeholder = "Vendor / description";
     updateExpTotals();
@@ -5797,7 +5805,7 @@ function getExpenses() {
     return {
       date:         (document.getElementById(id+"_date")||{}).value||"",
       vendor:       (document.getElementById(id+"_vendor")||{}).value||"",
-      amount:       parseFloat((document.getElementById(id+"_amount")||{}).value||"0")||0,
+      amount:       parseFloat(((document.getElementById(id+"_amount")||{}).value||"0").replace(/[^\d.]/g,""))||0,
       cat:          (document.getElementById(id+"_cat")||{}).value||"Other",
       paid_by:      (document.getElementById(id+"_paidby")||{}).value||"",
       reimbursable: (document.getElementById(id+"_reimb")||{}).checked||false,
