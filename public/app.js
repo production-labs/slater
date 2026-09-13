@@ -375,16 +375,21 @@ function lookupHospForDay(dayId, addr) {
   }).catch(function() {});
 }
 
+function getLocByName(name) {
+  if (!name) return null;
+  return (loadContacts().locations || []).find(function(l) { return l.name === name; }) || null;
+}
+
 function doLookup() {
   if (!scheduleDays.length) return;
   scheduleDays.forEach(function(dayId) {
     var iso = (document.getElementById(dayId+"_date_iso")||{}).value||"";
     if (!iso) return;
-    var sel = document.getElementById(dayId+"_loc_id");
-    if (!sel || !sel.value) return;
-    var opt = sel.options[sel.selectedIndex];
-    if (!opt || !opt.dataset.address) return;
-    var addr = [opt.dataset.address, opt.dataset.city, opt.dataset.state].filter(Boolean).join(", ");
+    var inp = document.getElementById(dayId+"_loc_id");
+    if (!inp || !inp.value) return;
+    var loc = getLocByName(inp.value);
+    if (!loc || !loc.address) return;
+    var addr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
     if (!addr) return;
     lookupSunForDayWithAddr(dayId, iso, addr);
   });
@@ -1038,60 +1043,98 @@ function addScheduleDay(data, insertAfterDayId) {
   // ── Location selector ──────────────────────────────────────────────────────
   const locRow = document.createElement("div"); locRow.className = "sday-loc-row";
   const locLbl = document.createElement("label"); locLbl.textContent = "Location";
-  const locSel = document.createElement("select");
-  locSel.className = "sday-loc-select"; locSel.id = dayId+"_loc_id";
-  locSel.innerHTML = "<option value=''>Select location</option>";
-  // Populate from contacts locations bucket
-  var _contactLocs = loadContacts().locations || [];
-  _contactLocs.forEach(function(loc) {
-    if (!loc.name) return;
-    const opt = document.createElement("option");
-    opt.value = loc.name;
-    opt.textContent = loc.name;
-    opt.dataset.address = loc.address || "";
-    opt.dataset.city = loc.city || "";
-    opt.dataset.state = loc.state || "";
-    opt.dataset.zip = loc.zip || "";
-    opt.dataset.hospital = loc.hospital || "";
-    opt.dataset.notes = loc.notes || "";
-    if (data.loc_id === loc.name || data.loc_name === loc.name) opt.selected = true;
-    locSel.appendChild(opt);
-  });
-  locSel.onchange = function() {
-    var opt = locSel.options[locSel.selectedIndex];
-    if (!opt || !opt.value) {
-      document.getElementById(dayId+"_loc_info").style.display = "none";
+
+  // Sort locations alphabetically
+  var _contactLocs = (loadContacts().locations || []).filter(function(l) { return !!l.name; });
+  _contactLocs.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  var _locByName = {};
+  _contactLocs.forEach(function(l) { _locByName[l.name] = l; });
+
+  // Helper: update address display + hospital visibility when a location is selected/cleared
+  function _applyLocSelection(loc) {
+    var infoDiv = document.getElementById(dayId+"_loc_info");
+    var hospWrapEl = document.getElementById(dayId+"_hospital_wrap");
+    var hospEl = document.getElementById(dayId+"_hospital");
+    if (!loc) {
+      if (infoDiv) { infoDiv.textContent = ""; infoDiv.style.display = "none"; }
+      if (hospWrapEl) hospWrapEl.style.display = "none";
       checkShowBlacks(dayId);
       return;
     }
-    var infoDiv = document.getElementById(dayId+"_loc_info");
-    var addrParts = [opt.dataset.address, opt.dataset.city, [opt.dataset.state, opt.dataset.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-    if (addrParts) { infoDiv.textContent = addrParts; infoDiv.style.display = "block"; }
-    var hospEl = document.getElementById(dayId+"_hospital");
+    var addrParts = [loc.address, loc.city, [loc.state, loc.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    if (infoDiv) {
+      if (addrParts) { infoDiv.textContent = addrParts; infoDiv.style.display = "block"; }
+      else { infoDiv.textContent = ""; infoDiv.style.display = "none"; }
+    }
+    if (hospWrapEl) hospWrapEl.style.display = addrParts ? "" : "none";
     if (hospEl) {
-      var parsedHosp = parseHospitalText(opt.dataset.hospital||"");
+      var parsedHosp = parseHospitalText(loc.hospital||"");
       hospEl.textContent = parsedHosp;
       hospEl.style.display = parsedHosp ? "block" : "none";
     }
-    var locAddr = [opt.dataset.address, opt.dataset.city, opt.dataset.state].filter(Boolean).join(", ");
+    var locAddr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
     if (locAddr) lookupHospForDay(dayId, locAddr);
     var notesEl = document.getElementById(dayId+"_loc_notes");
-    if (notesEl && !notesEl.value && opt.dataset.notes) notesEl.value = opt.dataset.notes;
+    if (notesEl && !notesEl.value && loc.notes) notesEl.value = loc.notes;
     checkShowBlacks(dayId);
     syncSchedDayDate(dayId);
     tl();
-  };
+  }
+
+  // Searchable autocomplete input
+  const locWrap = document.createElement("div"); locWrap.className = "ac-wrap"; locWrap.style.flex = "1";
+  const locInp = document.createElement("input"); locInp.type = "text";
+  locInp.id = dayId+"_loc_id";
+  locInp.className = "sday-loc-select";
+  locInp.placeholder = "Select location...";
+  locInp.autocomplete = "off";
+  if (data.loc_id || data.loc_name) locInp.value = data.loc_id || data.loc_name;
+
+  const locList = document.createElement("div"); locList.className = "ac-list";
+  locList.style.zIndex = "600";
+
+  function _buildLocList(query) {
+    locList.innerHTML = "";
+    var filtered = _contactLocs.filter(function(l) {
+      return !query || l.name.toLowerCase().indexOf(query.toLowerCase()) !== -1;
+    });
+    if (!filtered.length) { locList.classList.remove("open"); return; }
+    filtered.forEach(function(loc) {
+      var item = document.createElement("div"); item.className = "ac-item";
+      item.textContent = loc.name;
+      item.addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        locInp.value = loc.name;
+        locList.classList.remove("open");
+        _applyLocSelection(loc);
+      });
+      locList.appendChild(item);
+    });
+    locList.classList.add("open");
+  }
+
+  locInp.addEventListener("focus", function() { _buildLocList(""); });
+  locInp.addEventListener("input", function() { _buildLocList(locInp.value); });
+  locInp.addEventListener("blur", function() {
+    setTimeout(function() { locList.classList.remove("open"); }, 150);
+    if (locInp.value && !_locByName[locInp.value]) {
+      locInp.value = "";
+      _applyLocSelection(null);
+    }
+  });
+
+  locWrap.appendChild(locInp);
+  locWrap.appendChild(locList);
+
   const addLocBtn = document.createElement("button");
   addLocBtn.type = "button";
   addLocBtn.title = "Manage locations";
   addLocBtn.textContent = "+";
   addLocBtn.style.cssText = "padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:16px;font-family:inherit;cursor:pointer;color:var(--film-can);line-height:1;flex-shrink:0";
   addLocBtn.onclick = function() { contactsTab = "locations"; openContacts(); };
-  addLocBtn.style.flexShrink = "0";
+
   const locSelRow = document.createElement("div"); locSelRow.className = "sday-loc-sel-row";
-  locSelRow.style.cssText = "display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box";
-  locSel.style.cssText = "flex:1;min-width:0;width:auto";
-  locSelRow.appendChild(locSel); locSelRow.appendChild(addLocBtn);
+  locSelRow.appendChild(addLocBtn); locSelRow.appendChild(locWrap);
   locRow.appendChild(locLbl); locRow.appendChild(locSelRow);
   body.appendChild(locRow);
 
@@ -1102,15 +1145,20 @@ function addScheduleDay(data, insertAfterDayId) {
 
   // Show address if a location is already selected on load
   (function() {
-    var opt = locSel.options[locSel.selectedIndex];
-    if (opt && opt.value) {
-      var addrParts = [opt.dataset.address, opt.dataset.city, [opt.dataset.state, opt.dataset.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    var initLoc = _locByName[locInp.value];
+    if (initLoc) {
+      var addrParts = [initLoc.address, initLoc.city, [initLoc.state, initLoc.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
       if (addrParts) { locInfoDiv.textContent = addrParts; locInfoDiv.style.display = "block"; }
     }
   })();
 
-  // Hospital field
-  const hospWrap = document.createElement("div"); hospWrap.className = "fl";
+  // Hospital field — hidden when selected location has no address
+  var _initLocHasAddr = (function() {
+    var l = _locByName[locInp.value];
+    return l ? !![l.address, l.city, l.state].filter(Boolean).length : true;
+  })();
+  const hospWrap = document.createElement("div"); hospWrap.className = "fl"; hospWrap.id = dayId+"_hospital_wrap";
+  hospWrap.style.display = _initLocHasAddr ? "" : "none";
   const hospLbl = document.createElement("label"); hospLbl.innerHTML = 'Nearest hospital <span class="at">auto</span>';
   var hospText = parseHospitalText(data.hospital||"");
   var hospDiv = document.createElement("div");
@@ -1600,12 +1648,7 @@ function getScheduleDays() {
       sunrise:      v(dayId+"_sunrise"),
       sunset:       v(dayId+"_sunset"),
       loc_id:       (document.getElementById(dayId+"_loc_id")||{}).value||"",
-      loc_name:     (function() {
-        var sel = document.getElementById(dayId+"_loc_id");
-        if (!sel || !sel.value) return "";
-        var opt = sel.options[sel.selectedIndex];
-        return opt ? opt.textContent : "";
-      })(),
+      loc_name:     (document.getElementById(dayId+"_loc_id")||{}).value||"",
       hospital:     (document.getElementById(dayId+"_hospital")||{}).textContent||"",
       loc_notes:    v(dayId+"_loc_notes"),
       show_blacks:       (document.getElementById(dayId+"_show_blacks")||{}).checked||false,
@@ -5517,12 +5560,12 @@ function checkShowBlacks(dayId) {
 }
 
 function triggerSunLookup(dayId) {
-  var sel = document.getElementById(dayId+"_loc_id");
-  if (!sel || !sel.value) return;
-  var opt = sel.options[sel.selectedIndex];
-  if (!opt || !opt.dataset.address) return;
+  var inp = document.getElementById(dayId+"_loc_id");
+  if (!inp || !inp.value) return;
+  var loc = getLocByName(inp.value);
+  if (!loc || !loc.address) return;
   var iso = (document.getElementById(dayId+"_date_iso")||{}).value||"";
-  var addr = [opt.dataset.address, opt.dataset.city, opt.dataset.state].filter(Boolean).join(", ");
+  var addr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
   if (addr && iso) lookupSunForDayWithAddr(dayId, iso, addr);
 }
 
@@ -5548,26 +5591,7 @@ function lookupSunForDayWithAddr(dayId, iso, addr) {
 }
 
 function refreshSchedLocDropdowns() {
-  var contactLocs = loadContacts().locations || [];
   scheduleDays.forEach(function(dayId) {
-    var sel = document.getElementById(dayId+"_loc_id");
-    if (!sel) return;
-    var current = sel.value;
-    sel.innerHTML = "<option value=''>— Primary location —</option>";
-    contactLocs.forEach(function(loc) {
-      if (!loc.name) return;
-      var opt = document.createElement("option");
-      opt.value = loc.name;
-      opt.textContent = loc.name;
-      opt.dataset.address = loc.address || "";
-      opt.dataset.city = loc.city || "";
-      opt.dataset.state = loc.state || "";
-      opt.dataset.zip = loc.zip || "";
-      opt.dataset.hospital = loc.hospital || "";
-      opt.dataset.notes = loc.notes || "";
-      if (current === loc.name) opt.selected = true;
-      sel.appendChild(opt);
-    });
     checkShowBlacks(dayId);
     triggerSunLookup(dayId);
   });
