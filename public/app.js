@@ -12,6 +12,7 @@
    async getProject(key) {
      try {
        const r = await fetch(this.base+'/api/projects/'+key);
+       if (r.status === 401) return { _unauthenticated: true };
        if (!r.ok) return null;
        return await r.json();
      } catch(e) { return null; }
@@ -6349,7 +6350,7 @@ function libRefreshDropdown(selectKey) {
       });
       libSaveAll(db);
     }
-    sel.innerHTML = '<option value="">— New project —</option>';
+    sel.innerHTML = '<option value="" disabled>— Select a project —</option>';
     const today = new Date().toISOString().slice(0,10);
     function lastDayIso(sheet) {
       var label = sheet.label || "";
@@ -7780,8 +7781,14 @@ setTimeout(refreshWbDaySelector, 200);
       if (sel) sel.value = lastKey;
       if (result && result.data) {
         loadFormData(result.data);
+      } else if (result && result._unauthenticated) {
+        // Session expired — preserve the key so it restores after re-login
+        currentSheetKey = null;
+        if (sel) sel.value = "";
+        document.getElementById("lib-delete").style.display = "none";
+        document.getElementById("lib-duplicate").style.display = "none";
       } else {
-        // Server returned nothing — project doesn't belong to this user. Reset state.
+        // Project not found or deleted — clear saved key
         currentSheetKey = null;
         localStorage.removeItem("slater_last_project");
         if (sel) sel.value = "";
