@@ -741,7 +741,14 @@ function refreshAllTimeHints() {
 
 function addScheduleDay(data, insertAfterDayId) {
   data = data || {};
-  const dayId = "sday_" + (++_uid);
+  var dayId;
+  if (data.id && /^sday_\d+$/.test(data.id)) {
+    dayId = data.id;
+    var _n = parseInt(data.id.slice(5), 10);
+    if (_n >= _uid) _uid = _n;
+  } else {
+    dayId = "sday_" + (++_uid);
+  }
   if (insertAfterDayId === undefined) {
     scheduleDays.push(dayId);
   } else if (insertAfterDayId === null) {
@@ -3464,7 +3471,7 @@ function renderCompleted() {
   // Apply filter
   var filterQ = completedFilter.trim().toLowerCase();
   var visible = filterQ ? completed.filter(function(e) {
-    return e.item.toLowerCase().indexOf(filterQ) !== -1 || e.owner.toLowerCase().indexOf(filterQ) !== -1;
+    return e.item.toLowerCase().indexOf(filterQ) !== -1 || e.owner.toLowerCase().indexOf(filterQ) !== -1 || e.project.toLowerCase().indexOf(filterQ) !== -1;
   }) : completed;
 
   if (filterQ && !visible.length) {
