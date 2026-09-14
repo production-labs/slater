@@ -3444,7 +3444,7 @@ function renderCompleted() {
 
   // Search input
   var searchWrap = document.createElement("div");
-  searchWrap.style.cssText = "padding:0 12px 8px;position:sticky;top:0;background:var(--surface);z-index:1";
+  searchWrap.style.cssText = "padding:0 12px 4px;position:sticky;top:0;background:var(--surface);z-index:1";
   var searchInp = document.createElement("input");
   searchInp.type = "text";
   searchInp.placeholder = "🔍 Filter completed items...";
