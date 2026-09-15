@@ -3147,6 +3147,27 @@ function loadUrls(items) {
 var sidebarOpen = true;
 var sidebarRefreshTimer = null;
 
+// Matches a wb_item to a Rundown entry by uuid when both have one, falling back
+// to item text (old projects/items may predate the uuid field).
+function wbItemMatchesEntry(wi, entry) {
+  if (entry.itemUuid && wi.uuid) return wi.uuid === entry.itemUuid;
+  return wi.item === entry.itemName;
+}
+
+// Persists a Rundown-driven status change for a project that is NOT the one
+// currently loaded in the form (the live form + autosaveTrigger path handles
+// the currently-loaded project instead). Without this, toggling a checkbox
+// for any other project only updated localStorage/_allProjectsCache and was
+// silently lost on next reload since the server never saw the change.
+function persistRundownStatusChange(sheetKey) {
+  if (currentSheetKey === sheetKey) return; // live form + autosaveTrigger already handles this one
+  var entry = _allProjectsCache[sheetKey];
+  if (!entry || !entry.data) return;
+  API.saveProject(sheetKey, entry.label || entry.data.label, entry.data).then(function(result) {
+    if (!result) console.warn("Rundown status change: server save failed for", sheetKey, "(localStorage only)");
+  });
+}
+
 function toggleSidebar() {
   sidebarOpen = !sidebarOpen;
   document.getElementById("daily-sidebar").classList.toggle("hidden", !sidebarOpen);
@@ -3226,7 +3247,7 @@ function refreshSidebar() {
       }
       if (due) prevDue = due;
       if (!due) return;
-      var entry = {project:project, item:item.item, owner:item.owner||"", due:due, status:item.status||"Not Started", sheetKey:sheetKey, itemName:item.item};
+      var entry = {project:project, item:item.item, owner:item.owner||"", due:due, status:item.status||"Not Started", sheetKey:sheetKey, itemName:item.item, itemUuid:item.uuid||""};
       if (due < today) overdue.push(entry);
       else if (due === today) dueToday.push(entry);
       else if (due === tomorrow) dueTomorrow.push(entry);
@@ -3291,14 +3312,14 @@ function refreshSidebar() {
             var sheet2 = db2[entry.sheetKey];
             if (sheet2) {
               (sheet2.wb_items||[]).forEach(function(wi) {
-                if (wi.item === entry.itemName) wi.status = newStatus;
+                if (wbItemMatchesEntry(wi, entry)) wi.status = newStatus;
               });
               localStorage.setItem("slater_callsheets", JSON.stringify(db2));
             }
             // 1b. Update _allProjectsCache so refreshSidebar sees the change immediately
             if (_allProjectsCache[entry.sheetKey] && _allProjectsCache[entry.sheetKey].data) {
               (_allProjectsCache[entry.sheetKey].data.wb_items||[]).forEach(function(wi) {
-                if (wi.item === entry.itemName) wi.status = newStatus;
+                if (wbItemMatchesEntry(wi, entry)) wi.status = newStatus;
               });
             }
             // 2. If this is the currently loaded project, also update the live form
@@ -3312,6 +3333,9 @@ function refreshSidebar() {
                 }
               });
               autosaveTrigger();
+            } else {
+              // 2b. Otherwise persist directly, since no autosave is running for this project
+              persistRundownStatusChange(entry.sheetKey);
             }
             nameDiv.classList.toggle("done", cb.checked);
             setTimeout(refreshSidebar, 300);
@@ -3418,7 +3442,7 @@ function renderCompleted() {
       else if (_cMode === "sequential") { _cDue = wbBusinessDaysAfter(_cPrevDue||_cKickoff||_cEventIso, item.seq_days||0); }
       else { _cDue = (sheet.wb_direction==="forward") ? wbBusinessDaysAfter(_cEventIso, item.days||0) : wbBusinessDaysBefore(_cEventIso, item.days||0); }
       if (_cDue) _cPrevDue = _cDue;
-      completed.push({project:project, item:item.item, owner:item.owner||"", due:_cDue, sheetKey:sheetKey, itemName:item.item});
+      completed.push({project:project, item:item.item, owner:item.owner||"", due:_cDue, sheetKey:sheetKey, itemName:item.item, itemUuid:item.uuid||""});
     });
     // Past schedule pins auto-complete — they're events that happened
     var _cPinMilestones = [];
@@ -3509,13 +3533,13 @@ function renderCompleted() {
           var sheet2 = db2[entry.sheetKey];
           if (sheet2) {
             (sheet2.wb_items||[]).forEach(function(wi) {
-              if (wi.item === entry.itemName) wi.status = "Not Started";
+              if (wbItemMatchesEntry(wi, entry)) wi.status = "Not Started";
             });
             localStorage.setItem("slater_callsheets", JSON.stringify(db2));
           }
           if (_allProjectsCache[entry.sheetKey] && _allProjectsCache[entry.sheetKey].data) {
             (_allProjectsCache[entry.sheetKey].data.wb_items||[]).forEach(function(wi) {
-              if (wi.item === entry.itemName) wi.status = "Not Started";
+              if (wbItemMatchesEntry(wi, entry)) wi.status = "Not Started";
             });
           }
           if (currentSheetKey === entry.sheetKey) {
@@ -3524,6 +3548,9 @@ function renderCompleted() {
               var statusEl = document.getElementById(wid+"_status");
               if (itemEl && statusEl && itemEl.value === entry.itemName) { statusEl.value = "Not Started"; }
             });
+            autosaveTrigger();
+          } else {
+            persistRundownStatusChange(entry.sheetKey);
           }
           setTimeout(refreshSidebar, 300);
         });
