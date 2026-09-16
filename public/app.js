@@ -2532,7 +2532,13 @@ function wbAdd(item, afterId) {
   manualInp.type = "date"; manualInp.className = "wb-date-inp"; manualInp.id = id+"_manual_date";
   manualInp.value = item.manual_date||"";
   manualInp.style.width = "150px";
-  manualInp.onchange = function() { wbRecalc(); };
+  manualInp.onchange = function() {
+    wbRecalc();
+    clearTimeout(_wbLiveSortTimer); // don't sort until user exits the date field
+  };
+  manualInp.addEventListener('blur', function() {
+    if (_editingWbId === id) wbSortWithPin();
+  });
   manualCtrl.appendChild(manualInp);
 
   // Date control wrapper
