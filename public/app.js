@@ -1722,6 +1722,8 @@ function loadScheduleDays(days, legacyData) {
 
 // ── Workback ──────────────────────────────────────────────────────────────────
 let wbItems = [];
+var _editingWbId = null;
+var _lastEditedWbId = null;
 
 // US federal holidays as MM-DD strings (fixed); floating ones added dynamically
 function usHolidays(year) {
@@ -2209,7 +2211,7 @@ function wbRecalc() {
   if (typeof sidebarOpen !== "undefined" && sidebarOpen) refreshSidebar();
   var _wbScroll = window.scrollY;
   var _wbFocused = document.activeElement;
-  wbRebuildPins();
+  if (_editingWbId === null) wbRebuildPins();
   var _tl = document.getElementById("wb-timeline");
   if (_tl && _tl._cleanup) _tl._cleanup();
   wbDrawTimeline();
@@ -2260,6 +2262,14 @@ function wbSortAnimated() {
       });
     });
   });
+
+  if (_lastEditedWbId) {
+    var _scrollTarget = _lastEditedWbId;
+    setTimeout(function() {
+      var card = document.getElementById(_scrollTarget);
+      if (card) card.scrollIntoView({behavior: "smooth", block: "nearest"});
+    }, 750);
+  }
 }
 
 function wbUpdateDateCtrl(id) {
@@ -2383,30 +2393,7 @@ function wbAdd(item, afterId) {
       wbRemove(id); wbRecalc(); wbSortAnimated();
     });
   };
-  const saveBtn = document.createElement("button");
-  saveBtn.className = "wb-save-btn"; saveBtn.innerHTML = "&#x2713;";
-  saveBtn.title = "Sort into position";
-  saveBtn.tabIndex = -1;
-  saveBtn.onclick = function() {
-    saveBtn.blur();
-    wbSortAnimated();
-    var card = document.getElementById(id);
-    if (card) {
-      card.classList.add("wb-item-sorted");
-      clearTimeout(card._sortedTimer);
-      // Scroll to new position once the FLIP animation lands
-      setTimeout(function() {
-        card.scrollIntoView({behavior: "smooth", block: "nearest"});
-      }, 750);
-      // Hold highlight 4s then fade over 1s
-      card._sortedTimer = setTimeout(function() {
-        card.style.transition = "transform 0.7s cubic-bezier(0.4,0,0.2,1), background 1s";
-        card.classList.remove("wb-item-sorted");
-        setTimeout(function() { card.style.transition = ""; }, 1000);
-      }, 4000);
-    }
-  };
-  row1.appendChild(itemInp); row1.appendChild(dueSpan); row1.appendChild(saveBtn); row1.appendChild(delBtn);
+  row1.appendChild(itemInp); row1.appendChild(dueSpan); row1.appendChild(delBtn);
 
   // ── Row 2: owner | mode selector | date control | status ─────────────────
   const row2 = document.createElement("div"); row2.className = "wb-row2";
@@ -2512,6 +2499,21 @@ function wbAdd(item, afterId) {
   internalLbl.style.cssText = "font-size:11px;color:var(--film-can);cursor:pointer;user-select:none";
   internalWrap.appendChild(internalCb); internalWrap.appendChild(internalLbl);
   el.appendChild(internalWrap);
+
+  el.addEventListener('focusin', function() {
+    _editingWbId = id;
+    _lastEditedWbId = id;
+    el.classList.add('editing');
+  });
+  el.addEventListener('focusout', function() {
+    setTimeout(function() {
+      if (el.contains(document.activeElement)) return;
+      el.classList.remove('editing');
+      _editingWbId = null;
+      wbSortAnimated();
+    }, 0);
+  });
+
   document.getElementById("wb-list").appendChild(el);
   updateWbItemStyle(id);
   if (!_wbLoadingItems) {
