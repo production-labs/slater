@@ -2299,6 +2299,12 @@ function wbSortWithPin() {
   var order = wbItems.slice().sort(function(a, b) { return getDue(a).localeCompare(getDue(b)); });
   if (JSON.stringify(order) === JSON.stringify(wbItems)) return;
 
+  // Clear all in-flight transforms so FLIP measurements are accurate
+  wbItems.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.style.transition = "none"; el.style.transform = ""; }
+  });
+
   var positions = {};
   wbItems.forEach(function(id) {
     var el = document.getElementById(id);
@@ -2314,13 +2320,13 @@ function wbSortWithPin() {
   window.scrollTo(0, savedScroll);
   if (focused && document.body.contains(focused)) focused.focus({preventScroll: true});
 
-  // Re-pin locked card to its original viewport position
+  // Pin the locked card with a compensating transform — all synchronous, no visible jump
   if (_editingWbId !== null && _lockedCardTop !== null) {
     var lockedEl = document.getElementById(_editingWbId);
     if (lockedEl) {
       var newTop = lockedEl.getBoundingClientRect().top;
-      var scrollDelta = newTop - _lockedCardTop;
-      if (Math.abs(scrollDelta) > 1) window.scrollBy(0, scrollDelta);
+      var pinDelta = _lockedCardTop - newTop;
+      if (Math.abs(pinDelta) > 0.5) lockedEl.style.transform = "translateY("+pinDelta+"px)";
     }
   }
 
@@ -2331,7 +2337,6 @@ function wbSortWithPin() {
     if (!el || positions[id] == null) return;
     var delta = positions[id] - el.getBoundingClientRect().top;
     if (Math.abs(delta) < 1) return;
-    el.style.transition = "none";
     el.style.transform = "translateY("+delta+"px)";
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
@@ -2572,11 +2577,15 @@ function wbAdd(item, afterId) {
 
   el.addEventListener('focusin', function() {
     if (_editingWbId === id) return;
-    // Leaving another card — instant sort it, then set up this one
+    // Leaving another card — clear its transform and sort it instantly
     if (_editingWbId !== null) {
       clearTimeout(_wbLiveSortTimer);
       var prevCard = document.getElementById(_editingWbId);
-      if (prevCard) prevCard.classList.remove('editing');
+      if (prevCard) {
+        prevCard.classList.remove('editing');
+        prevCard.style.transition = 'none';
+        prevCard.style.transform = '';
+      }
       _editingWbId = null;
       _lockedCardTop = null;
       wbRebuildPins();
@@ -2597,13 +2606,23 @@ function wbAdd(item, afterId) {
       if (_editingWbId !== id) return;
       var wbList = document.getElementById('wb-list');
       if (wbList && wbList.contains(document.activeElement)) return;
-      // Flush any pending live sort before releasing the lock
+      // Flush any pending live sort, then animate card settling into its position
       clearTimeout(_wbLiveSortTimer);
-      wbSortWithPin();
+      wbSortWithPin(); // applies pinning transform one final time
       el.classList.remove('editing');
       _editingWbId = null;
       _lockedCardTop = null;
-      wbRecalc();
+      // Animate the card from its pinned position down to its sorted DOM position
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          el.style.transition = 'transform 0.7s cubic-bezier(0.4,0,0.2,1)';
+          el.style.transform = '';
+          setTimeout(function() {
+            el.style.transition = '';
+            wbRecalc();
+          }, 750);
+        });
+      });
     }, 0);
   });
 
