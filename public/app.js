@@ -2584,9 +2584,13 @@ function wbAdd(item, afterId) {
     _editingWbId = id;
     _lastEditedWbId = id;
     el.classList.add('editing');
-    // Scroll card to center of viewport and lock it there
-    el.scrollIntoView({behavior: 'instant', block: 'center'});
-    _lockedCardTop = el.getBoundingClientRect().top;
+    // Defer scroll so browser's own focus-scroll fires first, then we override it
+    setTimeout(function() {
+      if (_editingWbId !== id) return;
+      var targetTop = Math.max(20, Math.floor((window.innerHeight - el.offsetHeight) / 2));
+      window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - targetTop);
+      _lockedCardTop = targetTop;
+    }, 0);
   });
   el.addEventListener('focusout', function() {
     setTimeout(function() {
