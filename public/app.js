@@ -1724,6 +1724,8 @@ function loadScheduleDays(days, legacyData) {
 let wbItems = [];
 var _editingWbId = null;
 var _lastEditedWbId = null;
+var _lockedCardTop = null;
+var _wbLiveSortTimer = null;
 
 // US federal holidays as MM-DD strings (fixed); floating ones added dynamically
 function usHolidays(year) {
@@ -2211,7 +2213,11 @@ function wbRecalc() {
   if (typeof sidebarOpen !== "undefined" && sidebarOpen) refreshSidebar();
   var _wbScroll = window.scrollY;
   var _wbFocused = document.activeElement;
-  if (_editingWbId === null) wbRebuildPins();
+  if (_editingWbId === null) {
+    wbRebuildPins();
+  } else {
+    wbLiveSortDebounced();
+  }
   var _tl = document.getElementById("wb-timeline");
   if (_tl && _tl._cleanup) _tl._cleanup();
   wbDrawTimeline();
@@ -2266,6 +2272,64 @@ function wbSortAnimated() {
     const el = document.getElementById(id);
     if (!el || positions[id] == null) return;
     const delta = positions[id] - el.getBoundingClientRect().top;
+    if (Math.abs(delta) < 1) return;
+    el.style.transition = "none";
+    el.style.transform = "translateY("+delta+"px)";
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        el.style.transition = "transform 0.7s cubic-bezier(0.4,0,0.2,1)";
+        el.style.transform = "";
+      });
+    });
+  });
+}
+
+function wbLiveSortDebounced() {
+  clearTimeout(_wbLiveSortTimer);
+  _wbLiveSortTimer = setTimeout(wbSortWithPin, 350);
+}
+
+function wbSortWithPin() {
+  var list = document.getElementById("wb-list");
+  if (!list || wbItems.length < 2) return;
+  var getDue = function(id) {
+    var dueEl = document.getElementById(id+"_due");
+    return (dueEl && dueEl.dataset.iso) || "9999-99-99";
+  };
+  var order = wbItems.slice().sort(function(a, b) { return getDue(a).localeCompare(getDue(b)); });
+  if (JSON.stringify(order) === JSON.stringify(wbItems)) return;
+
+  var positions = {};
+  wbItems.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) positions[id] = el.getBoundingClientRect().top;
+  });
+
+  wbItems.length = 0;
+  order.forEach(function(id) { wbItems.push(id); });
+
+  var savedScroll = window.scrollY;
+  var focused = document.activeElement;
+  wbRebuildPins();
+  window.scrollTo(0, savedScroll);
+  if (focused && document.body.contains(focused)) focused.focus({preventScroll: true});
+
+  // Re-pin locked card to its original viewport position
+  if (_editingWbId !== null && _lockedCardTop !== null) {
+    var lockedEl = document.getElementById(_editingWbId);
+    if (lockedEl) {
+      var newTop = lockedEl.getBoundingClientRect().top;
+      var scrollDelta = newTop - _lockedCardTop;
+      if (Math.abs(scrollDelta) > 1) window.scrollBy(0, scrollDelta);
+    }
+  }
+
+  // FLIP animate all cards except the locked one
+  wbItems.forEach(function(id) {
+    if (id === _editingWbId) return;
+    var el = document.getElementById(id);
+    if (!el || positions[id] == null) return;
+    var delta = positions[id] - el.getBoundingClientRect().top;
     if (Math.abs(delta) < 1) return;
     el.style.transition = "none";
     el.style.transform = "translateY("+delta+"px)";
@@ -2507,26 +2571,35 @@ function wbAdd(item, afterId) {
   el.appendChild(internalWrap);
 
   el.addEventListener('focusin', function() {
-    // If arriving from a different wb-item, sort that card first
-    if (_editingWbId !== null && _editingWbId !== id) {
+    if (_editingWbId === id) return;
+    // Leaving another card — instant sort it, then set up this one
+    if (_editingWbId !== null) {
+      clearTimeout(_wbLiveSortTimer);
       var prevCard = document.getElementById(_editingWbId);
       if (prevCard) prevCard.classList.remove('editing');
       _editingWbId = null;
-      wbSortAnimated();
+      _lockedCardTop = null;
+      wbRebuildPins();
     }
     _editingWbId = id;
     _lastEditedWbId = id;
     el.classList.add('editing');
+    // Scroll card to center of viewport and lock it there
+    el.scrollIntoView({behavior: 'instant', block: 'center'});
+    _lockedCardTop = el.getBoundingClientRect().top;
   });
   el.addEventListener('focusout', function() {
-    // Only fires when focus leaves the workback list entirely (not card-to-card)
     setTimeout(function() {
-      if (_editingWbId !== id) return; // focusin on another card already handled it
+      if (_editingWbId !== id) return;
       var wbList = document.getElementById('wb-list');
       if (wbList && wbList.contains(document.activeElement)) return;
+      // Flush any pending live sort before releasing the lock
+      clearTimeout(_wbLiveSortTimer);
+      wbSortWithPin();
       el.classList.remove('editing');
       _editingWbId = null;
-      wbSortAnimated();
+      _lockedCardTop = null;
+      wbRecalc();
     }, 0);
   });
 
