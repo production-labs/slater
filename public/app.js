@@ -2236,6 +2236,10 @@ function wbSortAnimated() {
     if (el) positions[id] = el.getBoundingClientRect().top;
   });
 
+  // Snapshot edited card's viewport position before DOM moves
+  const editedEl = _lastEditedWbId ? document.getElementById(_lastEditedWbId) : null;
+  const editedOldTop = editedEl ? editedEl.getBoundingClientRect().top : null;
+
   // Update wbItems order, then let wbRebuildPins place items+pins together
   wbItems.length = 0;
   order.forEach(function(id) { wbItems.push(id); });
@@ -2248,7 +2252,17 @@ function wbSortAnimated() {
   window.scrollTo(0, savedScroll);
   if (focused && document.body.contains(focused)) focused.focus({preventScroll: true});
 
+  // Adjust scroll so the edited card stays at its original viewport position;
+  // the other cards will animate around it
+  if (editedEl && editedOldTop !== null) {
+    const editedNewTop = editedEl.getBoundingClientRect().top;
+    const scrollDelta = editedNewTop - editedOldTop;
+    if (Math.abs(scrollDelta) > 1) window.scrollBy(0, scrollDelta);
+  }
+
+  // FLIP animate all cards except the edited one (which appears stationary)
   wbItems.forEach(function(id) {
+    if (id === _lastEditedWbId) return;
     const el = document.getElementById(id);
     if (!el || positions[id] == null) return;
     const delta = positions[id] - el.getBoundingClientRect().top;
@@ -2262,14 +2276,6 @@ function wbSortAnimated() {
       });
     });
   });
-
-  if (_lastEditedWbId) {
-    var _scrollTarget = _lastEditedWbId;
-    setTimeout(function() {
-      var card = document.getElementById(_scrollTarget);
-      if (card) card.scrollIntoView({behavior: "smooth", block: "nearest"});
-    }, 750);
-  }
 }
 
 function wbUpdateDateCtrl(id) {
