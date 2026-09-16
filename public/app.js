@@ -2286,7 +2286,7 @@ function wbSortAnimated() {
 
 function wbLiveSortDebounced() {
   clearTimeout(_wbLiveSortTimer);
-  _wbLiveSortTimer = setTimeout(wbSortWithPin, 350);
+  _wbLiveSortTimer = setTimeout(wbSortWithPin, 150);
 }
 
 function wbSortWithPin() {
@@ -2299,12 +2299,14 @@ function wbSortWithPin() {
   var order = wbItems.slice().sort(function(a, b) { return getDue(a).localeCompare(getDue(b)); });
   if (JSON.stringify(order) === JSON.stringify(wbItems)) return;
 
-  // Clear all in-flight transforms so FLIP measurements are accurate
+  // Clear transforms only now that we know a sort is needed
+  // (clearing before the order-check would remove the locked card's pinning on early return)
   wbItems.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.style.transition = "none"; el.style.transform = ""; }
   });
 
+  // Record positions after clearing transforms, before DOM reorder
   var positions = {};
   wbItems.forEach(function(id) {
     var el = document.getElementById(id);
@@ -2314,23 +2316,22 @@ function wbSortWithPin() {
   wbItems.length = 0;
   order.forEach(function(id) { wbItems.push(id); });
 
-  var savedScroll = window.scrollY;
   var focused = document.activeElement;
   wbRebuildPins();
-  window.scrollTo(0, savedScroll);
   if (focused && document.body.contains(focused)) focused.focus({preventScroll: true});
 
-  // Pin the locked card with a compensating transform — all synchronous, no visible jump
+  // Pin locked card via scroll so its DOM position == viewport position (no transform).
+  // This ensures other cards sort around the correct visual position, not an offset one.
   if (_editingWbId !== null && _lockedCardTop !== null) {
     var lockedEl = document.getElementById(_editingWbId);
     if (lockedEl) {
-      var newTop = lockedEl.getBoundingClientRect().top;
-      var pinDelta = _lockedCardTop - newTop;
-      if (Math.abs(pinDelta) > 0.5) lockedEl.style.transform = "translateY("+pinDelta+"px)";
+      var lockedDocTop = lockedEl.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo(0, Math.max(0, lockedDocTop - _lockedCardTop));
+      _lockedCardTop = lockedEl.getBoundingClientRect().top; // update if scroll was clamped
     }
   }
 
-  // FLIP animate all cards except the locked one
+  // FLIP animate non-locked cards to their new positions
   wbItems.forEach(function(id) {
     if (id === _editingWbId) return;
     var el = document.getElementById(id);
@@ -2606,23 +2607,13 @@ function wbAdd(item, afterId) {
       if (_editingWbId !== id) return;
       var wbList = document.getElementById('wb-list');
       if (wbList && wbList.contains(document.activeElement)) return;
-      // Flush any pending live sort, then animate card settling into its position
+      // Flush any pending sort, deselect, then clean up
       clearTimeout(_wbLiveSortTimer);
-      wbSortWithPin(); // applies pinning transform one final time
+      wbSortWithPin();
       el.classList.remove('editing');
       _editingWbId = null;
       _lockedCardTop = null;
-      // Animate the card from its pinned position down to its sorted DOM position
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          el.style.transition = 'transform 0.7s cubic-bezier(0.4,0,0.2,1)';
-          el.style.transform = '';
-          setTimeout(function() {
-            el.style.transition = '';
-            wbRecalc();
-          }, 750);
-        });
-      });
+      wbRecalc();
     }, 0);
   });
 
