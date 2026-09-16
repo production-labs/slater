@@ -2507,13 +2507,23 @@ function wbAdd(item, afterId) {
   el.appendChild(internalWrap);
 
   el.addEventListener('focusin', function() {
+    // If arriving from a different wb-item, sort that card first
+    if (_editingWbId !== null && _editingWbId !== id) {
+      var prevCard = document.getElementById(_editingWbId);
+      if (prevCard) prevCard.classList.remove('editing');
+      _editingWbId = null;
+      wbSortAnimated();
+    }
     _editingWbId = id;
     _lastEditedWbId = id;
     el.classList.add('editing');
   });
   el.addEventListener('focusout', function() {
+    // Only fires when focus leaves the workback list entirely (not card-to-card)
     setTimeout(function() {
-      if (el.contains(document.activeElement)) return;
+      if (_editingWbId !== id) return; // focusin on another card already handled it
+      var wbList = document.getElementById('wb-list');
+      if (wbList && wbList.contains(document.activeElement)) return;
       el.classList.remove('editing');
       _editingWbId = null;
       wbSortAnimated();
