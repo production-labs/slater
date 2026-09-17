@@ -246,32 +246,100 @@
           <button class="ab" onclick="addTalent()">+ Add talent</button>
         </div>
 
-        <div id="tab-workback" class="sec">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-            <div class="sh" style="margin-bottom:0">Workback schedule</div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <button class="gb" id="wb-btn" onclick="generateWorkback()" style="margin-top:0;font-size:13px"><i data-lucide="download" class="lucide"></i> Download workback (.docx)</button>
-              <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px"><i data-lucide="save" class="lucide"></i> Save as template</button>
-              <button class="lb" onclick="openTemplateManager()" style="font-size:12px"><i data-lucide="folder" class="lucide"></i> Templates</button>
+        <div id="tab-workback" class="sec wb-sec">
+          <!-- Top toolbar row -->
+          <div style="display:flex;align-items:flex-end;margin-bottom:.75rem;flex-wrap:wrap;gap:6px">
+            <!-- View toggle -->
+            <div class="view-toggle">
+              <button class="vt-btn" id="wb-vt-list" onclick="wbSetView('list')" title="List + Edit panel">
+                <span class="vt-icon">&#8861;</span> List
+              </button>
+              <button class="vt-btn" id="wb-vt-table" onclick="wbSetView('table')" title="Spreadsheet view">
+                <span class="vt-icon">&#8862;</span> Table
+              </button>
+            </div>
+            <!-- Anchor / direction controls -->
+            <div style="display:flex;gap:8px;align-items:flex-end">
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:9px;font-weight:500;color:var(--text-secondary);white-space:nowrap;text-transform:uppercase;letter-spacing:.5px">Anchor</span>
+                <div class="select-wrap"><select id="wb_day_select" onchange="wbRecalc();wbRebuildPins()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
+                  <option value="last" selected>Last day</option>
+                </select></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:9px;font-weight:500;color:var(--text-secondary);white-space:nowrap;text-transform:uppercase;letter-spacing:.5px">Direction</span>
+                <div class="select-wrap"><select id="wb_direction" onchange="wbRecalc();wbRebuildPins()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
+                  <option value="back" selected>Work back</option>
+                  <option value="forward">Work forward</option>
+                </select></div>
+              </div>
+            </div>
+            <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px;padding:5px 10px"><i data-lucide="save" class="lucide"></i> Template</button>
+            <button class="lb" onclick="openTemplateManager()" style="font-size:12px;padding:5px 10px"><i data-lucide="folder" class="lucide"></i> Templates</button>
+            <button class="lb accent" id="wb-btn" onclick="generateWorkback()" style="font-size:12px;padding:5px 10px"><i data-lucide="download" class="lucide"></i> Download</button>
+          </div>
+          <!-- Timeline -->
+          <div id="wb-timeline" style="margin-bottom:.5rem"></div>
+          <!-- Views container -->
+          <div id="wb-views">
+            <!-- LIST VIEW -->
+            <div id="wb-list-view" class="hidden">
+              <div class="wb-list-panel">
+                <div class="list-hdr">
+                  <span class="list-hdr-title">Workback items</span>
+                  <span style="font-size:11px;color:var(--text-secondary)" id="wb-lv-count"></span>
+                </div>
+                <div class="list-body" id="wb-lv-body"></div>
+                <button class="list-add-btn" onclick="wbAddItem()">+ Add workback item</button>
+              </div>
+              <div class="wb-edit-panel" id="wb-edit-panel">
+                <div class="ep-empty">
+                  <div style="font-size:36px;opacity:.15">&#128203;</div>
+                  <div style="font-size:14px;font-weight:500;color:var(--text-secondary)">Select an item to edit</div>
+                  <div style="font-size:11px;color:var(--text-secondary);opacity:.6;max-width:220px;line-height:1.5;margin-top:4px">Click any item in the list or a bar in the timeline</div>
+                </div>
+              </div>
+            </div>
+            <!-- TABLE VIEW -->
+            <div id="wb-table-view" class="hidden">
+              <div class="tbl-wrap">
+                <table class="wb-table">
+                  <thead>
+                    <tr>
+                      <th class="c-drag"></th>
+                      <th class="c-num">#</th>
+                      <th class="c-item">Item</th>
+                      <th class="c-owner">Owner</th>
+                      <th class="c-mode">Mode</th>
+                      <th class="c-days">Days</th>
+                      <th class="c-after">After</th>
+                      <th class="c-due">Due</th>
+                      <th class="c-status">Status</th>
+                      <th class="c-int" title="Internal only">Int</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wb-tv-tbody"></tbody>
+                </table>
+                <div class="tbl-add" onclick="wbAddItem()">
+                  <span style="font-size:15px;color:var(--accent-red);font-weight:300">+</span>
+                  <span>Add workback item</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div style="margin-bottom:1rem">
-            <div class="fl">
-              <label>Anchor date</label>
-              <div class="select-wrap"><select id="wb_day_select" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-                <option value="last" selected>Last day</option>
-              </select></div>
-            </div>
-            <div class="fl">
-              <label>Direction</label>
-              <div class="select-wrap"><select id="wb_direction" onchange="wbRecalc();wbRebuildPins()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-                <option value="back" selected>Work back from anchor</option>
-                <option value="forward">Work forward from anchor</option>
-              </select></div>
-            </div>
+          <!-- Stats bar -->
+          <div class="wb-stats-bar" id="wb-stats-bar"></div>
+          <!-- Row toolbar (table view) -->
+          <div class="wb-row-toolbar" id="wb-row-toolbar">
+            <button class="rtb-btn" onclick="wbInsertAbove()">&#8593; Insert above</button>
+            <button class="rtb-btn" onclick="wbInsertBelow()">&#8595; Insert below</button>
+            <div class="rtb-sep"></div>
+            <button class="rtb-btn" onclick="wbDuplicateRow()">&#8680; Duplicate</button>
+            <div class="rtb-sep"></div>
+            <button class="rtb-btn danger" onclick="wbDeleteSelected()">&#x2715; Delete</button>
           </div>
-          <div id="wb-timeline"></div>
-          <div id="wb-list"></div>
+          <!-- Legacy hidden list div kept for compatibility -->
+          <div id="wb-list" style="display:none"></div>
         </div>
 
         <div id="tab-expenses" class="sec">

@@ -1722,10 +1722,12 @@ function loadScheduleDays(days, legacyData) {
 
 // ── Workback ──────────────────────────────────────────────────────────────────
 let wbItems = [];
-var _editingWbId = null;
-var _lastEditedWbId = null;
-var _lockedCardTop = null;
-var _wbLiveSortTimer = null;
+var _wbData = {};
+var _wbView = localStorage.getItem('slater_wb_view') || 'table';
+var _wbSelectedId = null;
+var _wbEditingCell = null;
+var _wbTlElements = {};
+var _wbLiveSortTimer = null; // kept for compat
 
 // US federal holidays as MM-DD strings (fixed); floating ones added dynamically
 function usHolidays(year) {
@@ -1740,6 +1742,7 @@ function usHolidays(year) {
   // Labor Day: 1st Monday in September
   // Columbus Day: 2nd Monday in October
   function nthMonday(year, month, n) {
+    if (!isFinite(year) || !isFinite(month)) return null;
     let d = new Date(year, month-1, 1), count=0;
     while(true){ if(d.getDay()===1) count++; if(count===n) return d.toISOString().slice(0,10); d.setDate(d.getDate()+1); }
   }
@@ -1813,20 +1816,30 @@ function getAnchorIso() {
   return schedDays[schedDays.length-1].date_iso||"";
 }
 
+function wbOwnerColor(name) {
+  var palette = ["#2a78d6","#1baf7a","#eb6834","#6250d6","#d6502a","#2ab5d6","#9d50d6","#d6a82a"];
+  if (!name || !name.trim()) return "#888";
+  var h = 0;
+  for (var i = 0; i < name.length; i++) h = ((h * 31 + name.charCodeAt(i)) | 0);
+  return palette[Math.abs(h) % palette.length];
+}
+
+function wbStatusClass(status) {
+  var map = {'Not Started':'not-started','In Progress':'in-progress','Stuck':'stuck','Complete':'complete','N/A':'na'};
+  return map[status] || (status||'').toLowerCase().replace(/[^a-z0-9]/g,'-');
+}
+
 function wbCalcDue(id, anchorIso, prevDue) {
-  const mode = (document.getElementById(id+"_mode")||{value:"anchor"}).value || "anchor";
-  const dir  = (document.getElementById("wb_direction")||{value:"back"}).value || "back";
-  if (mode === "manual") {
-    return (document.getElementById(id+"_manual_date")||{}).value || "";
-  }
+  var d = _wbData[id];
+  if (!d) return "";
+  var mode = d.mode || "anchor";
+  var dir = (document.getElementById("wb_direction")||{value:"back"}).value || "back";
+  if (mode === "manual") return d.manual_date || "";
   if (mode === "sequential") {
-    const days = parseInt((document.getElementById(id+"_seq_days")||{}).value)||0;
-    // Chain from: previous item due date, or kickoff date, or anchor date
-    const base = prevDue || getKickoffIso() || anchorIso;
-    return wbBusinessDaysAfter(base, days);
+    var base = prevDue || getKickoffIso() || anchorIso;
+    return wbBusinessDaysAfter(base, d.seq_days || 0);
   }
-  // anchor mode
-  const days = parseInt((document.getElementById(id+"_days")||{}).value)||0;
+  var days = d.days || 0;
   return dir === "forward" ? wbBusinessDaysAfter(anchorIso, days) : wbBusinessDaysBefore(anchorIso, days);
 }
 
@@ -1959,54 +1972,47 @@ function wbDrawTimeline() {
     return new Date(+p[0], +p[1]-1, +p[2]).getTime();
   }
 
-  function ownerColor(name) {
-    var palette = ["#2a78d6","#1baf7a","#eb6834","#6250d6","#d6502a","#2ab5d6","#9d50d6","#d6a82a"];
-    if (!name || !name.trim()) return "#888";
-    var h = 0;
-    for (var i = 0; i < name.length; i++) h = ((h * 31 + name.charCodeAt(i)) | 0);
-    return palette[Math.abs(h) % palette.length];
-  }
-
   // ── Collect data ─────────────────────────────────────────────────────────
 
   var kickoffIso = (document.getElementById("kickoff_date_iso")||{}).value || "";
   var videoDueIso = (document.getElementById("video_due_date_iso")||{}).value || "";
 
+  var _tlMilestoneDates = {};
+  getSchedMilestones().forEach(function(m) { _tlMilestoneDates[m.id] = m.date_iso || ""; });
+
   var dueMap = {};
   wbItems.forEach(function(id) {
-    var dueEl = document.getElementById(id+"_due");
-    dueMap[id] = (dueEl && dueEl.dataset.iso) || "";
+    dueMap[id] = (_wbData[id] && _wbData[id].due) || "";
   });
 
   var all = [];
+  _wbTlElements = {};
 
   wbItems.forEach(function(id) {
-    var dueEl = document.getElementById(id+"_due");
-    var dueIso = (dueEl && dueEl.dataset.iso) || "";
+    var d = _wbData[id];
+    if (!d) return;
+    var dueIso = d.due || "";
     if (!dueIso) return;
-    var label = (document.getElementById(id+"_item")||{}).value || "Untitled";
-    var owner = (document.getElementById(id+"_owner")||{}).value || "";
-    var mode = (document.getElementById(id+"_mode")||{value:"anchor"}).value || "anchor";
+    var mode = d.mode || "anchor";
     var startIso;
     if (mode === "sequential") {
-      var anchorSel = document.getElementById(id+"_seq_anchor");
-      var seqId = anchorSel ? anchorSel.value : "";
+      var seqId = d.seq_anchor_id || "";
       var base;
       if (seqId === "kickoff") base = kickoffIso;
       else if (seqId === "video_due") base = videoDueIso;
-      else if (seqId && seqId.indexOf("pin_") === 0) base = seqId.slice(4);
+      else if (seqId && seqId.indexOf("pin_") === 0) base = _tlMilestoneDates[seqId.slice(4)] || kickoffIso;
       else if (seqId && dueMap[seqId]) base = dueMap[seqId];
       else base = kickoffIso;
       startIso = base || dueIso;
     } else {
       startIso = dueIso;
     }
-    all.push({type:"task", label:label, owner:owner, startIso:startIso, endIso:dueIso});
+    all.push({type:"task", id:id, label:d.item||"Untitled", owner:d.owner||"", startIso:startIso, endIso:dueIso});
   });
 
   getSchedMilestones().forEach(function(m) {
     if (!m.date_iso) return;
-    all.push({type:"pin", label:m.label, owner:"", startIso:m.date_iso, endIso:m.date_iso});
+    all.push({type:"pin", pinId:"pin_"+m.id, label:m.label, owner:"", startIso:m.date_iso, endIso:m.date_iso});
   });
 
   if (all.length < 1) { container.style.display = "none"; return; }
@@ -2128,24 +2134,28 @@ function wbDrawTimeline() {
         pinEl.style.border = "2px solid #fff";
       }
       var pinTipHtml = "<strong>"+d.label+"</strong><br><span style='color:var(--text-muted);font-size:11px'>Milestone &middot; "+fmtD(d.startIso)+"</span>";
-      pinEl.addEventListener("mouseenter", function(e) {
-        pinEl.style.boxShadow = isPast
-          ? "0 0 0 4px rgba(255,255,255,.08), 0 0 10px 3px rgba(255,255,255,.05)"
-          : "0 0 0 4px rgba(255,255,255,.15), 0 0 10px 3px rgba(255,255,255,.1)";
-        showTip(e, pinTipHtml);
-      });
-      pinEl.addEventListener("mousemove", moveTip);
-      pinEl.addEventListener("mouseleave", function() { pinEl.style.boxShadow = ""; hideTip(); });
+      (function(pe, isP, pinId) {
+        pe.addEventListener("mouseenter", function(e) {
+          if (_wbSelectedId !== pinId) pe.style.boxShadow = isP ? "0 0 0 4px rgba(255,255,255,.08)" : "0 0 0 4px rgba(255,255,255,.15)";
+          showTip(e, pinTipHtml);
+        });
+        pe.addEventListener("mousemove", moveTip);
+        pe.addEventListener("mouseleave", function() { if (_wbSelectedId !== pinId) pe.style.boxShadow = ""; hideTip(); });
+        pe.addEventListener("click", function() { wbSelectItem(pinId); });
+      })(pinEl, isPast, d.pinId || "");
+      _wbTlElements[d.pinId||""] = {el: pinEl, type: "pin"};
+      if (_wbSelectedId === (d.pinId||"")) { pinEl.style.width = "11px"; pinEl.style.height = "11px"; pinEl.style.boxShadow = "0 0 0 4px rgba(255,255,255,.3)"; }
       container.appendChild(pinEl);
 
     } else {
-      var color = ownerColor(d.owner);
+      var color = wbOwnerColor(d.owner);
       var leftPct = isoPct(d.startIso);
       var widthPct = Math.max(0.5, isoPct(d.endIso) - leftPct);
       var bar = document.createElement("div");
       bar.className = "wb-tl-bar";
       bar.style.left = leftPct+"%";
       bar.style.width = widthPct+"%";
+      bar.style.height = (_wbSelectedId === d.id) ? "8px" : "4px";
       bar.style.top = y+"px";
       bar.style.transform = "translateY(-50%)";
       bar.style.background = color;
@@ -2154,12 +2164,17 @@ function wbDrawTimeline() {
         ? fmtD(d.endIso)
         : fmtD(d.startIso)+" &rarr; "+fmtD(d.endIso);
       var barTipHtml = "<strong>"+d.label+"</strong><br><span style='color:var(--text-muted);font-size:11px'>"+(d.owner?d.owner+" &middot; ":"")+dateStr+"</span>";
-      bar.addEventListener("mouseenter", function(e) {
-        bar.style.boxShadow = "0 0 0 3px "+color+"44, 0 0 8px 2px "+color+"33";
-        showTip(e, barTipHtml);
-      });
-      bar.addEventListener("mousemove", moveTip);
-      bar.addEventListener("mouseleave", function() { bar.style.boxShadow = ""; hideTip(); });
+      if (_wbSelectedId === d.id) bar.style.boxShadow = "0 0 0 3px "+color+"66, 0 0 10px 3px "+color+"44";
+      (function(b, c, itemId) {
+        b.addEventListener("mouseenter", function(e) {
+          if (_wbSelectedId !== itemId) b.style.boxShadow = "0 0 0 3px "+c+"44, 0 0 8px 2px "+c+"33";
+          showTip(e, barTipHtml);
+        });
+        b.addEventListener("mousemove", moveTip);
+        b.addEventListener("mouseleave", function() { if (_wbSelectedId !== itemId) b.style.boxShadow = ""; hideTip(); });
+        b.addEventListener("click", function() { wbSelectItem(itemId); });
+      })(bar, color, d.id);
+      _wbTlElements[d.id] = {el: bar, type: "task", color: color};
       container.appendChild(bar);
     }
   });
@@ -2168,525 +2183,115 @@ function wbDrawTimeline() {
 }
 
 function wbRecalc() {
-  const anchorIso = getAnchorIso();
-  const kickoffIso = getKickoffIso();
+  var anchorIso = getAnchorIso();
+  var kickoffIso = getKickoffIso();
+  var videoDueIso2 = (document.getElementById("video_due_date_iso")||{}).value || "";
   function _localIso(d) { return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-  const today = _localIso(new Date());
-  const soon  = _localIso(new Date(Date.now()+5*864e5));
+  var today = _localIso(new Date());
+  var soon  = _localIso(new Date(Date.now()+7*864e5));
+  var _milestoneDates = {};
+  getSchedMilestones().forEach(function(m) { _milestoneDates[m.id] = m.date_iso || ""; });
   var dueMap = {};
   var prevDue = kickoffIso;
-  var schedMilestones = getSchedMilestones();
   wbItems.forEach(function(id) {
-    const dueEl = document.getElementById(id+"_due");
-    if (!dueEl) return;
-    const mode = (document.getElementById(id+"_mode")||{value:"anchor"}).value;
+    var d = _wbData[id];
+    if (!d) return;
     var due;
-    if (mode === "sequential") {
-      const anchorSel = document.getElementById(id+"_seq_anchor");
-      const seqAnchorId = anchorSel ? anchorSel.value : "";
-      const days = parseInt((document.getElementById(id+"_seq_days")||{}).value)||0;
+    if (d.mode === "sequential") {
+      var seqAnchorId = d.seq_anchor_id || "";
       var base;
       if (seqAnchorId === "kickoff") { base = kickoffIso || anchorIso; }
-      else if (seqAnchorId === "video_due") {
-        base = (document.getElementById("video_due_date_iso")||{}).value || kickoffIso || anchorIso;
-      }
+      else if (seqAnchorId === "video_due") { base = videoDueIso2 || kickoffIso || anchorIso; }
       else if (seqAnchorId && seqAnchorId.indexOf("pin_") === 0) {
-        base = seqAnchorId.slice(4) || kickoffIso || anchorIso;
+        base = _milestoneDates[seqAnchorId.slice(4)] || kickoffIso || anchorIso;
       }
       else if (seqAnchorId && dueMap.hasOwnProperty(seqAnchorId)) { base = dueMap[seqAnchorId] || kickoffIso || anchorIso; }
       else { base = prevDue || kickoffIso || anchorIso; }
-      due = wbBusinessDaysAfter(base, days);
+      due = wbBusinessDaysAfter(base, d.seq_days || 0);
     } else {
       due = wbCalcDue(id, anchorIso, prevDue);
     }
     dueMap[id] = due;
     if (due) prevDue = due;
-    dueEl.dataset.iso = due || "";
-    dueEl.textContent = wbFmtDate(due) || "\u2014";
-    dueEl.className = "wb-due";
+    d.due = due || "";
+    d.dueClass = "";
     if (due && anchorIso) {
-      if (due < today) dueEl.classList.add("overdue");
-      else if (due <= soon) dueEl.classList.add("soon");
-      else dueEl.classList.add("ok");
+      if (due < today) d.dueClass = "overdue";
+      else if (due <= soon) d.dueClass = "soon";
+      else d.dueClass = "ok";
     }
+    if (d.status === "Complete" || d.status === "N/A") d.dueClass = "done";
   });
   if (typeof sidebarOpen !== "undefined" && sidebarOpen) refreshSidebar();
-  var _wbScroll = window.scrollY;
-  var _wbFocused = document.activeElement;
-  if (_editingWbId === null) {
-    wbRebuildPins();
-  } else {
-    wbLiveSortDebounced();
-  }
   var _tl = document.getElementById("wb-timeline");
   if (_tl && _tl._cleanup) _tl._cleanup();
   wbDrawTimeline();
-  window.scrollTo(0, _wbScroll);
-  if (_wbFocused && document.body.contains(_wbFocused) && document.activeElement !== _wbFocused) _wbFocused.focus({preventScroll: true});
+  wbRefreshDates();
 }
 
-function wbSortAnimated() {
-  const list = document.getElementById("wb-list");
-  if (!list || wbItems.length < 2) return;
-
-  const getDue = function(id) {
-    const dueEl = document.getElementById(id+"_due");
-    return (dueEl && dueEl.dataset.iso) || "9999-99-99";
-  };
-  const order = wbItems.slice().sort(function(a, b) { return getDue(a).localeCompare(getDue(b)); });
-  if (JSON.stringify(order) === JSON.stringify(wbItems)) return;
-
-  const positions = {};
-  wbItems.forEach(function(id) {
-    const el = document.getElementById(id);
-    if (el) positions[id] = el.getBoundingClientRect().top;
-  });
-
-  // Snapshot edited card's viewport position before DOM moves
-  const editedEl = _lastEditedWbId ? document.getElementById(_lastEditedWbId) : null;
-  const editedOldTop = editedEl ? editedEl.getBoundingClientRect().top : null;
-
-  // Update wbItems order, then let wbRebuildPins place items+pins together
-  wbItems.length = 0;
-  order.forEach(function(id) { wbItems.push(id); });
-
-  // Save scroll and focused element — wbRebuildPins moves DOM nodes, which
-  // causes the browser to scroll to the re-inserted focused element
-  const savedScroll = window.scrollY;
-  const focused = document.activeElement;
-  wbRebuildPins();
-  window.scrollTo(0, savedScroll);
-  if (focused && document.body.contains(focused)) focused.focus({preventScroll: true});
-
-  // Adjust scroll so the edited card stays at its original viewport position;
-  // the other cards will animate around it
-  if (editedEl && editedOldTop !== null) {
-    const editedNewTop = editedEl.getBoundingClientRect().top;
-    const scrollDelta = editedNewTop - editedOldTop;
-    if (Math.abs(scrollDelta) > 1) window.scrollBy(0, scrollDelta);
-  }
-
-  // FLIP animate all cards except the edited one (which appears stationary)
-  wbItems.forEach(function(id) {
-    if (id === _lastEditedWbId) return;
-    const el = document.getElementById(id);
-    if (!el || positions[id] == null) return;
-    const delta = positions[id] - el.getBoundingClientRect().top;
-    if (Math.abs(delta) < 1) return;
-    el.style.transition = "none";
-    el.style.transform = "translateY("+delta+"px)";
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        el.style.transition = "transform 0.7s cubic-bezier(0.4,0,0.2,1)";
-        el.style.transform = "";
-      });
-    });
-  });
-}
-
-function wbLiveSortDebounced() {
-  clearTimeout(_wbLiveSortTimer);
-  _wbLiveSortTimer = setTimeout(wbSortWithPin, 150);
-}
-
-function wbSortWithPin() {
-  var list = document.getElementById("wb-list");
-  if (!list || wbItems.length < 2) return;
-  var getDue = function(id) {
-    var dueEl = document.getElementById(id+"_due");
-    return (dueEl && dueEl.dataset.iso) || "9999-99-99";
-  };
-  var order = wbItems.slice().sort(function(a, b) { return getDue(a).localeCompare(getDue(b)); });
-  if (JSON.stringify(order) === JSON.stringify(wbItems)) return;
-
-  // Clear transforms only now that we know a sort is needed
-  // (clearing before the order-check would remove the locked card's pinning on early return)
-  wbItems.forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) { el.style.transition = "none"; el.style.transform = ""; }
-  });
-
-  // Record positions after clearing transforms, before DOM reorder
-  var positions = {};
-  wbItems.forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) positions[id] = el.getBoundingClientRect().top;
-  });
-
-  wbItems.length = 0;
-  order.forEach(function(id) { wbItems.push(id); });
-
-  var focused = document.activeElement;
-  wbRebuildPins();
-  if (focused && document.body.contains(focused)) focused.focus({preventScroll: true});
-
-  // Pin locked card via scroll so its DOM position == viewport position (no transform).
-  // This ensures other cards sort around the correct visual position, not an offset one.
-  if (_editingWbId !== null && _lockedCardTop !== null) {
-    var lockedEl = document.getElementById(_editingWbId);
-    if (lockedEl) {
-      var lockedDocTop = lockedEl.getBoundingClientRect().top + window.scrollY;
-      window.scrollTo(0, Math.max(0, lockedDocTop - _lockedCardTop));
-      _lockedCardTop = lockedEl.getBoundingClientRect().top; // update if scroll was clamped
-    }
-  }
-
-  // FLIP animate non-locked cards to their new positions
-  wbItems.forEach(function(id) {
-    if (id === _editingWbId) return;
-    var el = document.getElementById(id);
-    if (!el || positions[id] == null) return;
-    var delta = positions[id] - el.getBoundingClientRect().top;
-    if (Math.abs(delta) < 1) return;
-    el.style.transform = "translateY("+delta+"px)";
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        el.style.transition = "transform 0.7s cubic-bezier(0.4,0,0.2,1)";
-        el.style.transform = "";
-      });
-    });
-  });
-}
-
-function wbUpdateDateCtrl(id) {
-  const mode = (document.getElementById(id+"_mode")||{value:"anchor"}).value;
-  const anchorCtrl  = document.getElementById(id+"_anchor_ctrl");
-  const seqCtrl     = document.getElementById(id+"_seq_ctrl");
-  const manualCtrl  = document.getElementById(id+"_manual_ctrl");
-  if (anchorCtrl) anchorCtrl.style.display  = mode === "anchor"     ? "" : "none";
-  if (seqCtrl)    seqCtrl.style.display     = mode === "sequential" ? "" : "none";
-  if (manualCtrl) manualCtrl.style.display  = mode === "manual"     ? "" : "none";
-  refreshSeqAnchorDropdowns();
-  wbRecalc();
-  clearTimeout(_wbLiveSortTimer); // defer sort until user leaves the card
-}
 
 function generateWbUuid() {
   return 'wbu_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 }
 
-var _wbLoadingItems = false;
-
-function refreshSeqAnchorDropdowns() {
-  var allItems = wbItems.map(function(wid) {
-    var nameEl = document.getElementById(wid+"_item");
-    return {id: wid, label: (nameEl ? nameEl.value.trim() : "") || "(untitled)"};
-  });
-
-  // Get schedule day pins using the same scheme as wbRebuildPins()
-  var pins = [];
-  var days = getScheduleDays();
-  days.forEach(function(day) {
-    if (day.date_iso) {
-      pins.push({
-        id: "pin_"+day.date_iso,
-        label: "📅 " + (day.label || day.date_iso),
-      });
-    }
-  });
-
-  wbItems.forEach(function(wid, idx) {
-    var modeSel = document.getElementById(wid+"_mode");
-    if (!modeSel || modeSel.value !== "sequential") return;
-    var anchorSel = document.getElementById(wid+"_seq_anchor");
-    if (!anchorSel) return;
-
-    // Read current selection BEFORE rebuilding
-    var pendingVal = anchorSel.dataset.pendingValue;
-    var currentVal = (pendingVal !== undefined && pendingVal !== "")
-      ? pendingVal
-      : anchorSel.value;
-    // Do not clear pendingValue yet — only clear after successful apply below
-
-    // Rebuild options
-    anchorSel.innerHTML = "";
-    var kickoffOpt = document.createElement("option");
-    kickoffOpt.value = "kickoff"; kickoffOpt.textContent = "Kickoff";
-    anchorSel.appendChild(kickoffOpt);
-    var _vdIso = (document.getElementById("video_due_date_iso")||{}).value||"";
-    if (_vdIso) {
-      var vdOpt = document.createElement("option");
-      vdOpt.value = "video_due"; vdOpt.textContent = "Project Due Date";
-      anchorSel.appendChild(vdOpt);
-    }
-    pins.forEach(function(pin) {
-      var opt = document.createElement("option");
-      opt.value = pin.id; opt.textContent = pin.label;
-      anchorSel.appendChild(opt);
-    });
-    allItems.forEach(function(item) {
-      if (item.id === wid) return;
-      var opt = document.createElement("option");
-      opt.value = item.id; opt.textContent = item.label;
-      anchorSel.appendChild(opt);
-    });
-
-    // Restore previously selected value if it still exists
-    var validIds = Array.from(anchorSel.options).map(function(o) { return o.value; });
-    if (currentVal && validIds.indexOf(currentVal) !== -1) {
-      anchorSel.value = currentVal;
-      anchorSel.dataset.pendingValue = ""; // clear only after successful apply
-    } else if (!pendingVal) {
-      // No pending value and current selection lost — fall back to safe default
-      var prevId = idx > 0 ? wbItems[idx - 1] : null;
-      anchorSel.value = (prevId && prevId !== wid) ? prevId : "kickoff";
-    }
-    // If pendingVal was set but not yet in options, keep it for next rebuild attempt
-  });
-}
+function refreshSeqAnchorDropdowns() { /* no-op in new UI — dropdowns built per edit panel render */ }
 
 function wbAdd(item, afterId) {
-  var isNew = !item;
   item = item || {};
-  const id = "wb_"+(++_uid);
-  if (afterId === null) {
-    wbItems.unshift(id);
-  } else if (afterId) {
-    var _aidx = wbItems.indexOf(afterId);
-    if (_aidx > -1) { wbItems.splice(_aidx + 1, 0, id); } else { wbItems.push(id); }
-  } else {
-    wbItems.push(id);
-  }
-
-  const el = document.createElement("div");
-  el.className = "wb-item"; el.id = id;
-  el.dataset.uuid = item.uuid || generateWbUuid();
-
-  // ── Row 1: deliverable | due date badge | delete ──────────────────────────
-  const row1 = document.createElement("div"); row1.className = "wb-row1";
-  const itemInp = document.createElement("input");
-  itemInp.type = "text"; itemInp.id = id+"_item"; itemInp.placeholder = "Task or deliverable";
-  itemInp.value = item.item||""; itemInp.autocomplete = "new-password";
-  itemInp.style.cssText = "padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit;width:100%";
-  itemInp.oninput = function() { refreshSeqAnchorDropdowns(); };
-  const dueSpan = document.createElement("span");
-  dueSpan.className = "wb-due"; dueSpan.id = id+"_due"; dueSpan.textContent = "\u2014";
-  const delBtn = document.createElement("button");
-  delBtn.className = "rb"; delBtn.innerHTML = "&#x2715;";
-  delBtn.tabIndex = -1;
-  delBtn.onclick = function() {
-    var _itemName = (document.getElementById(id+"_item")||{}).value || "this item";
-    showModal("Remove workback item", "Remove \""+_itemName+"\"? This cannot be undone.", function() {
-      wbRemove(id); wbRecalc(); wbSortAnimated();
-    });
+  var id = "wb_" + (++_uid);
+  if (afterId === null) { wbItems.unshift(id); }
+  else if (afterId) { var _aidx=wbItems.indexOf(afterId); if(_aidx>-1) wbItems.splice(_aidx+1,0,id); else wbItems.push(id); }
+  else { wbItems.push(id); }
+  var defMode = item.mode || ((document.getElementById("project_type")||{value:""}).value === "post_production" ? "sequential" : "anchor");
+  _wbData[id] = {
+    item: item.item||"", owner: item.owner||"", mode: defMode,
+    days: item.days===undefined ? 0 : item.days,
+    seq_days: item.seq_days===undefined ? 1 : item.seq_days,
+    seq_anchor_id: "", seq_anchor_uuid: item.seq_anchor_uuid||"",
+    manual_date: item.manual_date||"",
+    status: item.status||"Not Started", internal: item.internal||false,
+    uuid: item.uuid||generateWbUuid(), due: "",
   };
-  row1.appendChild(itemInp); row1.appendChild(dueSpan); row1.appendChild(delBtn);
-
-  // ── Row 2: owner | mode selector | date control | status ─────────────────
-  const row2 = document.createElement("div"); row2.className = "wb-row2";
-
-  const ownerInp = document.createElement("input");
-  ownerInp.type = "text"; ownerInp.id = id+"_owner"; ownerInp.placeholder = "Owner";
-  ownerInp.value = item.owner||""; ownerInp.autocomplete = "new-password";
-  ownerInp.style.cssText = "padding:5px 7px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;width:100%";
-
-  const modeSel = document.createElement("select");
-  modeSel.className = "wb-mode-sel"; modeSel.id = id+"_mode";
-  const mode = item.mode || (function() {
-    const pt = (document.getElementById("project_type")||{value:"live_event"}).value;
-    return pt === "post_production" ? "sequential" : "anchor";
-  })();
-  [["anchor","Anchor"],["sequential","Sequential"],["manual","Manual date"]].forEach(function(pair) {
-    const opt = document.createElement("option");
-    opt.value = pair[0]; opt.textContent = pair[1];
-    if (pair[0] === mode) opt.selected = true;
-    modeSel.appendChild(opt);
-  });
-  modeSel.onchange = function() { wbUpdateDateCtrl(id); };
-
-  // Anchor control
-  const anchorCtrl = document.createElement("div");
-  anchorCtrl.className = "wb-date-ctrl"; anchorCtrl.id = id+"_anchor_ctrl";
-  anchorCtrl.style.display = mode === "anchor" ? "" : "none";
-  const daysInp = document.createElement("input");
-  daysInp.type = "number"; daysInp.className = "wb-days-inp"; daysInp.id = id+"_days";
-  daysInp.min = "-365"; daysInp.max = "365"; daysInp.value = item.days === undefined ? 0 : item.days;
-  daysInp.oninput = function() { wbRecalc(); };
-  const daysLbl = document.createElement("span"); daysLbl.textContent = "days";
-  anchorCtrl.appendChild(daysInp); anchorCtrl.appendChild(daysLbl);
-
-  // Sequential control
-  const seqCtrl = document.createElement("div");
-  seqCtrl.className = "wb-date-ctrl"; seqCtrl.id = id+"_seq_ctrl";
-  seqCtrl.style.display = mode === "sequential" ? "" : "none";
-  const seqInp = document.createElement("input");
-  seqInp.type = "number"; seqInp.className = "wb-seq-inp"; seqInp.id = id+"_seq_days";
-  seqInp.min = "0"; seqInp.max = "365"; seqInp.value = item.seq_days === undefined ? 1 : item.seq_days;
-  seqInp.oninput = function() { wbRecalc(); };
-  const seqDaysSuffix = document.createElement("span"); seqDaysSuffix.textContent = "days";
-  seqDaysSuffix.style.cssText = "font-size:12px;color:var(--film-can)";
-  const seqAfterLbl = document.createElement("span"); seqAfterLbl.textContent = "after:";
-  seqAfterLbl.style.cssText = "font-size:12px;color:var(--film-can);margin-left:4px";
-  const seqAnchorSel = document.createElement("select");
-  seqAnchorSel.id = id+"_seq_anchor";
-  seqAnchorSel.style.cssText = "padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;max-width:140px;color:var(--text-primary);background:var(--surface)";
-  seqAnchorSel.dataset.pendingUuid = item.seq_anchor_uuid || "";
-  seqAnchorSel.onchange = function() { wbRecalc(); };
-  seqCtrl.appendChild(seqInp); seqCtrl.appendChild(seqDaysSuffix);
-  seqCtrl.appendChild(seqAfterLbl); seqCtrl.appendChild(seqAnchorSel);
-
-  // Manual control
-  const manualCtrl = document.createElement("div");
-  manualCtrl.className = "wb-date-ctrl"; manualCtrl.id = id+"_manual_ctrl";
-  manualCtrl.style.display = mode === "manual" ? "" : "none";
-  const manualInp = document.createElement("input");
-  manualInp.type = "date"; manualInp.className = "wb-date-inp"; manualInp.id = id+"_manual_date";
-  manualInp.value = item.manual_date||"";
-  manualInp.style.width = "150px";
-  manualInp.onchange = function() {
-    wbRecalc();
-    clearTimeout(_wbLiveSortTimer); // don't sort until user exits the date field
-  };
-  manualInp.addEventListener('blur', function() {
-    if (_editingWbId === id) wbSortWithPin();
-  });
-  manualCtrl.appendChild(manualInp);
-
-  // Date control wrapper
-  const dateWrap = document.createElement("div");
-  dateWrap.style.cssText = "display:flex;gap:6px;align-items:center";
-  dateWrap.appendChild(anchorCtrl);
-  dateWrap.appendChild(seqCtrl);
-  dateWrap.appendChild(manualCtrl);
-
-  const statusSel = document.createElement("select");
-  statusSel.id = id+"_status"; statusSel.className = "wb-status";
-  statusSel.style.cssText = "padding:5px 6px;border:1px solid var(--border);border-radius:5px;font-size:11px;font-family:inherit";
-  ["Not Started","In Progress","Stuck","Complete","N/A"].forEach(function(s) {
-    const opt = document.createElement("option");
-    opt.value = s; opt.textContent = s;
-    if (s === (item.status||"Not Started")) opt.selected = true;
-    statusSel.appendChild(opt);
-  });
-  statusSel.onchange = function() {
-    updateWbItemStyle(id);
-    if (typeof sidebarOpen !== "undefined" && sidebarOpen) refreshSidebar();
-  };
-
-  row2.appendChild(ownerInp);
-  row2.appendChild(modeSel);
-  row2.appendChild(dateWrap);
-  row2.appendChild(statusSel);
-
-  el.appendChild(row1); el.appendChild(row2);
-  // Internal only checkbox
-  var internalWrap = document.createElement("div");
-  internalWrap.style.cssText = "display:flex;align-items:center;gap:6px;margin-top:6px;padding:2px 0";
-  var internalCb = document.createElement("input");
-  internalCb.type = "checkbox"; internalCb.id = id+"_internal";
-  internalCb.checked = item.internal||false;
-  internalCb.style.cssText = "accent-color:var(--charcoal);cursor:pointer";
-  var internalLbl = document.createElement("label");
-  internalLbl.htmlFor = id+"_internal";
-  internalLbl.textContent = "Internal only — exclude from exported workback";
-  internalLbl.style.cssText = "font-size:11px;color:var(--film-can);cursor:pointer;user-select:none";
-  internalWrap.appendChild(internalCb); internalWrap.appendChild(internalLbl);
-  el.appendChild(internalWrap);
-
-  el.addEventListener('focusin', function() {
-    if (_editingWbId === id) return;
-    // Leaving another card — clear its transform and sort it instantly
-    if (_editingWbId !== null) {
-      clearTimeout(_wbLiveSortTimer);
-      var prevCard = document.getElementById(_editingWbId);
-      if (prevCard) {
-        prevCard.classList.remove('editing');
-        prevCard.style.transition = 'none';
-        prevCard.style.transform = '';
-      }
-      _editingWbId = null;
-      _lockedCardTop = null;
-      wbRebuildPins();
-    }
-    _editingWbId = id;
-    _lastEditedWbId = id;
-    el.classList.add('editing');
-    // Defer scroll so browser's own focus-scroll fires first, then we override it
-    setTimeout(function() {
-      if (_editingWbId !== id) return;
-      var targetTop = Math.max(20, Math.floor((window.innerHeight - el.offsetHeight) / 2));
-      window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - targetTop);
-      _lockedCardTop = targetTop;
-    }, 0);
-  });
-  el.addEventListener('focusout', function() {
-    setTimeout(function() {
-      if (_editingWbId !== id) return;
-      var wbList = document.getElementById('wb-list');
-      if (wbList && wbList.contains(document.activeElement)) return;
-      // Flush any pending sort, deselect, then clean up
-      clearTimeout(_wbLiveSortTimer);
-      wbSortWithPin();
-      el.classList.remove('editing');
-      _editingWbId = null;
-      _lockedCardTop = null;
-      wbRecalc();
-    }, 0);
-  });
-
-  document.getElementById("wb-list").appendChild(el);
-  updateWbItemStyle(id);
-  if (!_wbLoadingItems) {
-    refreshSeqAnchorDropdowns();
-    wbRecalc();
-    if (isNew) itemInp.focus();
-  } else { wbRecalc(); }
 }
 
 function wbRemove(id) {
   const i = wbItems.indexOf(id); if (i > -1) wbItems.splice(i, 1);
-  const el = document.getElementById(id); if (el) el.remove();
-  refreshSeqAnchorDropdowns();
+  delete _wbData[id];
 }
 
 function wbGetItems() {
-  // Returns regular items only — used for saving to library
-  const anchorIso = getAnchorIso();
-  const kickoffIso = getKickoffIso();
-  var dueMap = {};
-  var prevDue = kickoffIso;
-  // Build uuid map: domId -> uuid
-  var uuidMap = {};
-  wbItems.forEach(function(wid) {
-    var el2 = document.getElementById(wid);
-    if (el2) uuidMap[wid] = el2.dataset.uuid || "";
-  });
+  // Returns regular items only — reads from _wbData (no DOM)
   return wbItems.map(function(id) {
-    const mode = (document.getElementById(id+"_mode")||{value:"anchor"}).value;
-    const anchorSel = document.getElementById(id+"_seq_anchor");
-    const seqAnchorDomId = anchorSel ? anchorSel.value : "";
-    var due;
-    if (mode === "sequential") {
-      const seqDays = parseInt((document.getElementById(id+"_seq_days")||{}).value)||0;
-      var base;
-      if (seqAnchorDomId === "kickoff") { base = kickoffIso || anchorIso; }
-      else if (seqAnchorDomId && dueMap.hasOwnProperty(seqAnchorDomId)) { base = dueMap[seqAnchorDomId] || kickoffIso || anchorIso; }
-      else { base = prevDue || kickoffIso || anchorIso; }
-      due = wbBusinessDaysAfter(base, seqDays);
-    } else {
-      due = wbCalcDue(id, anchorIso, prevDue);
+    var d = _wbData[id];
+    if (!d) return null;
+    // Build seq_anchor_uuid: stable reference for save/load
+    var seq_anchor_uuid = d.seq_anchor_uuid || "";
+    if (d.mode === "sequential" && d.seq_anchor_id) {
+      var ancId = d.seq_anchor_id;
+      if (ancId === "kickoff" || ancId === "video_due" || ancId.indexOf("pin_") === 0) {
+        seq_anchor_uuid = ancId;
+      } else {
+        var ancD = _wbData[ancId];
+        seq_anchor_uuid = ancD ? ancD.uuid : (d.seq_anchor_uuid || "");
+      }
     }
-    dueMap[id] = due;
-    if (due) prevDue = due;
-    const days = parseInt((document.getElementById(id+"_days")||{}).value)||0;
-    const seq_days = parseInt((document.getElementById(id+"_seq_days")||{}).value)||0;
-    const manual_date = (document.getElementById(id+"_manual_date")||{}).value||"";
-    const elNode = document.getElementById(id);
-    var seq_anchor_uuid;
-    if (seqAnchorDomId === "kickoff") { seq_anchor_uuid = "kickoff"; }
-    else if (seqAnchorDomId === "video_due" || (seqAnchorDomId && seqAnchorDomId.indexOf("pin_") === 0)) { seq_anchor_uuid = seqAnchorDomId; }
-    else { seq_anchor_uuid = uuidMap[seqAnchorDomId] || ""; }
     return {
-      item:        v(id+"_item"),
-      owner:       v(id+"_owner"),
-      uuid:        elNode ? elNode.dataset.uuid : "",
-      mode:        mode, days:days, seq_days:seq_days, seq_anchor_uuid:seq_anchor_uuid,
-      manual_date:manual_date,
-      status:      (document.getElementById(id+"_status")||{}).value||"Not Started",
-      internal:    (document.getElementById(id+"_internal")||{}).checked||false,
-      due:due, dueFmt:wbFmtDate(due),
+      item: d.item, owner: d.owner, uuid: d.uuid,
+      mode: d.mode, days: d.days, seq_days: d.seq_days,
+      seq_anchor_uuid: seq_anchor_uuid,
+      manual_date: d.manual_date,
+      status: d.status, internal: d.internal,
+      due: d.due, dueFmt: wbFmtDate(d.due),
     };
-  }).filter(function(x) { return x.item; });
+  }).filter(function(x) { return x && x.item; });
+}
+
+function wbSortItems() {
+  wbItems.sort(function(a, b) {
+    var da = (_wbData[a] && _wbData[a].due) || "9999-99-99";
+    var db = (_wbData[b] && _wbData[b].due) || "9999-99-99";
+    return da.localeCompare(db);
+  });
 }
 
 function wbGetItemsForDoc() {
@@ -2708,32 +2313,743 @@ function wbGetItemsForDoc() {
 }
 
 function wbLoadItems(items) {
-  document.getElementById("wb-list").innerHTML = "";
   wbItems = [];
-  _wbLoadingItems = true;
+  _wbData = {};
+  _wbSelectedId = null;
   (items||[]).forEach(function(item) { wbAdd(item); });
-  _wbLoadingItems = false;
-  // Resolve seq_anchor_uuid -> current dom id now that all items are loaded
-  var uuidToDomId = {};
+  // Resolve seq_anchor_uuid -> seq_anchor_id (runtime DOM ID)
+  var uuidToId = {};
+  wbItems.forEach(function(wid) { var d = _wbData[wid]; if (d) uuidToId[d.uuid] = wid; });
   wbItems.forEach(function(wid) {
-    var el2 = document.getElementById(wid);
-    if (el2 && el2.dataset.uuid) uuidToDomId[el2.dataset.uuid] = wid;
+    var d = _wbData[wid];
+    if (!d || d.mode !== "sequential" || !d.seq_anchor_uuid) return;
+    var uuid = d.seq_anchor_uuid;
+    if (uuid === "kickoff" || uuid === "video_due" || uuid.indexOf("pin_") === 0) {
+      d.seq_anchor_id = uuid;
+    } else if (uuidToId[uuid]) {
+      d.seq_anchor_id = uuidToId[uuid];
+    }
   });
-  wbItems.forEach(function(wid) {
-    var anchorSel = document.getElementById(wid+"_seq_anchor");
-    if (!anchorSel) return;
-    var pendingUuid = anchorSel.dataset.pendingUuid || "";
-    if (!pendingUuid) return;
-    if (pendingUuid === "kickoff") anchorSel.dataset.pendingValue = "kickoff";
-    else if (pendingUuid === "video_due" || (pendingUuid && pendingUuid.indexOf("pin_") === 0)) anchorSel.dataset.pendingValue = pendingUuid;
-    else if (uuidToDomId[pendingUuid]) anchorSel.dataset.pendingValue = uuidToDomId[pendingUuid];
-  });
-  refreshSeqAnchorDropdowns();
   wbRecalc();
+  wbRender();
 }
 
 function wbInit() {
-  // placeholder — items loaded via wbLoadItems or kickoff
+  wbSetView(_wbView);
+  // Detect when timeline is sticky and cover the gap above it
+  (function() {
+    var tl = document.getElementById("wb-timeline");
+    if (!tl || !window.IntersectionObserver) return;
+    var sentinel = document.createElement("div");
+    sentinel.style.cssText = "height:1px;margin-bottom:-1px;pointer-events:none;visibility:hidden";
+    tl.parentNode.insertBefore(sentinel, tl);
+    new IntersectionObserver(function(entries) {
+      tl.classList.toggle("is-stuck", !entries[0].isIntersecting);
+    }).observe(sentinel);
+  })();
+  // Click outside deselects in table view
+  document.addEventListener("click", function(e) {
+    if (!e.target.closest("tr") && !e.target.closest("#wb-row-toolbar") && !e.target.closest("#wb-timeline")) {
+      if (_wbView === "table") {
+        var hadSelection = !!_wbSelectedId;
+        if (hadSelection) { wbSortItems(); }
+        _wbSelectedId = null;
+        wbHideToolbar();
+        wbApplyTlSelection(null);
+        if (hadSelection) { wbRender(); } else { document.querySelectorAll("#wb-tv-tbody tr").forEach(function(r) { r.classList.remove("t-selected"); }); }
+      }
+    }
+  });
+  // Keyboard nav
+  document.addEventListener("keydown", function(e) {
+    if (!_wbSelectedId || _wbEditingCell) return;
+    var tab = document.getElementById("tab-workback");
+    if (!tab || tab.style.display === "none") return;
+    var milestones = getSchedMilestones();
+    var allIds = milestones.map(function(m) { return "pin_"+m.id; }).concat(wbItems);
+    var idx = allIds.indexOf(_wbSelectedId);
+    if (e.key === "ArrowDown" && idx < allIds.length - 1) { e.preventDefault(); wbSelectItem(allIds[idx+1]); }
+    if (e.key === "ArrowUp" && idx > 0) { e.preventDefault(); wbSelectItem(allIds[idx-1]); }
+    if ((e.key === "Delete" || e.key === "Backspace") && _wbView === "table") {
+      var d = _wbData[_wbSelectedId];
+      if (d) wbDeleteItem(_wbSelectedId);
+    }
+  });
+}
+
+// ── Workback rendering helpers ────────────────────────────────────────────────
+
+function wbTodayIso() {
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+function wbFmtDateFull(iso) {
+  if (!iso) return "";
+  var d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString("en-US", {weekday:"long", month:"long", day:"numeric", year:"numeric"});
+}
+
+function wbGetDueClass(d) {
+  if (!d) return "ok";
+  if (d.status === "Complete") return "done";
+  if (!d.due) return "ok";
+  var today = wbTodayIso();
+  if (d.due < today) return "overdue";
+  var diff = (new Date(d.due+"T12:00:00") - new Date(today+"T12:00:00")) / 86400000;
+  return diff <= 7 ? "soon" : "ok";
+}
+
+function wbGetDueClassFromIso(dueIso, status) {
+  if (status === "Complete") return "done";
+  if (!dueIso) return "ok";
+  var today = wbTodayIso();
+  if (dueIso < today) return "overdue";
+  var diff = (new Date(dueIso+"T12:00:00") - new Date(today+"T12:00:00")) / 86400000;
+  return diff <= 7 ? "soon" : "ok";
+}
+
+function wbDueDaysLabel(dueIso, status) {
+  if (!dueIso) return "";
+  if (status === "Complete") return "Complete";
+  var today = wbTodayIso();
+  var diff = Math.round((new Date(dueIso+"T12:00:00") - new Date(today+"T12:00:00")) / 86400000);
+  if (diff < 0) return Math.abs(diff) + " days overdue";
+  if (diff === 0) return "Due today";
+  return diff + " days away";
+}
+
+function wbDueDaysColor(dc) {
+  if (dc === "overdue") return "var(--accent)";
+  if (dc === "soon") return "#FFC107";
+  if (dc === "done") return "#4A9E6B";
+  return "#4A9E6B";
+}
+
+function wbStatusDisplayLabel(status) {
+  var map = {"Not Started":"Not Started","In Progress":"In Progress","Stuck":"Stuck","Complete":"Complete","N/A":"N/A"};
+  return map[status] || status || "Not Started";
+}
+
+function wbApplyTlSelection(id) {
+  Object.keys(_wbTlElements).forEach(function(elId) {
+    var entry = _wbTlElements[elId];
+    if (!entry || !entry.el) return;
+    if (elId === id) {
+      if (entry.type === "task") {
+        entry.el.style.boxShadow = "0 0 0 3px " + entry.color + "66,0 0 10px 3px " + entry.color + "44";
+        entry.el.style.height = "8px";
+      } else {
+        entry.el.style.boxShadow = "0 0 0 4px rgba(255,255,255,.3)";
+        entry.el.style.width = "11px"; entry.el.style.height = "11px";
+      }
+    } else {
+      entry.el.style.boxShadow = "";
+      if (entry.type === "task") entry.el.style.height = "4px";
+      else { entry.el.style.width = "8px"; entry.el.style.height = "8px"; }
+    }
+  });
+}
+
+// ── View switching ────────────────────────────────────────────────────────────
+
+function wbSetView(v) {
+  _wbView = v;
+  localStorage.setItem("slater_wb_view", v);
+  var lBtn = document.getElementById("wb-vt-list");
+  var tBtn = document.getElementById("wb-vt-table");
+  var lView = document.getElementById("wb-list-view");
+  var tView = document.getElementById("wb-table-view");
+  if (lBtn) lBtn.classList.toggle("active", v === "list");
+  if (tBtn) tBtn.classList.toggle("active", v === "table");
+  if (lView) lView.classList.toggle("hidden", v !== "list");
+  if (tView) tView.classList.toggle("hidden", v !== "table");
+  wbRender();
+  wbHideToolbar();
+}
+
+function wbSelectItem(id) {
+  if (_wbSelectedId && _wbSelectedId !== id) {
+    wbSortItems();
+    wbRender();
+  }
+  _wbSelectedId = id;
+  wbApplyTlSelection(id);
+  if (_wbView === "list") {
+    document.querySelectorAll(".wb-list-item").forEach(function(el) {
+      el.classList.toggle("active", el.id === "wb-li-" + id);
+    });
+    wbRenderEditPanel(id);
+    var li = document.getElementById("wb-li-" + id);
+    if (li) li.scrollIntoView({block: "nearest", behavior: "smooth"});
+  } else {
+    document.querySelectorAll("#wb-tv-tbody tr").forEach(function(r) {
+      r.classList.toggle("t-selected", r.id === "wb-tr-" + id);
+    });
+    var row = document.getElementById("wb-tr-" + id);
+    if (row) { row.scrollIntoView({block: "nearest", behavior: "smooth"}); wbShowToolbar(row); }
+  }
+}
+
+function wbRender() {
+  if (_wbView === "list") wbBuildListView();
+  else wbBuildTableView();
+  wbUpdateStats();
+}
+
+function wbRefreshDates() {
+  var today = wbTodayIso();
+  if (_wbView === "list") {
+    wbItems.forEach(function(id) {
+      var d = _wbData[id]; if (!d) return;
+      var dueEl = document.getElementById("wb-li-due-" + id);
+      if (dueEl) { dueEl.textContent = d.due ? wbFmtDate(d.due) : "--"; dueEl.className = "li-due " + wbGetDueClass(d); }
+    });
+    if (_wbSelectedId && _wbData[_wbSelectedId]) {
+      var d = _wbData[_wbSelectedId];
+      var dc = wbGetDueClass(d);
+      var dueCard = document.getElementById("wb-ep-due-card");
+      if (dueCard) {
+        var dateEl = dueCard.querySelector(".due-card-date");
+        var fullEl = dueCard.querySelector(".due-card-full");
+        var daysEl = dueCard.querySelector(".due-card-days");
+        if (dateEl) dateEl.textContent = d.due ? wbFmtDate(d.due) : "--";
+        if (fullEl) fullEl.textContent = d.due ? wbFmtDateFull(d.due) : "";
+        if (daysEl) { daysEl.textContent = wbDueDaysLabel(d.due, d.status); daysEl.style.color = wbDueDaysColor(dc); }
+      }
+    }
+  } else {
+    wbItems.forEach(function(id) {
+      var d = _wbData[id]; if (!d) return;
+      var row = document.getElementById("wb-tr-" + id); if (!row) return;
+      var dueCell = row.querySelector(".t-due");
+      if (dueCell) { dueCell.textContent = d.due ? wbFmtDate(d.due) : "--"; dueCell.className = "t-due " + wbGetDueClass(d); }
+    });
+  }
+  wbDrawTimeline();
+}
+
+// ════════════════════════════════════════
+// LIST VIEW
+// ════════════════════════════════════════
+
+function wbBuildListView() {
+  var body = document.getElementById("wb-lv-body");
+  var countEl = document.getElementById("wb-lv-count");
+  if (!body) return;
+  body.innerHTML = "";
+
+  var milestones = getSchedMilestones();
+  var taskCount = wbItems.length;
+  if (countEl) countEl.textContent = taskCount + " task" + (taskCount !== 1 ? "s" : "");
+
+  if (milestones.length) {
+    var s1 = document.createElement("div"); s1.className = "list-section"; s1.textContent = "Milestones";
+    body.appendChild(s1);
+    milestones.forEach(function(m) { body.appendChild(wbBuildLvPinItem(m)); });
+  }
+  var s2 = document.createElement("div"); s2.className = "list-section"; s2.textContent = "Tasks";
+  body.appendChild(s2);
+  wbItems.forEach(function(id) { body.appendChild(wbBuildLvTaskItem(id)); });
+
+  // Restore selection highlight
+  if (_wbSelectedId) {
+    document.querySelectorAll(".wb-list-item").forEach(function(el) {
+      el.classList.toggle("active", el.id === "wb-li-" + _wbSelectedId);
+    });
+  }
+}
+
+function wbBuildLvPinItem(m) {
+  var pinId = "pin_" + m.id;
+  var dc = wbGetDueClassFromIso(m.date_iso, "");
+  var el = document.createElement("div");
+  el.className = "list-item wb-list-item" + (_wbSelectedId === pinId ? " active" : "");
+  el.id = "wb-li-" + pinId;
+  el.onclick = function() { wbSelectItem(pinId); };
+  var icon = document.createElement("div");
+  icon.className = "li-icon pin";
+  var info = document.createElement("div"); info.className = "li-info";
+  var name = document.createElement("div"); name.className = "li-name"; name.textContent = m.label;
+  var meta = document.createElement("div"); meta.className = "li-meta"; meta.textContent = wbFmtDate(m.date_iso);
+  info.appendChild(name); info.appendChild(meta);
+  var right = document.createElement("div"); right.className = "li-right";
+  var due = document.createElement("div"); due.className = "li-due " + dc; due.textContent = wbFmtDate(m.date_iso);
+  right.appendChild(due);
+  el.appendChild(icon); el.appendChild(info); el.appendChild(right);
+  return el;
+}
+
+function wbBuildLvTaskItem(id) {
+  var d = _wbData[id]; if (!d) return document.createTextNode("");
+  var dc = wbGetDueClass(d);
+  var color = wbOwnerColor(d.owner);
+  var el = document.createElement("div");
+  el.className = "list-item wb-list-item" + (_wbSelectedId === id ? " active" : "");
+  el.id = "wb-li-" + id;
+  el.onclick = function() { wbSelectItem(id); };
+  var icon = document.createElement("div");
+  icon.className = "li-icon"; icon.style.background = color; icon.style.borderRadius = "50%";
+  var info = document.createElement("div"); info.className = "li-info";
+  var name = document.createElement("div"); name.className = "li-name"; name.textContent = d.item || "(untitled)";
+  var meta = document.createElement("div"); meta.className = "li-meta";
+  if (d.owner) {
+    var dot = document.createElement("div");
+    dot.style.cssText = "width:6px;height:6px;border-radius:50%;flex-shrink:0;background:" + color;
+    meta.appendChild(dot); meta.appendChild(document.createTextNode(d.owner));
+  }
+  info.appendChild(name); info.appendChild(meta);
+  var right = document.createElement("div"); right.className = "li-right";
+  var dueEl = document.createElement("div");
+  dueEl.className = "li-due " + dc; dueEl.id = "wb-li-due-" + id;
+  dueEl.textContent = d.due ? wbFmtDate(d.due) : "--";
+  var statusDot = document.createElement("div");
+  statusDot.className = "li-status-dot";
+  var sColors = {"Complete":"#4A9E6B","In Progress":"#FFC107","Stuck":"#eb6834","N/A":"#6e747b","Not Started":"#6e747b"};
+  statusDot.style.background = sColors[d.status] || "#6e747b";
+  right.appendChild(dueEl); right.appendChild(statusDot);
+  el.appendChild(icon); el.appendChild(info); el.appendChild(right);
+  return el;
+}
+
+// ── Edit panel ────────────────────────────────────────────────────────────────
+
+function wbRenderEditPanel(id) {
+  var panel = document.getElementById("wb-edit-panel");
+  if (!panel) return;
+  if (!id) {
+    panel.innerHTML = '<div class="ep-empty"><div style="font-size:36px;opacity:.15">&#128203;</div><div style="font-size:14px;font-weight:500;color:var(--text-muted)">Select an item to edit</div><div style="font-size:11px;color:var(--text-muted);opacity:.6;max-width:220px;line-height:1.5;margin-top:4px">Click any item in the list or a bar in the timeline</div></div>';
+    return;
+  }
+  // Check if it's a pin
+  if (id.indexOf("pin_") === 0) { wbRenderEditPanelPin(id, panel); return; }
+  // Task
+  var d = _wbData[id];
+  if (!d) return;
+  var dc = wbGetDueClass(d);
+  var dcol = wbDueDaysColor(dc);
+  var dlbl = wbDueDaysLabel(d.due, d.status);
+  var milestones = getSchedMilestones();
+  var color = wbOwnerColor(d.owner);
+  // Build After options
+  var afterOpts = "";
+  milestones.forEach(function(m) {
+    var pId = "pin_" + m.id;
+    afterOpts += '<option value="' + pId + '"' + (d.seq_anchor_id === pId ? " selected" : "") + '>&#128204; ' + m.label + '</option>';
+  });
+  wbItems.forEach(function(wid) {
+    if (wid === id) return;
+    var wd = _wbData[wid]; if (!wd) return;
+    afterOpts += '<option value="' + wid + '"' + (d.seq_anchor_id === wid ? " selected" : "") + '>' + (wd.item || "(untitled)") + '</option>';
+  });
+  var idx = wbItems.indexOf(id);
+  var prevId = null, nextId = null;
+  var allIds = milestones.map(function(m) { return "pin_"+m.id; }).concat(wbItems);
+  var allIdx = allIds.indexOf(id);
+  if (allIdx > 0) prevId = allIds[allIdx - 1];
+  if (allIdx < allIds.length - 1) nextId = allIds[allIdx + 1];
+  var navHtml = (prevId ? '<button class="nav-btn" onclick="wbSelectItem(\'' + prevId + '\')">&#8593;</button>' : '') +
+    (nextId ? '<button class="nav-btn" onclick="wbSelectItem(\'' + nextId + '\')">&#8595;</button>' : '');
+
+  var modeCtrl = "";
+  if (d.mode === "sequential") {
+    modeCtrl = '<div class="ep-grid3"><div class="ep-sec" style="margin:0"><div class="ep-lbl">Days</div><input class="ep-inp" id="wb-ep-seq-days" type="number" value="' + d.seq_days + '" min="0" style="text-align:center" oninput="_wbData[\'' + id + '\'].seq_days=parseInt(this.value)||0;wbRecalc()"></div>' +
+      '<div class="ep-sec" style="margin:0"><div class="ep-lbl">After</div><select class="ep-sel" id="wb-ep-after" onchange="_wbData[\'' + id + '\'].seq_anchor_id=this.value;wbRecalc()">' + afterOpts + '</select></div></div>';
+  } else if (d.mode === "manual") {
+    modeCtrl = '<div class="ep-sec"><div class="ep-lbl">Date</div><input class="ep-inp" type="date" value="' + (d.manual_date||"") + '" onchange="_wbData[\'' + id + '\'].manual_date=this.value;wbRecalc()"></div>';
+  } else {
+    modeCtrl = '<div class="ep-grid3"><div class="ep-sec" style="margin:0"><div class="ep-lbl">Days</div><input class="ep-inp" id="wb-ep-days" type="number" value="' + d.days + '" style="text-align:center" oninput="_wbData[\'' + id + '\'].days=parseInt(this.value)||0;wbRecalc()"></div><div class="ep-sec" style="margin:0"><div class="ep-lbl">Direction</div><select class="ep-sel" id="wb_direction" onchange="wbRecalc()"><option value="back">Before</option><option value="forward">After</option></select></div></div>';
+  }
+
+  var statuses = ["Not Started","In Progress","Stuck","Complete","N/A"];
+  var statusBtns = statuses.map(function(s) {
+    var sc = wbStatusClass(s);
+    return '<button class="status-btn' + (d.status===s?' active '+sc:'') + '" onclick="wbEpSetStatus(\'' + id + '\',\'' + s + '\')">' + s + '</button>';
+  }).join("");
+
+  panel.innerHTML = '<div class="ep-hdr"><div class="ep-hdr-left"><div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block;flex-shrink:0"></span><span style="font-size:11px;color:' + color + ';font-weight:500">' + (d.owner||"No owner") + '</span></div><div class="ep-name">' + (d.item||"(untitled)") + '</div><div class="ep-breadcrumb">' + (d.mode) + ' mode</div></div><div class="nav-btns">' + navHtml + '</div></div>' +
+    '<div class="ep-body">' +
+    '<div class="ep-sec"><div class="ep-lbl">Item name</div><input class="ep-inp" value="' + (d.item||"").replace(/"/g,"&quot;") + '" oninput="_wbData[\'' + id + '\'].item=this.value;var n=document.querySelector(\'#wb-li-' + id + ' .li-name\');if(n)n.textContent=this.value"></div>' +
+    '<div class="ep-grid"><div class="ep-sec" style="margin:0"><div class="ep-lbl">Owner</div><input class="ep-inp" value="' + (d.owner||"").replace(/"/g,"&quot;") + '" oninput="_wbData[\'' + id + '\'].owner=this.value;wbBuildListView();wbSelectItem(\'' + id + '\')"></div>' +
+    '<div class="ep-sec" style="margin:0"><div class="ep-lbl">Status</div><select class="ep-sel" onchange="wbEpSetStatus(\'' + id + '\',this.value)">' +
+    statuses.map(function(s) { return '<option value="' + s + '"' + (d.status===s?' selected':'') + '>' + s + '</option>'; }).join("") +
+    '</select></div></div>' +
+    '<div class="ep-sec"><div class="ep-lbl">Scheduling mode</div><div class="mode-btns">' +
+    ["anchor","sequential","manual"].map(function(m) { return '<button class="mode-btn' + (d.mode===m?' active':'') + '" onclick="wbEpSetMode(\'' + id + '\',\'' + m + '\')">' + m.charAt(0).toUpperCase()+m.slice(1) + '</button>'; }).join("") +
+    '</div></div>' + modeCtrl +
+    '<div class="ep-sec"><div class="ep-lbl">Calculated due date</div><div class="due-card" id="wb-ep-due-card"><div><div class="ep-lbl">Due</div><div class="due-card-date">' + (d.due ? wbFmtDate(d.due) : "--") + '</div><div class="due-card-full">' + (d.due ? wbFmtDateFull(d.due) : "") + '</div></div><div class="due-card-days" style="color:' + dcol + '">' + dlbl + '</div></div></div>' +
+    '<div class="ep-div"></div>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between"><label class="ep-check"><input type="checkbox"' + (d.internal?' checked':'') + ' onchange="_wbData[\'' + id + '\'].internal=this.checked"> Internal only</label>' +
+    '<button class="ep-del" onclick="wbDeleteItem(\'' + id + '\')">Remove</button></div>' +
+    '</div>';
+
+  // Restore direction select value
+  var dirSel = document.getElementById("wb_direction");
+  if (dirSel) {
+    var mainDir = document.querySelector("#tab-workback #wb_direction");
+    if (mainDir && dirSel !== mainDir) dirSel.value = mainDir.value;
+  }
+}
+
+function wbEpSetMode(id, mode) {
+  var d = _wbData[id]; if (!d) return;
+  d.mode = mode;
+  wbRenderEditPanel(id);
+  wbRecalc();
+}
+
+function wbEpSetStatus(id, status) {
+  var d = _wbData[id]; if (!d) return;
+  d.status = status;
+  wbRenderEditPanel(id);
+  wbRefreshDates();
+  wbUpdateStats();
+  if (typeof sidebarOpen !== "undefined" && sidebarOpen) refreshSidebar();
+  autosaveTrigger();
+}
+
+function wbRenderEditPanelPin(pinId, panel) {
+  var mid = pinId.replace(/^pin_/, "");
+  var milestones = getSchedMilestones();
+  var m = milestones.find(function(x) { return x.id === mid; });
+  if (!m) { panel.innerHTML = '<div class="ep-empty"><div style="color:var(--text-muted)">Milestone not found</div></div>'; return; }
+  var dc = wbGetDueClassFromIso(m.date_iso, "");
+  var dcol = wbDueDaysColor(dc);
+  var dlbl = wbDueDaysLabel(m.date_iso, "");
+  var allIds = milestones.map(function(x) { return "pin_"+x.id; }).concat(wbItems);
+  var allIdx = allIds.indexOf(pinId);
+  var prevId = allIdx > 0 ? allIds[allIdx-1] : null;
+  var nextId = allIdx < allIds.length-1 ? allIds[allIdx+1] : null;
+  var navHtml = (prevId ? '<button class="nav-btn" onclick="wbSelectItem(\'' + prevId + '\')">&#8593;</button>' : '') +
+    (nextId ? '<button class="nav-btn" onclick="wbSelectItem(\'' + nextId + '\')">&#8595;</button>' : '');
+  var isInternal = (currentSheetKey && localStorage.getItem("slater_pin_"+currentSheetKey+"_"+pinId) === "1") || false;
+  panel.innerHTML = '<div class="ep-hdr"><div class="ep-hdr-left"><div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:3px;background:rgba(217,75,67,.1);border:1px solid rgba(217,75,67,.2);font-size:10px;font-weight:600;color:var(--accent);margin-bottom:6px">&#128204; Milestone</div><div class="ep-name">' + m.label + '</div><div class="ep-breadcrumb">' + wbFmtDateFull(m.date_iso) + '</div></div><div class="nav-btns">' + navHtml + '</div></div>' +
+    '<div class="ep-body"><div class="ep-sec"><div class="due-card" id="wb-ep-due-card"><div><div class="ep-lbl">Date</div><div class="due-card-date">' + (m.date_iso ? wbFmtDate(m.date_iso) : "--") + '</div><div class="due-card-full">' + wbFmtDateFull(m.date_iso) + '</div></div><div class="due-card-days" style="color:' + dcol + '">' + dlbl + '</div></div></div>' +
+    '<div class="ep-sec"><div class="ep-lbl">Status</div><div class="status-row"><button class="status-btn">Info only — set per item</button></div></div>' +
+    '<label class="ep-check"><input type="checkbox"' + (isInternal?' checked':'') + ' onchange="wbPinSetInternal(\'' + pinId + '\',this.checked)"> Internal only</label>' +
+    '</div>';
+}
+
+function wbPinSetInternal(pinId, val) {
+  if (!currentSheetKey) return;
+  if (val) localStorage.setItem("slater_pin_"+currentSheetKey+"_"+pinId, "1");
+  else localStorage.removeItem("slater_pin_"+currentSheetKey+"_"+pinId);
+  autosaveTrigger();
+}
+
+// ════════════════════════════════════════
+// TABLE VIEW
+// ════════════════════════════════════════
+
+function wbBuildTableView() {
+  var tbody = document.getElementById("wb-tv-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  var milestones = getSchedMilestones();
+  if (milestones.length) {
+    var s1 = document.createElement("tr"); s1.className = "t-section";
+    s1.innerHTML = '<td colspan="10">Milestones</td>'; tbody.appendChild(s1);
+    milestones.forEach(function(m) { tbody.appendChild(wbBuildTvPinRow(m)); });
+  }
+  var s2 = document.createElement("tr"); s2.className = "t-section";
+  s2.innerHTML = '<td colspan="10" style="position:relative">Tasks<button onclick="wbAddItem()" title="Add item" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:auto;cursor:pointer;background:none;border:none;font-size:18px;font-weight:300;color:var(--text-secondary);line-height:1;padding:0 4px">+</button></td>';
+  tbody.appendChild(s2);
+  wbItems.forEach(function(id, i) { tbody.appendChild(wbBuildTvTaskRow(id, i+1)); });
+}
+
+function wbBuildTvPinRow(m) {
+  var pinId = "pin_" + m.id;
+  var dc = wbGetDueClassFromIso(m.date_iso, "");
+  var tr = document.createElement("tr");
+  tr.className = "t-pin" + (_wbSelectedId === pinId ? " t-selected" : "");
+  tr.id = "wb-tr-" + pinId;
+  tr.onclick = function(e) { if (!e.target.closest("input,select,button")) wbSelectItem(pinId); };
+  tr.innerHTML = '<td><div class="t-drag">&#10783;</div></td>' +
+    '<td><div class="t-pin-icon"><div class="t-diamond"></div></div></td>' +
+    '<td><div class="t-cell"><span style="font-size:10px;color:var(--accent);margin-right:5px;opacity:.7">&#128204;</span><span class="tv-val-label">' + m.label + '</span></div></td>' +
+    '<td><div class="t-cell" style="color:var(--text-muted);font-size:11px">Milestone</div></td>' +
+    '<td><div class="t-cell"><span class="t-mode pinned">pinned</span></div></td>' +
+    '<td><div class="t-days">--</div></td>' +
+    '<td><div class="t-cell" style="color:var(--text-muted)">--</div></td>' +
+    '<td><div class="t-due-cell"><span class="t-due ' + dc + '">' + (m.date_iso ? wbFmtDate(m.date_iso) : "--") + '</span></div></td>' +
+    '<td><div class="t-status-cell"><span style="font-size:11px;color:var(--text-muted)">--</span></div></td>' +
+    '<td><div class="t-int-cell"><input type="checkbox"' + ((currentSheetKey && localStorage.getItem("slater_pin_"+currentSheetKey+"_"+pinId)==="1") ? " checked" : "") + ' onchange="wbPinSetInternal(\'' + pinId + '\',this.checked)" onclick="event.stopPropagation()"></div></td>';
+  return tr;
+}
+
+function wbBuildTvTaskRow(id, num) {
+  var d = _wbData[id]; if (!d) return document.createElement("tr");
+  var dc = wbGetDueClass(d);
+  var sc = wbStatusClass(d.status);
+  var color = wbOwnerColor(d.owner);
+  var milestones = getSchedMilestones();
+  var afterLabel = "--";
+  if (d.seq_anchor_id) {
+    if (d.seq_anchor_id.indexOf("pin_") === 0) {
+      var mid = d.seq_anchor_id.replace(/^pin_/, "");
+      var pm = milestones.find(function(x) { return x.id === mid; });
+      afterLabel = pm ? pm.label : d.seq_anchor_id;
+    } else {
+      var ad = _wbData[d.seq_anchor_id];
+      afterLabel = ad ? (ad.item || "(untitled)") : "--";
+    }
+  }
+  var tr = document.createElement("tr");
+  tr.className = (_wbSelectedId === id ? "t-selected" : "");
+  tr.id = "wb-tr-" + id;
+  tr.onclick = function(e) { if (!e.target.closest("input,select,button")) wbSelectItem(id); };
+  tr.innerHTML = '<td><div class="t-drag">&#10783;</div></td>' +
+    '<td><div class="t-num">' + num + '</div></td>' +
+    '<td ondblclick="wbTvEditLabel(\'' + id + '\',this)"><div class="t-cell"><span class="tv-val-label">' + (d.item||"").replace(/</g,"&lt;") + '</span></div></td>' +
+    '<td ondblclick="wbTvEditOwner(\'' + id + '\',this)"><div class="t-owner"><div class="t-owner-dot" style="background:' + color + '"></div><span class="t-owner-name">' + (d.owner||"--") + '</span></div></td>' +
+    '<td ondblclick="wbTvEditMode(\'' + id + '\',this)"><div class="t-cell"><span class="t-mode ' + d.mode + '">' + d.mode + '</span></div></td>' +
+    '<td ondblclick="wbTvEditDays(\'' + id + '\',this)"><div class="t-days tv-val-days">' + (d.mode==="sequential"?d.seq_days:d.mode==="manual"?"--":d.days) + '</div></td>' +
+    '<td ondblclick="wbTvEditAfter(\'' + id + '\',this)"><div class="t-cell" style="color:var(--text-muted);font-size:11px"><span class="tv-val-after" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + afterLabel + '</span></div></td>' +
+    '<td><div class="t-due-cell"><span class="t-due ' + dc + '">' + (d.due ? wbFmtDate(d.due) : "--") + '</span></div></td>' +
+    '<td><div class="t-status-cell"><button class="t-status ' + sc + '" onclick="wbTvCycleStatus(\'' + id + '\',event)">' + wbStatusDisplayLabel(d.status) + '</button></div></td>' +
+    '<td><div class="t-int-cell"><input type="checkbox"' + (d.internal?" checked":"") + ' onchange="_wbData[\'' + id + '\'].internal=this.checked;autosaveTrigger()" onclick="event.stopPropagation()"></div></td>';
+  return tr;
+}
+
+// ── Table inline editing ──────────────────────────────────────────────────────
+
+function wbTvClearEdit() {
+  if (_wbEditingCell && _wbEditingCell.commit) { _wbEditingCell.commit(); _wbEditingCell = null; }
+}
+
+function wbTvEditLabel(id, td) {
+  wbTvClearEdit();
+  var d = _wbData[id]; if (!d) return;
+  td.classList.add("t-editing");
+  var cell = td.querySelector(".t-cell");
+  var span = cell.querySelector(".tv-val-label");
+  var inp = document.createElement("input");
+  inp.value = d.item; inp.style.cssText = "width:100%;background:transparent;border:none;outline:none;font-size:12px;font-family:inherit;color:var(--text-primary)";
+  span.replaceWith(inp); inp.focus(); inp.select();
+  _wbEditingCell = {td:td, commit:function() {
+    d.item = inp.value; td.classList.remove("t-editing");
+    var ns = document.createElement("span"); ns.className = "tv-val-label"; ns.textContent = inp.value; inp.replaceWith(ns);
+    td.ondblclick = function() { wbTvEditLabel(id,td); }; _wbEditingCell = null; autosaveTrigger();
+  }};
+  inp.addEventListener("blur", function() { if (_wbEditingCell) _wbEditingCell.commit(); });
+  inp.addEventListener("keydown", function(e) {
+    if (e.key==="Enter"||e.key==="Tab") { e.preventDefault(); if (_wbEditingCell) _wbEditingCell.commit(); }
+    if (e.key==="Escape") { td.classList.remove("t-editing"); inp.replaceWith(span); _wbEditingCell=null; }
+  });
+}
+
+function wbTvEditDays(id, td) {
+  wbTvClearEdit();
+  var d = _wbData[id]; if (!d) return;
+  td.classList.add("t-editing");
+  var div = td.querySelector(".t-days");
+  var inp = document.createElement("input");
+  inp.type = "number";
+  inp.value = d.mode==="sequential" ? d.seq_days : d.days;
+  inp.style.cssText = "width:100%;background:transparent;border:none;outline:none;font-size:12px;font-family:inherit;color:var(--text-primary);text-align:center;padding:0 10px";
+  div.textContent = ""; div.appendChild(inp); inp.focus(); inp.select();
+  _wbEditingCell = {td:td, commit:function() {
+    var val = parseInt(inp.value)||0;
+    if (d.mode==="sequential") d.seq_days=val; else d.days=val;
+    td.classList.remove("t-editing"); div.textContent=val;
+    td.ondblclick = function() { wbTvEditDays(id,td); }; _wbEditingCell=null; wbRecalc(); autosaveTrigger();
+  }};
+  inp.addEventListener("blur", function() { if (_wbEditingCell) _wbEditingCell.commit(); });
+  inp.addEventListener("keydown", function(e) { if (e.key==="Enter") { e.preventDefault(); if (_wbEditingCell) _wbEditingCell.commit(); } });
+}
+
+function wbTvEditOwner(id, td) {
+  wbTvClearEdit();
+  var d = _wbData[id]; if (!d) return;
+  td.classList.add("t-editing");
+  var div = td.querySelector(".t-owner");
+  var inp = document.createElement("input");
+  inp.value = d.owner||""; inp.placeholder = "Owner name";
+  inp.style.cssText = "width:100%;background:var(--surface-3);border:none;outline:none;font-size:12px;font-family:inherit;color:var(--text-primary);padding:0 10px;height:34px";
+  div.innerHTML = ""; div.appendChild(inp); inp.focus();
+  var commit = function() {
+    d.owner = inp.value; var color = wbOwnerColor(d.owner);
+    td.classList.remove("t-editing");
+    div.innerHTML = '<div class="t-owner-dot" style="background:' + color + '"></div><span class="t-owner-name">' + (d.owner||"--") + '</span>';
+    td.ondblclick = function() { wbTvEditOwner(id,td); }; _wbEditingCell=null; autosaveTrigger();
+  };
+  _wbEditingCell = {td:td, commit:commit};
+  inp.addEventListener("blur", commit);
+  inp.addEventListener("keydown", function(e) { if (e.key==="Enter") { e.preventDefault(); commit(); } });
+}
+
+function wbTvEditMode(id, td) {
+  wbTvClearEdit();
+  var d = _wbData[id]; if (!d) return;
+  td.classList.add("t-editing");
+  var cell = td.querySelector(".t-cell");
+  var sel = document.createElement("select");
+  sel.style.cssText = "width:100%;background:var(--surface-3);border:none;outline:none;font-size:12px;font-family:inherit;color:var(--text-primary);padding:0 10px;height:34px";
+  ["anchor","sequential","manual"].forEach(function(m) {
+    var opt = document.createElement("option"); opt.value=m; opt.textContent=m.charAt(0).toUpperCase()+m.slice(1);
+    if (d.mode===m) opt.selected=true; sel.appendChild(opt);
+  });
+  cell.innerHTML=""; cell.appendChild(sel); sel.focus();
+  var commit = function() {
+    d.mode=sel.value; td.classList.remove("t-editing");
+    cell.innerHTML='<span class="t-mode '+sel.value+'">'+sel.value+'</span>';
+    td.ondblclick=function(){wbTvEditMode(id,td);}; _wbEditingCell=null; wbRecalc(); autosaveTrigger();
+  };
+  _wbEditingCell={td:td,commit:commit};
+  sel.addEventListener("change",commit); sel.addEventListener("blur",commit);
+}
+
+function wbTvEditAfter(id, td) {
+  wbTvClearEdit();
+  var d = _wbData[id]; if (!d) return;
+  td.classList.add("t-editing");
+  var cell = td.querySelector(".t-cell");
+  var sel = document.createElement("select");
+  sel.style.cssText = "width:100%;background:var(--surface-3);border:none;outline:none;font-size:11px;font-family:inherit;color:var(--text-primary);padding:0 8px;height:34px";
+  var milestones = getSchedMilestones();
+  milestones.forEach(function(m) {
+    var opt=document.createElement("option"); opt.value="pin_"+m.id; opt.textContent=m.label;
+    if (d.seq_anchor_id==="pin_"+m.id) opt.selected=true; sel.appendChild(opt);
+  });
+  wbItems.forEach(function(wid) {
+    if (wid===id) return;
+    var wd=_wbData[wid]; if (!wd) return;
+    var opt=document.createElement("option"); opt.value=wid; opt.textContent=wd.item||"(untitled)";
+    if (d.seq_anchor_id===wid) opt.selected=true; sel.appendChild(opt);
+  });
+  cell.innerHTML=""; cell.appendChild(sel); sel.focus();
+  var commit = function() {
+    d.seq_anchor_id=sel.value;
+    var label="--";
+    var pm=milestones.find(function(m){return "pin_"+m.id===sel.value;});
+    if(pm) label=pm.label;
+    else {var ad=_wbData[sel.value];if(ad) label=ad.item||"(untitled)";}
+    td.classList.remove("t-editing");
+    cell.innerHTML='<span class="tv-val-after" style="color:var(--text-muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+label+'</span>';
+    td.ondblclick=function(){wbTvEditAfter(id,td);}; _wbEditingCell=null; wbRecalc(); autosaveTrigger();
+  };
+  _wbEditingCell={td:td,commit:commit};
+  sel.addEventListener("change",commit); sel.addEventListener("blur",commit);
+}
+
+function wbTvCycleStatus(id, e) {
+  e.stopPropagation();
+  var d = _wbData[id]; if (!d) return;
+  var statuses = ["Not Started","In Progress","Stuck","Complete","N/A"];
+  var idx = statuses.indexOf(d.status);
+  d.status = statuses[(idx+1) % statuses.length];
+  var btn = e.target; btn.className = "t-status " + wbStatusClass(d.status); btn.textContent = wbStatusDisplayLabel(d.status);
+  var row = document.getElementById("wb-tr-"+id);
+  if (row) { var db=row.querySelector(".t-due"); if(db) db.className="t-due "+wbGetDueClass(d); }
+  wbUpdateStats(); autosaveTrigger();
+  if (typeof sidebarOpen !== "undefined" && sidebarOpen) refreshSidebar();
+}
+
+// ── Toolbar ───────────────────────────────────────────────────────────────────
+
+function wbShowToolbar(row) {
+  var toolbar = document.getElementById("wb-row-toolbar");
+  if (!toolbar) return;
+  var rect = row.getBoundingClientRect();
+  toolbar.style.top = (rect.top - 36) + "px";
+  toolbar.style.left = (rect.left + 52) + "px";
+  toolbar.classList.add("vis");
+}
+
+function wbHideToolbar() {
+  var toolbar = document.getElementById("wb-row-toolbar");
+  if (toolbar) toolbar.classList.remove("vis");
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+function wbUpdateStats() {
+  var bar = document.getElementById("wb-stats-bar");
+  if (!bar) return;
+  var today = wbTodayIso();
+  var tasks = wbItems.map(function(id) { return _wbData[id]; }).filter(Boolean);
+  var co = tasks.filter(function(d) { return d.status==="Complete"; }).length;
+  var ip = tasks.filter(function(d) { return d.status==="In Progress"; }).length;
+  var st = tasks.filter(function(d) { return d.status==="Stuck"; }).length;
+  var ns = tasks.filter(function(d) { return d.status==="Not Started"||d.status==="N/A"; }).length;
+  var ov = tasks.filter(function(d) { return d.status!=="Complete" && d.due && d.due < today; }).length;
+  var hint = _wbView === "table" ? "Double-click any cell to edit &middot; Click status to cycle &middot; &uarr;&darr; to navigate" : "Click any item to edit &middot; Timeline syncs with selection";
+  bar.innerHTML = '<div class="stat"><div class="stat-dot" style="background:#4A9E6B"></div>' + co + ' complete</div>' +
+    '<div class="stat"><div class="stat-dot" style="background:#FFC107"></div>' + ip + ' in progress</div>' +
+    (st ? '<div class="stat"><div class="stat-dot" style="background:#eb6834"></div>' + st + ' stuck</div>' : '') +
+    '<div class="stat"><div class="stat-dot" style="background:#6e747b"></div>' + ns + ' not started</div>' +
+    (ov ? '<div class="stat"><div class="stat-dot" style="background:var(--accent)"></div>' + ov + ' overdue</div>' : '') +
+    '<div style="margin-left:auto;color:var(--text-muted)">' + hint + '</div>';
+}
+
+// ── Item actions ──────────────────────────────────────────────────────────────
+
+function wbAddItem() {
+  var lastId = wbItems.length ? wbItems[wbItems.length-1] : null;
+  var defMode = (document.getElementById("project_type")||{value:""}).value === "post_production" ? "sequential" : "anchor";
+  wbAdd({mode:defMode, seq_days:1, seq_anchor_id:lastId||""}, null);
+  var newId = wbItems[wbItems.length-1];
+  wbRecalc();
+  wbRender();
+  wbSelectItem(newId);
+  autosaveTrigger();
+}
+
+function wbDeleteItem(id) {
+  var d = _wbData[id];
+  var name = d ? (d.item || "this item") : "this item";
+  showModal("Remove workback item", 'Remove "' + name + '"? This cannot be undone.', function() {
+    wbRemove(id);
+    if (_wbSelectedId === id) {
+      _wbSelectedId = null;
+      if (_wbView === "list") wbRenderEditPanel(null);
+    }
+    wbRecalc();
+    wbRender();
+    autosaveTrigger();
+  });
+}
+
+function wbDeleteSelected() {
+  if (!_wbSelectedId || _wbSelectedId.indexOf("pin_") === 0) return;
+  wbDeleteItem(_wbSelectedId);
+  wbHideToolbar();
+}
+
+function wbInsertAbove() {
+  if (!_wbSelectedId) return;
+  var idx = wbItems.indexOf(_wbSelectedId);
+  var beforeId = idx > 0 ? wbItems[idx-1] : null;
+  wbAdd({mode:"anchor"}, beforeId);
+  var newId = wbItems[wbItems.indexOf(_wbSelectedId) - 1];
+  if (!newId) return;
+  _wbSelectedId = null;
+  wbRecalc(); wbRender(); wbSelectItem(newId); wbHideToolbar(); autosaveTrigger();
+}
+
+function wbInsertBelow() {
+  if (!_wbSelectedId) return;
+  wbAdd({mode:"anchor"}, _wbSelectedId);
+  var idx = wbItems.indexOf(_wbSelectedId);
+  var newId = wbItems[idx+1];
+  if (!newId) return;
+  _wbSelectedId = null;
+  wbRecalc(); wbRender(); wbSelectItem(newId); wbHideToolbar(); autosaveTrigger();
+}
+
+function wbDuplicateRow() {
+  if (!_wbSelectedId || _wbSelectedId.indexOf("pin_") === 0) return;
+  var d = _wbData[_wbSelectedId];
+  if (!d) return;
+  var copy = JSON.parse(JSON.stringify(d));
+  copy.item = (copy.item || "") + " (copy)";
+  copy.uuid = generateWbUuid();
+  wbAdd(copy, _wbSelectedId);
+  var idx = wbItems.indexOf(_wbSelectedId);
+  var newId = wbItems[idx+1];
+  if (!newId) return;
+  _wbSelectedId = null;
+  wbRecalc(); wbRender(); wbSelectItem(newId); wbHideToolbar(); autosaveTrigger();
 }
 
 
@@ -3437,11 +3753,10 @@ function refreshSidebar() {
             // 2. If this is the currently loaded project, also update the live form
             if (currentSheetKey === entry.sheetKey) {
               wbItems.forEach(function(wid) {
-                var itemEl = document.getElementById(wid+"_item");
-                var statusEl = document.getElementById(wid+"_status");
-                if (itemEl && statusEl && itemEl.value === entry.itemName) {
-                  statusEl.value = newStatus;
-                  updateWbItemStyle(wid);
+                var wd = _wbData[wid];
+                if (wd && wd.item === entry.itemName) {
+                  wd.status = newStatus;
+                  wbRefreshDates();
                 }
               });
               autosaveTrigger();
@@ -3656,9 +3971,8 @@ function renderCompleted() {
           }
           if (currentSheetKey === entry.sheetKey) {
             wbItems.forEach(function(wid) {
-              var itemEl = document.getElementById(wid+"_item");
-              var statusEl = document.getElementById(wid+"_status");
-              if (itemEl && statusEl && itemEl.value === entry.itemName) { statusEl.value = "Not Started"; }
+              var wd = _wbData[wid];
+              if (wd && wd.item === entry.itemName) { wd.status = "Not Started"; wbRefreshDates(); }
             });
             autosaveTrigger();
           } else {
@@ -4499,12 +4813,6 @@ function refreshWbDaySelector() {
 
 // ── Kickoff row ───────────────────────────────────────────────────────────────
 
-function getKickoffIso() {
-  return (document.getElementById("kickoff_date_iso")||{}).value || "";
-}
-
-
-
 
 // ── Schedule milestone pins in workback ───────────────────────────────────────
 function syncKickoffDate() {
@@ -4548,157 +4856,8 @@ function getSchedMilestones() {
 }
 
 function wbRebuildPins() {
-  // Remove existing pins
-  document.querySelectorAll(".wb-pin").forEach(function(el) { el.remove(); });
-  var list = document.getElementById("wb-list");
-  if (!list) return;
-  var milestones = getSchedMilestones();
-  refreshSeqAnchorDropdowns();
-  if (!milestones.length) return;
-
-  // Get current due dates from values already computed by wbRecalc
-  var wbDated = wbItems.map(function(id) {
-    var dueEl = document.getElementById(id+"_due");
-    var due = (dueEl && dueEl.dataset.iso) || "";
-    return {type:"item", id:id, date:due||"9999-99-99"};
-  });
-
-  var pinDated = milestones.map(function(m) {
-    return {type:"pin", pinId:"pin_"+m.id, milestone:m, date:m.date_iso||"9999-99-99"};
-  });
-
-  var combined = wbDated.concat(pinDated).sort(function(a,b) {
-    return a.date.localeCompare(b.date);
-  });
-
-  combined.forEach(function(entry) {
-    if (entry.type === "pin") {
-      var m = entry.milestone;
-      var pinEl = document.createElement("div");
-      pinEl.className = "wb-pin";
-      pinEl.id = entry.pinId;
-      // Top row: icon + label + date + tag
-      var pinTop = document.createElement("div");
-      pinTop.style.cssText = "display:flex;align-items:center;gap:10px;width:100%";
-      var pinCal = document.createElement("div");
-      pinCal.className = "sday-cal sm";
-      var pinCalMonth = document.createElement("div");
-      pinCalMonth.className = "sday-cal-month";
-      var pinCalDay = document.createElement("div");
-      pinCalDay.className = "sday-cal-day";
-      var months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-      if (m.date_iso) {
-        var parts = m.date_iso.split("-");
-        pinCalMonth.textContent = months[parseInt(parts[1])-1] || "---";
-        pinCalDay.textContent = parseInt(parts[2]) || "--";
-      } else {
-        pinCalMonth.textContent = "---";
-        pinCalDay.textContent = "--";
-      }
-      pinCal.appendChild(pinCalMonth);
-      pinCal.appendChild(pinCalDay);
-      var lbl = document.createElement("span"); lbl.className = "wb-pin-label";
-      lbl.textContent = m.label;
-      var dateSpan = document.createElement("span"); dateSpan.className = "wb-pin-date";
-      dateSpan.textContent = wbFmtDate(m.date_iso) + (m.time ? " · " + m.time : "");
-      var tag = document.createElement("span"); tag.className = "wb-pin-tag";
-      tag.textContent = m.isKickoff ? "kickoff" : (m.isVideoDue ? "due date" : "schedule");
-      pinTop.appendChild(pinCal); pinTop.appendChild(lbl); pinTop.appendChild(dateSpan); pinTop.appendChild(tag);
-      pinEl.appendChild(pinTop);
-
-      // Schedule entries (if any)
-      if (m.schedEntries && m.schedEntries.length) {
-        var schedWrap = document.createElement("div");
-        schedWrap.style.cssText = "margin-top:6px;padding-top:6px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:2px";
-        m.schedEntries.forEach(function(e) {
-          if (!e.time && !e.desc) return;
-          var row = document.createElement("div");
-          row.style.cssText = "display:flex;gap:10px;font-size:11px;color:var(--charcoal)";
-          var timeSpan = document.createElement("span");
-          timeSpan.style.cssText = "min-width:60px;color:var(--film-can);font-weight:600;flex-shrink:0";
-          timeSpan.textContent = e.time||"";
-          var descSpan = document.createElement("span");
-          descSpan.textContent = e.desc||"";
-          row.appendChild(timeSpan); row.appendChild(descSpan);
-          schedWrap.appendChild(row);
-        });
-        pinEl.appendChild(schedWrap);
-      }
-      // Internal only checkbox for pins
-      var pinInternalWrap = document.createElement("div");
-      pinInternalWrap.style.cssText = "display:flex;align-items:center;gap:6px;margin-top:6px;padding:2px 0";
-      var pinInternalCb = document.createElement("input");
-      pinInternalCb.type = "checkbox"; pinInternalCb.id = entry.pinId+"_internal";
-      // Load saved state
-      var pinInternalKey = "pin_internal_"+entry.pinId;
-      pinInternalCb.checked = (currentSheetKey && localStorage.getItem("slater_pin_"+currentSheetKey+"_"+entry.pinId) === "1")||false;
-      pinInternalCb.style.cssText = "accent-color:var(--charcoal);cursor:pointer";
-      pinInternalCb.onchange = function() {
-        if (currentSheetKey) {
-          if (pinInternalCb.checked) localStorage.setItem("slater_pin_"+currentSheetKey+"_"+entry.pinId, "1");
-          else localStorage.removeItem("slater_pin_"+currentSheetKey+"_"+entry.pinId);
-        }
-      };
-      var pinInternalLbl = document.createElement("label");
-      pinInternalLbl.htmlFor = entry.pinId+"_internal";
-      pinInternalLbl.textContent = "Internal only — exclude from exported workback";
-      pinInternalLbl.style.cssText = "font-size:11px;color:var(--film-can);cursor:pointer;user-select:none";
-      pinInternalWrap.appendChild(pinInternalCb); pinInternalWrap.appendChild(pinInternalLbl);
-      pinEl.appendChild(pinInternalWrap);
-      list.appendChild(pinEl);
-    } else {
-      var itemEl = document.getElementById(entry.id);
-      if (itemEl) list.appendChild(itemEl);
-    }
-  });
-  rebuildWbDividers();
-}
-
-function makeWbInsertDivider(afterEl) {
-  var div = document.createElement('div');
-  div.className = 'sday-insert wb-insert';
-  div.innerHTML = '<div class="sday-insert-line"></div><div class="sday-insert-btn">+</div><div class="sday-insert-line"></div>';
-  div.onclick = function() { wbInsertAfterEl(afterEl); };
-  return div;
-}
-
-function wbInsertAfterEl(afterEl) {
-  var afterWbId = null;
-  var defaultItem = {};
-  if (afterEl) {
-    if (afterEl.classList.contains('wb-item')) {
-      afterWbId = afterEl.id;
-      defaultItem = { mode: 'sequential', seq_days: 1 };
-    } else if (afterEl.classList.contains('wb-pin')) {
-      var dateMatch = afterEl.id.match(/^pin_(\d{4}-\d{2}-\d{2})$/);
-      if (dateMatch) {
-        defaultItem = { mode: 'manual', manual_date: dateMatch[1] };
-      } else {
-        defaultItem = { mode: 'sequential', seq_days: 1 };
-      }
-      var prev = afterEl.previousSibling;
-      while (prev) {
-        if (prev.classList && prev.classList.contains('wb-item')) { afterWbId = prev.id; break; }
-        prev = prev.previousSibling;
-      }
-    }
-  }
-  wbAdd(defaultItem, afterWbId);
-}
-
-function rebuildWbDividers() {
-  var list = document.getElementById('wb-list');
-  if (!list) return;
-  list.querySelectorAll('.wb-insert').forEach(function(d) { d.remove(); });
-  var children = Array.from(list.children);
-  list.insertBefore(makeWbInsertDivider(null), children[0] || null);
-  children.forEach(function(child) {
-    if (child.nextSibling) {
-      list.insertBefore(makeWbInsertDivider(child), child.nextSibling);
-    } else {
-      list.appendChild(makeWbInsertDivider(child));
-    }
-  });
+  wbRecalc();
+  wbRender();
 }
 
 
@@ -5690,14 +5849,11 @@ function updateNoteDraftIndicator(content) {
 
 
 function updateWbItemStyle(id) {
-  const el = document.getElementById(id);
-  const statusEl = document.getElementById(id+"_status");
-  if (!el || !statusEl) return;
-  el.classList.toggle("complete", statusEl.value === "Complete");
+  // no-op in new UI — status stored in _wbData, rendered by wbRefreshDates
 }
 
 function updateAllWbItemStyles() {
-  wbItems.forEach(function(id) { updateWbItemStyle(id); });
+  // no-op in new UI
 }
 
 
