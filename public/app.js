@@ -2358,6 +2358,7 @@ function wbUpdateDateCtrl(id) {
   if (manualCtrl) manualCtrl.style.display  = mode === "manual"     ? "" : "none";
   refreshSeqAnchorDropdowns();
   wbRecalc();
+  clearTimeout(_wbLiveSortTimer); // defer sort until user leaves the card
 }
 
 function generateWbUuid() {
