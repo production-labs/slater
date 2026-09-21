@@ -414,9 +414,11 @@ function syncDayDate(n) {
 }
 var CREW_STATUS = {
   tbd:       {label:"TBD",       color:"#9D9D99", tip:"Not yet contacted"},
+  contacted: {label:"Contacted", color:"#60a5fa", tip:"Reached out, awaiting response"},
   pencil:    {label:"Pencil",    color:"#E8B84B", tip:"Informally in mind, no commitment yet"},
   hold:      {label:"1st Hold",  color:"#E07B39", tip:"Priority hold on their schedule — check with before accepting other work"},
-  confirmed: {label:"Confirmed", color:"#4A9E6B", tip:"Booked and locked in"}
+  confirmed: {label:"Confirmed", color:"#4A9E6B", tip:"Booked and locked in"},
+  declined:  {label:"Declined",  color:"#555555", tip:"Not available for this project"}
 };
 
 var CATEGORY_CONFIG = {
@@ -439,49 +441,166 @@ var CATEGORY_CONFIG = {
 function updateCrewStatusPill(id, val) {
   var s = CREW_STATUS[val] || CREW_STATUS.tbd;
   var pill = document.getElementById(id+"_status_pill");
-  if (!pill) return;
-  pill.textContent = s.label;
-  pill.style.background = s.color;
-  pill.setAttribute("data-tooltip", s.tip);
+  if (pill) {
+    pill.textContent = s.label;
+    pill.style.background = s.color;
+    pill.setAttribute("data-tooltip", s.tip);
+    pill.style.display = (val === "declined") ? "none" : "";
+  }
+  var nameEl = document.getElementById(id+"_name");
+  if (nameEl) nameEl.style.textDecoration = (val === "declined") ? "line-through" : "";
+}
+function handleCrewStatusChange(id, newVal) {
+  var sel = document.getElementById(id+"_status");
+  var prevVal = sel ? (sel.getAttribute("data-prev") || "tbd") : "tbd";
+  if (newVal === "contacted" && prevVal !== "contacted") {
+    var f = document.getElementById(id+"_contacted_at");
+    if (f) f.value = new Date().toISOString();
+  }
+  if (sel) sel.setAttribute("data-prev", newVal);
+  updateCrewStatusPill(id, newVal);
+  updateContactedAgo(id);
+  updateCrewStatusBar();
+  updateDeclinedSection("crew");
+}
+function handleTalentStatusChange(id, newVal) {
+  var sel = document.getElementById(id+"_status");
+  var prevVal = sel ? (sel.getAttribute("data-prev") || "tbd") : "tbd";
+  if (newVal === "contacted" && prevVal !== "contacted") {
+    var f = document.getElementById(id+"_contacted_at");
+    if (f) f.value = new Date().toISOString();
+  }
+  if (sel) sel.setAttribute("data-prev", newVal);
+  updateCrewStatusPill(id, newVal);
+  updateContactedAgo(id);
+  updateTalentStatusBar();
+  updateDeclinedSection("talent");
+}
+function updateContactedAgo(id) {
+  var agoEl = document.getElementById(id+"_contacted_ago");
+  if (!agoEl) return;
+  var val = (document.getElementById(id+"_status")||{}).value;
+  var contactedAt = (document.getElementById(id+"_contacted_at")||{}).value;
+  if (val === "contacted" && contactedAt) {
+    var diff = Date.now() - new Date(contactedAt).getTime();
+    var days = Math.floor(diff / (1000*60*60*24));
+    agoEl.textContent = days === 0 ? "Contacted today" : days === 1 ? "Contacted 1 day ago" : "Contacted " + days + " days ago";
+    agoEl.style.display = "";
+  } else {
+    agoEl.style.display = "none";
+  }
+}
+var _declinedExpanded = {crew: false, talent: false};
+function updateDeclinedSection(type) {
+  var listEl = document.getElementById(type+"-list");
+  if (!listEl) return;
+  var sectionId = type+"-declined-section";
+  var sectionEl = document.getElementById(sectionId);
+  if (!sectionEl) {
+    sectionEl = document.createElement("div");
+    sectionEl.id = sectionId;
+    listEl.insertAdjacentElement("afterend", sectionEl);
+  }
+  var arr = type === "crew" ? crew : talent;
+  var declined = arr.filter(function(id) {
+    var sel = document.getElementById(id+"_status");
+    return sel && sel.value === "declined";
+  });
+  arr.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var sel = document.getElementById(id+"_status");
+    var isDeclined = sel && sel.value === "declined";
+    if (isDeclined && el.dataset.declinedRevealed !== "1") {
+      el.style.display = "none";
+    } else if (!isDeclined) {
+      el.style.display = "";
+      delete el.dataset.declinedRevealed;
+    }
+  });
+  if (!declined.length) {
+    sectionEl.innerHTML = "";
+    sectionEl.style.display = "none";
+    return;
+  }
+  sectionEl.style.display = "";
+  var expanded = _declinedExpanded[type];
+  var html = '<div onclick="toggleDeclinedSection(\''+type+'\')" style="cursor:pointer;user-select:none;padding:8px 4px 6px;color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;border-top:1px solid var(--border);margin-top:8px">';
+  html += '<span style="font-size:10px">'+(expanded ? "&#9662;" : "&#9656;")+'</span>';
+  html += '<span>Declined ('+declined.length+')</span>';
+  html += '</div>';
+  if (expanded) {
+    declined.forEach(function(id) {
+      var nameEl = document.getElementById(id+"_name");
+      var roleEl = document.getElementById(id+(type==="crew"?"_position":"_title"));
+      var name = nameEl ? nameEl.value : "";
+      var role = roleEl ? roleEl.value : "";
+      var display = (name||"(unnamed)") + (role ? " - " + role : "");
+      html += '<div onclick="revealDeclinedCard(\''+id+'\')" style="cursor:pointer;padding:4px 4px 4px 22px;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted)">';
+      html += '<span style="color:var(--film-can);font-size:10px">&#x2715;</span>';
+      html += '<span>'+display+'</span>';
+      html += '</div>';
+    });
+  }
+  sectionEl.innerHTML = html;
+}
+function toggleDeclinedSection(type) {
+  _declinedExpanded[type] = !_declinedExpanded[type];
+  updateDeclinedSection(type);
+}
+function revealDeclinedCard(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.dataset.declinedRevealed = "1";
+  el.style.display = "";
+  el.scrollIntoView({behavior:"smooth", block:"center"});
+  var type = id.startsWith("crew_") ? "crew" : "talent";
+  updateDeclinedSection(type);
 }
 function updateCrewStatusBar() {
   var bar = document.getElementById("crew-status-bar");
   if (!bar) return;
   if (!crew.length) { bar.style.display = "none"; return; }
-  var counts = {tbd:0, pencil:0, hold:0, confirmed:0};
+  var counts = {tbd:0, contacted:0, pencil:0, hold:0, confirmed:0, declined:0};
   crew.forEach(function(id) {
     var sel = document.getElementById(id+"_status");
     var val = sel ? (sel.value || "tbd") : "tbd";
     if (counts[val] !== undefined) counts[val]++; else counts.tbd++;
   });
-  var total = crew.length;
-  var pct = Math.round((counts.confirmed / total) * 100);
+  var activeTotal = crew.length - counts.declined;
+  var pct = activeTotal ? Math.round((counts.confirmed / activeTotal) * 100) : 0;
   document.getElementById("csb-tbd-count").textContent = counts.tbd;
+  document.getElementById("csb-contacted-count").textContent = counts.contacted;
   document.getElementById("csb-pencil-count").textContent = counts.pencil;
   document.getElementById("csb-hold-count").textContent = counts.hold;
   document.getElementById("csb-confirmed-count").textContent = counts.confirmed;
   document.getElementById("csb-progress-fill").style.width = pct + "%";
-  document.getElementById("csb-summary").textContent = total + " crew · " + pct + "% confirmed";
+  document.getElementById("csb-summary").textContent = activeTotal + " crew \xb7 " + pct + "% confirmed";
+  var dn = document.getElementById("csb-declined-note");
+  if (dn) { dn.textContent = counts.declined ? counts.declined + " declined" : ""; dn.style.display = counts.declined ? "" : "none"; }
   bar.style.display = "block";
 }
 function updateTalentStatusBar() {
   var bar = document.getElementById("talent-status-bar");
   if (!bar) return;
   if (!talent.length) { bar.style.display = "none"; return; }
-  var counts = {tbd:0, pencil:0, hold:0, confirmed:0};
+  var counts = {tbd:0, contacted:0, pencil:0, hold:0, confirmed:0, declined:0};
   talent.forEach(function(id) {
     var sel = document.getElementById(id+"_status");
     var val = sel ? (sel.value || "tbd") : "tbd";
     if (counts[val] !== undefined) counts[val]++; else counts.tbd++;
   });
-  var total = talent.length;
-  var pct = Math.round((counts.confirmed / total) * 100);
+  var activeTotal = talent.length - counts.declined;
+  var pct = activeTotal ? Math.round((counts.confirmed / activeTotal) * 100) : 0;
   document.getElementById("tsb-tbd-count").textContent = counts.tbd;
+  document.getElementById("tsb-contacted-count").textContent = counts.contacted;
   document.getElementById("tsb-pencil-count").textContent = counts.pencil;
   document.getElementById("tsb-hold-count").textContent = counts.hold;
   document.getElementById("tsb-confirmed-count").textContent = counts.confirmed;
   document.getElementById("tsb-progress-fill").style.width = pct + "%";
-  document.getElementById("tsb-summary").textContent = total + " talent \xb7 " + pct + "% confirmed";
+  document.getElementById("tsb-summary").textContent = activeTotal + " talent \xb7 " + pct + "% confirmed";
+  var dn = document.getElementById("tsb-declined-note");
+  if (dn) { dn.textContent = counts.declined ? counts.declined + " declined" : ""; dn.style.display = counts.declined ? "" : "none"; }
   bar.style.display = "block";
 }
 // ── Drag-to-reorder (crew + talent) ──────────────────────────────────────────
@@ -532,13 +651,14 @@ function addCrew(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, crew));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateCrewStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div style="font-size:10px;color:var(--text-muted);margin:-6px 0 6px;display:none" id="${id}_contacted_ago"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
   } else { crew.push(id); document.getElementById("crew-list").appendChild(d); }
   updateCrewStatusPill(id, "tbd");
   updateCrewStatusBar();
+  updateDeclinedSection("crew");
   scheduleDays.forEach(function(d) { updateDayCrewBadge(d); });
   setTimeout(() => acAttachCrew(id), 0);
 }
@@ -547,13 +667,14 @@ function addTalent(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" onchange="updateCrewStatusPill('${id}', this.value);updateTalentStatusBar()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div>`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div style="font-size:10px;color:var(--text-muted);margin:-6px 0 6px;display:none" id="${id}_contacted_ago"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
   } else { talent.push(id); document.getElementById("talent-list").appendChild(d); }
   updateCrewStatusPill(id, "tbd");
   updateTalentStatusBar();
+  updateDeclinedSection("talent");
   scheduleDays.forEach(function(d) { updateDayTalentBadge(d); });
   setTimeout(() => acAttachTalent(id), 0);
 }
@@ -563,7 +684,7 @@ function confirmRemoveCrew(id) {
   var role = (document.getElementById(id+"_position")||{}).value||"";
   var label = (name||role) ? (name||role) : "this crew member";
   showModal("Remove crew member", "Remove "+label+"? This cannot be undone.", function() {
-    ri(id, crew); updateCrewStatusBar(); scheduleDays.forEach(function(d) { updateDayCrewBadge(d); });
+    ri(id, crew); updateCrewStatusBar(); updateDeclinedSection("crew"); scheduleDays.forEach(function(d) { updateDayCrewBadge(d); });
   });
 }
 function confirmRemoveTalent(id) {
@@ -571,7 +692,7 @@ function confirmRemoveTalent(id) {
   var role = (document.getElementById(id+"_title")||{}).value||"";
   var label = (name||role) ? (name||role) : "this talent";
   showModal("Remove talent", "Remove "+label+"? This cannot be undone.", function() {
-    ri(id, talent); updateTalentStatusBar(); scheduleDays.forEach(function(d) { updateDayTalentBadge(d); });
+    ri(id, talent); updateTalentStatusBar(); updateDeclinedSection("talent"); scheduleDays.forEach(function(d) { updateDayTalentBadge(d); });
   });
 }
 
@@ -4115,11 +4236,13 @@ function renderSidebarCrew() {
         if (!summary || !summary.total) {
           var crewArr = result.data.crew || [];
           if (!crewArr.length) return null;
-          summary = {tbd:0, pencil:0, hold:0, confirmed:0, total:crewArr.length};
+          summary = {tbd:0, contacted:0, pencil:0, hold:0, confirmed:0, declined:0, total:0};
           crewArr.forEach(function(c) {
             var s = c.status || "tbd";
             if (summary[s] !== undefined) summary[s]++; else summary.tbd++;
+            if (s !== "declined") summary.total++;
           });
+          if (!summary.total) return null;
         }
         var dateObj = parseLabelDate(p.label);
         return {key: p.key, label: p.label || result.data.project_title || "Untitled", summary: summary, date: dateObj};
@@ -4145,6 +4268,7 @@ function renderSidebarCrew() {
         {key:"confirmed", label:"Confirmed", color:"#4A9E6B"},
         {key:"hold",      label:"1st Hold",  color:"#E07B39"},
         {key:"pencil",    label:"Pencil",    color:"#E8B84B"},
+        {key:"contacted", label:"Contacted", color:"#60a5fa"},
         {key:"tbd",       label:"TBD",       color:"#9D9D99"}
       ];
 
@@ -6893,17 +7017,17 @@ function gather() {
     hospital:v("hospital"), breakfast:v("breakfast")||"8:00 am", lunch:v("lunch")||"12:00 pm",
     sunrise:v("sunrise"), sunset:v("sunset"),
 
-    crew: crew.map(id => ({id:id,position:v(id+"_position"),name:v(id+"_name"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd"})).filter(c => c.position||c.name||c.email||c.phone||c.notes),
+    crew: crew.map(id => ({id:id,position:v(id+"_position"),name:v(id+"_name"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined})).filter(c => c.position||c.name||c.email||c.phone||c.notes),
     crew_summary: (function() {
-      var counts = {tbd:0, pencil:0, hold:0, confirmed:0, total:0};
+      var counts = {tbd:0, contacted:0, pencil:0, hold:0, confirmed:0, declined:0, total:0};
       crew.forEach(function(id) {
         var status = (document.getElementById(id+"_status")||{}).value || "tbd";
-        counts[status] = (counts[status]||0) + 1;
-        counts.total++;
+        if (counts[status] !== undefined) counts[status]++; else counts.tbd++;
+        if (status !== "declined") counts.total++;
       });
       return counts;
     })(),
-    talent: talent.map(id => ({id:id,name:v(id+"_name"),title:v(id+"_title"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd"})),
+    talent: talent.map(id => ({id:id,name:v(id+"_name"),title:v(id+"_title"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined})),
     timezone: v("timezone")||"PT",
     kickoff_date_iso: v("kickoff_date_iso"),
     kickoff_time: v("kickoff_time"),
@@ -6960,9 +7084,14 @@ function loadFormData(data) {
     s(id+"_email", c.email); s(id+"_phone", c.phone); s(id+"_notes", c.notes);
     const statusVal = c.status || "tbd";
     s(id+"_status", statusVal);
+    var sel = document.getElementById(id+"_status");
+    if (sel) sel.setAttribute("data-prev", statusVal);
+    if (c.contacted_at) s(id+"_contacted_at", c.contacted_at);
     updateCrewStatusPill(id, statusVal);
+    updateContactedAgo(id);
   });
   updateCrewStatusBar();
+  updateDeclinedSection("crew");
 
   // Talent
   document.getElementById("talent-list").innerHTML = "";
@@ -6974,9 +7103,14 @@ function loadFormData(data) {
     s(id+"_email", t.email); s(id+"_phone", t.phone); s(id+"_notes", t.notes);
     const talentStatus = t.status || "tbd";
     s(id+"_status", talentStatus);
+    var sel = document.getElementById(id+"_status");
+    if (sel) sel.setAttribute("data-prev", talentStatus);
+    if (t.contacted_at) s(id+"_contacted_at", t.contacted_at);
     updateCrewStatusPill(id, talentStatus);
+    updateContactedAgo(id);
   });
   updateTalentStatusBar();
+  updateDeclinedSection("talent");
 
   // Schedules
   var _kd = document.getElementById("kickoff_date_iso"); if(_kd) _kd.value = data.kickoff_date_iso||"";
@@ -7020,8 +7154,8 @@ function clearForm() {
   document.getElementById("kp-list").innerHTML = ""; kp = [];
   getDefaultKP().forEach(function(c) { addKP(c); });
   updateAddKPButton();
-  document.getElementById("crew-list").innerHTML = ""; crew = []; updateCrewStatusBar();
-  document.getElementById("talent-list").innerHTML = ""; talent = []; updateTalentStatusBar();
+  document.getElementById("crew-list").innerHTML = ""; crew = []; updateCrewStatusBar(); updateDeclinedSection("crew");
+  document.getElementById("talent-list").innerHTML = ""; talent = []; updateTalentStatusBar(); updateDeclinedSection("talent");
   loadScheduleDays([]);
   const wbDayEl = document.getElementById("wb_day_select"); if(wbDayEl) wbDayEl.value = "last";
   wbLoadItems([]);
@@ -7300,7 +7434,7 @@ function generateDayICS(dayId) {
   if (!dateIso) { setStatus("Please add a date to this schedule day before exporting.", "err"); return; }
 
   var data = gather();
-  var STATUS_LABELS = {tbd:"TBD", pencil:"Pencil", hold:"1st Hold", confirmed:"Confirmed"};
+  var STATUS_LABELS = {tbd:"TBD", contacted:"Contacted", pencil:"Pencil", hold:"1st Hold", confirmed:"Confirmed", declined:"Declined"};
   var ag = getAgencyInfo();
   var _kp0 = (data.kp_cards||[])[0]||{};
   var orgName  = ag.billing_contact || _kp0.name  || ag.name || "Slater";
@@ -7399,7 +7533,7 @@ function generateDayICS(dayId) {
 
   var excludedCrew = getDayExcludedCrew(dayId);
   var allCrew = (data.crew||[]).filter(function(c, i) {
-    return excludedCrew.indexOf(crew[i]) === -1 && (c.name || c.position);
+    return excludedCrew.indexOf(crew[i]) === -1 && (c.name || c.position) && c.status !== "declined";
   });
   if (_includeCrewInICS && allCrew.length) {
     d.push(DIVIDER); d.push("");
@@ -7507,15 +7641,16 @@ function updateDayStaffCounts(dayId) {
   var kpExcluded = getDayExcludedKP(dayId);
   var kpWithNames = kp.filter(function(id) { var e=document.getElementById(id+'_name'); return e&&e.value.trim(); });
   var kpIncluded = kpWithNames.filter(function(id) { return kpExcluded.indexOf(id)===-1; }).length;
-  var crewExcluded = getDayExcludedCrew(dayId).filter(function(id) { return crew.indexOf(id) !== -1; });
-  var crewIncluded = crew.length - crewExcluded.length;
-  var talentExcluded = getDayExcludedTalent(dayId).filter(function(id) { return talent.indexOf(id) !== -1; });
-  var talentIncluded = talent.length - talentExcluded.length;
+  var activeCrew = crew.filter(function(id) { var sel=document.getElementById(id+'_status'); return !(sel&&sel.value==='declined'); });
+  var crewExcluded = getDayExcludedCrew(dayId).filter(function(id) { return activeCrew.indexOf(id) !== -1; });
+  var crewIncluded = activeCrew.length - crewExcluded.length;
+  var activeTalent = talent.filter(function(id) { var sel=document.getElementById(id+'_status'); return !(sel&&sel.value==='declined'); });
+  var talentExcluded = getDayExcludedTalent(dayId).filter(function(id) { return activeTalent.indexOf(id) !== -1; });
+  var talentIncluded = activeTalent.length - talentExcluded.length;
   var parts = [];
   if (kpWithNames.length) parts.push(kpIncluded+' of '+kpWithNames.length+' key personnel');
-
-  if (crew.length) parts.push(crewIncluded+' of '+crew.length+' crew');
-  if (talent.length) parts.push(talentIncluded+' of '+talent.length+' talent');
+  if (activeCrew.length) parts.push(crewIncluded+' of '+activeCrew.length+' crew');
+  if (activeTalent.length) parts.push(talentIncluded+' of '+activeTalent.length+' talent');
   countEl.textContent = parts.join(' \xb7 ');
 }
 
@@ -7532,8 +7667,8 @@ function openDayStaffModal(dayId) {
   var _cardBlacks = document.getElementById(dayId+'_show_blacks');
   if (_modalBlacks && _cardBlacks) _modalBlacks.checked = _cardBlacks.checked;
 
-  var statusColors = {tbd:'#9D9D99', pencil:'#E8B84B', hold:'#E07B39', confirmed:'#4A9E6B'};
-  var statusLabels = {tbd:'TBD', pencil:'Pencil', hold:'1st Hold', confirmed:'Confirmed'};
+  var statusColors = {tbd:'#9D9D99', contacted:'#60a5fa', pencil:'#E8B84B', hold:'#E07B39', confirmed:'#4A9E6B', declined:'#555555'};
+  var statusLabels = {tbd:'TBD', contacted:'Contacted', pencil:'Pencil', hold:'1st Hold', confirmed:'Confirmed', declined:'Declined'};
 
   function makeRow(cb, name, subtitle, status) {
     var row = document.createElement('div');
@@ -7593,11 +7728,14 @@ function openDayStaffModal(dayId) {
   var crewList = document.getElementById('day-staff-crew-list');
   crewList.innerHTML = '';
   var crewExcluded = getDayExcludedCrew(dayId);
+  var _crewRowCount = 0;
   crew.forEach(function(id) {
     var position = (document.getElementById(id+'_position')||{}).value||'';
     var name     = (document.getElementById(id+'_name')||{}).value||'';
     var status   = (document.getElementById(id+'_status')||{}).value||'tbd';
     if (!position && !name) return;
+    if (status === 'declined') return;
+    _crewRowCount++;
     var isIncluded = crewExcluded.indexOf(id) === -1;
     var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=isIncluded;
     cb.style.cssText = 'accent-color:var(--charcoal);cursor:pointer;flex-shrink:0';
@@ -7613,17 +7751,20 @@ function openDayStaffModal(dayId) {
     })(id, cb);
     crewList.appendChild(makeRow(cb, name, position, status));
   });
-  if (crew.length === 0) crewList.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--film-can);font-size:13px">No crew added yet.</div>';
+  if (_crewRowCount === 0) crewList.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--film-can);font-size:13px">No crew added yet.</div>';
 
   // Talent section
   var talentList = document.getElementById('day-staff-talent-list');
   talentList.innerHTML = '';
   var talentExcluded = getDayExcludedTalent(dayId);
+  var _talentRowCount = 0;
   talent.forEach(function(id) {
     var name  = (document.getElementById(id+'_name')||{}).value||'';
     var title = (document.getElementById(id+'_title')||{}).value||'';
     var status = (document.getElementById(id+'_status')||{}).value||'tbd';
     if (!name) return;
+    if (status === 'declined') return;
+    _talentRowCount++;
     var isIncluded = talentExcluded.indexOf(id) === -1;
     var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=isIncluded;
     cb.style.cssText = 'accent-color:var(--charcoal);cursor:pointer;flex-shrink:0';
@@ -7639,7 +7780,7 @@ function openDayStaffModal(dayId) {
     })(id, cb);
     talentList.appendChild(makeRow(cb, name, title, status));
   });
-  if (talent.length === 0) talentList.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--film-can);font-size:13px">No talent added yet.</div>';
+  if (_talentRowCount === 0) talentList.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--film-can);font-size:13px">No talent added yet.</div>';
 
   updateDayStaffModalCounts(dayId);
   updateKPSelectAllState(dayId);
@@ -7659,9 +7800,11 @@ function dayStaffSelectAll(category, includeAll) {
   if (category === 'kp') {
     setDayExcludedKP(_currentDayStaffId, includeAll ? [] : kp.slice());
   } else if (category === 'crew') {
-    setDayExcludedCrew(_currentDayStaffId, includeAll ? [] : crew.slice());
+    var activeCrew = crew.filter(function(id){var s=document.getElementById(id+'_status');return !(s&&s.value==='declined');});
+    setDayExcludedCrew(_currentDayStaffId, includeAll ? [] : activeCrew.slice());
   } else if (category === 'talent') {
-    setDayExcludedTalent(_currentDayStaffId, includeAll ? [] : talent.slice());
+    var activeTalent = talent.filter(function(id){var s=document.getElementById(id+'_status');return !(s&&s.value==='declined');});
+    setDayExcludedTalent(_currentDayStaffId, includeAll ? [] : activeTalent.slice());
   }
   openDayStaffModal(_currentDayStaffId);
 }
@@ -7670,14 +7813,16 @@ function updateDayStaffModalCounts(dayId) {
   var kpExcl = getDayExcludedKP(dayId);
   var kpWithNames = kp.filter(function(id){var e=document.getElementById(id+'_name');return e&&e.value.trim();});
   var kpInc = kpWithNames.filter(function(id){return kpExcl.indexOf(id)===-1;}).length;
-  var crewExcl = getDayExcludedCrew(dayId).filter(function(id){return crew.indexOf(id)!==-1;});
-  var crewInc = crew.length - crewExcl.length;
-  var talExcl = getDayExcludedTalent(dayId).filter(function(id){return talent.indexOf(id)!==-1;});
-  var talInc = talent.length - talExcl.length;
+  var activeCrew = crew.filter(function(id){var s=document.getElementById(id+'_status');return !(s&&s.value==='declined');});
+  var crewExcl = getDayExcludedCrew(dayId).filter(function(id){return activeCrew.indexOf(id)!==-1;});
+  var crewInc = activeCrew.length - crewExcl.length;
+  var activeTalent = talent.filter(function(id){var s=document.getElementById(id+'_status');return !(s&&s.value==='declined');});
+  var talExcl = getDayExcludedTalent(dayId).filter(function(id){return activeTalent.indexOf(id)!==-1;});
+  var talInc = activeTalent.length - talExcl.length;
   var parts = [];
   if (kpWithNames.length) parts.push(kpInc+' of '+kpWithNames.length+' key personnel');
-  if (crew.length) parts.push(crewInc+' of '+crew.length+' crew');
-  if (talent.length) parts.push(talInc+' of '+talent.length+' talent');
+  if (activeCrew.length) parts.push(crewInc+' of '+activeCrew.length+' crew');
+  if (activeTalent.length) parts.push(talInc+' of '+activeTalent.length+' talent');
   var el = document.getElementById('day-staff-count');
   if (el) el.textContent = parts.join(' \xb7 ');
 }
@@ -7688,11 +7833,15 @@ function updateKPSelectAllState(dayId) {
 }
 function updateCrewSelectAllState(dayId) {
   var cb = document.getElementById('day-staff-crew-all');
-  if (cb) cb.checked = getDayExcludedCrew(dayId).filter(function(id){return crew.indexOf(id)!==-1;}).length === 0;
+  if (!cb) return;
+  var activeCrew = crew.filter(function(id){var s=document.getElementById(id+'_status');return !(s&&s.value==='declined');});
+  cb.checked = getDayExcludedCrew(dayId).filter(function(id){return activeCrew.indexOf(id)!==-1;}).length === 0;
 }
 function updateTalentSelectAllState(dayId) {
   var cb = document.getElementById('day-staff-talent-all');
-  if (cb) cb.checked = getDayExcludedTalent(dayId).filter(function(id){return talent.indexOf(id)!==-1;}).length === 0;
+  if (!cb) return;
+  var activeTalent = talent.filter(function(id){var s=document.getElementById(id+'_status');return !(s&&s.value==='declined');});
+  cb.checked = getDayExcludedTalent(dayId).filter(function(id){return activeTalent.indexOf(id)!==-1;}).length === 0;
 }
 
 async function generateDoc() {
@@ -7839,6 +7988,7 @@ async function generateDoc() {
 
       const cd = data.crew.filter(function(c) {
         if (!c.position && !c.name) return false;
+        if (c.status === "declined") return false;
         if (dayData.excluded_crew && dayData.excluded_crew.length && c.id && dayData.excluded_crew.indexOf(c.id) !== -1) return false;
         return true;
       });
@@ -7868,6 +8018,7 @@ async function generateDoc() {
 
       const td = data.talent.filter(function(x) {
         if (!x.name) return false;
+        if (x.status === "declined") return false;
         if (dayData.excluded_talent && dayData.excluded_talent.length && x.id && dayData.excluded_talent.indexOf(x.id) !== -1) return false;
         return true;
       });
