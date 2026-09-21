@@ -8326,11 +8326,26 @@ document.addEventListener("change", function(e) {
 });
 
 // Autosave on page unload/visibility change
+// Guard: skip if crew/talent cards exist in DOM but all are blank — indicates a corrupted
+// load state (broken loadFormData wrote data to wrong cards, leaving blanks everywhere).
+function _safeUnloadAutosave() {
+  if (!currentSheetKey) return;
+  var data = gather();
+  if (crew.length > 0 && data.crew.length === 0) {
+    console.warn("Unload autosave skipped: crew cards present but all empty (possible load corruption)");
+    return;
+  }
+  if (talent.length > 0 && data.talent.filter(function(t){return t.name||t.title||t.email||t.phone||t.notes;}).length === 0) {
+    console.warn("Unload autosave skipped: talent cards present but all empty (possible load corruption)");
+    return;
+  }
+  autosaveNow();
+}
 document.addEventListener("visibilitychange", function() {
-  if (document.hidden && currentSheetKey) autosaveNow();
+  if (document.hidden && currentSheetKey) _safeUnloadAutosave();
 });
 window.addEventListener("beforeunload", function() {
-  if (currentSheetKey) autosaveNow();
+  if (currentSheetKey) _safeUnloadAutosave();
 });
 
 // ── SAMPLE DATA (remove before go-live) ───────────────────────────────────
