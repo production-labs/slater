@@ -4619,8 +4619,8 @@ function renderCrewConfigManager() {
 function loadCrewConfig(config) {
   config.roles.forEach(function(role) {
     addCrew();
-    var lastId = crew[crew.length - 1];
-    var posField = document.getElementById(lastId + '_position');
+    var newId = crew[0];
+    var posField = document.getElementById(newId + '_position');
     if (posField) posField.value = role;
   });
   closeCrewConfigModal();
@@ -7089,7 +7089,7 @@ function loadFormData(data) {
   // Crew
   document.getElementById("crew-list").innerHTML = "";
   crew = [];
-  (data.crew || []).forEach(c => {
+  (data.crew || []).slice().reverse().forEach(c => {
     addCrew();
     const id = crew[0];
     s(id+"_position", c.position); s(id+"_name", c.name);
@@ -7108,7 +7108,7 @@ function loadFormData(data) {
   // Talent
   document.getElementById("talent-list").innerHTML = "";
   talent = [];
-  (data.talent || []).forEach(t => {
+  (data.talent || []).slice().reverse().forEach(t => {
     addTalent();
     const id = talent[0];
     s(id+"_name", t.name); s(id+"_title", t.title);
