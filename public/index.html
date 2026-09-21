@@ -208,6 +208,7 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
             <div class="sh" style="margin-bottom:0">Crew</div>
             <div style="display:flex;gap:8px">
+              <button class="lb" onclick="addCrew()" style="font-size:12px;background:#E07B39;color:#fff;border-color:#E07B39">+ Add crew member</button>
               <button class="lb" onclick="saveCrewConfig()" style="font-size:12px"><i data-lucide="save" class="lucide"></i> Save config</button>
               <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px"><i data-lucide="folder" class="lucide"></i> Configs</button>
             </div>
@@ -227,7 +228,6 @@
             </div>
           </div>
           <div id="crew-list"></div>
-          <button class="ab" onclick="addCrew()">+ Add crew member</button>
         </div>
 
         <div id="tab-talent" class="sec">

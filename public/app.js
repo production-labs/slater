@@ -490,7 +490,7 @@ function updateContactedAgo(id) {
     agoEl.style.display = "none";
   }
 }
-var _declinedExpanded = {crew: false, talent: false};
+var _declinedExpanded = {crew: true, talent: true};
 function updateDeclinedSection(type) {
   var listEl = document.getElementById(type+"-list");
   if (!listEl) return;
