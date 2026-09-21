@@ -7091,7 +7091,7 @@ function loadFormData(data) {
   crew = [];
   (data.crew || []).forEach(c => {
     addCrew();
-    const id = crew[crew.length-1];
+    const id = crew[0];
     s(id+"_position", c.position); s(id+"_name", c.name);
     s(id+"_email", c.email); s(id+"_phone", c.phone); s(id+"_notes", c.notes);
     const statusVal = c.status || "tbd";
@@ -7110,7 +7110,7 @@ function loadFormData(data) {
   talent = [];
   (data.talent || []).forEach(t => {
     addTalent();
-    const id = talent[talent.length-1];
+    const id = talent[0];
     s(id+"_name", t.name); s(id+"_title", t.title);
     s(id+"_email", t.email); s(id+"_phone", t.phone); s(id+"_notes", t.notes);
     const talentStatus = t.status || "tbd";
