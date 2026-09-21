@@ -208,7 +208,7 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
             <div class="sh" style="margin-bottom:0">Crew</div>
             <div style="display:flex;gap:8px">
-              <button class="lb" onclick="addCrew()" style="font-size:12px;background:var(--accent);color:#fff;border-color:var(--accent)"><i data-lucide="plus" class="lucide btn-icon"></i> Add crew</button>
+              <button class="lb" onclick="addCrew()" style="font-size:12px;background:var(--accent);color:#fff;border-color:var(--accent)">+ Add crew</button>
               <button class="lb" onclick="saveCrewConfig()" style="font-size:12px"><i data-lucide="save" class="lucide"></i> Save config</button>
               <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px"><i data-lucide="folder" class="lucide"></i> Configs</button>
             </div>
@@ -231,7 +231,12 @@
         </div>
 
         <div id="tab-talent" class="sec">
-          <div class="sh">Talent</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+            <div class="sh" style="margin-bottom:0">Talent</div>
+            <div style="display:flex;gap:8px">
+              <button class="lb" onclick="addTalent()" style="font-size:12px;background:var(--accent);color:#fff;border-color:var(--accent)">+ Add talent</button>
+            </div>
+          </div>
           <div id="talent-status-bar" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:none">
             <div class="crew-status-bar-row1">
               <div class="crew-status-count"><span class="crew-status-dot" style="background:#9D9D99"></span><span>TBD</span>&nbsp;<strong id="tsb-tbd-count">0</strong></div>
@@ -247,7 +252,6 @@
             </div>
           </div>
           <div id="talent-list"></div>
-          <button class="ab" onclick="addTalent()">+ Add talent</button>
         </div>
 
         <div id="tab-workback" class="sec wb-sec">

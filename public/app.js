@@ -683,7 +683,7 @@ function addTalent(afterId=null) {
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
-  } else { talent.push(id); document.getElementById("talent-list").appendChild(d); }
+  } else { talent.unshift(id); document.getElementById("talent-list").prepend(d); }
   updateCrewStatusPill(id, "tbd");
   updateTalentStatusBar();
   updateDeclinedSection("talent");
