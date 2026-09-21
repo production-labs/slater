@@ -476,20 +476,32 @@ function handleTalentStatusChange(id, newVal) {
   updateTalentStatusBar();
   updateDeclinedSection("talent");
 }
+function _formatContactedAgo(contactedAt) {
+  var diff = Date.now() - new Date(contactedAt).getTime();
+  var mins  = Math.floor(diff / 60000);
+  var hours = Math.floor(diff / 3600000);
+  var days  = Math.floor(diff / 86400000);
+  if (mins < 1)   return "just now";
+  if (mins < 60)  return mins + "m ago";
+  if (hours < 24) { var rm = mins - hours*60; return hours + "h" + (rm ? " " + rm + "m" : "") + " ago"; }
+  var rh = hours - days*24; return days + "d" + (rh ? " " + rh + "h" : "") + " ago";
+}
 function updateContactedAgo(id) {
   var agoEl = document.getElementById(id+"_contacted_ago");
   if (!agoEl) return;
   var val = (document.getElementById(id+"_status")||{}).value;
   var contactedAt = (document.getElementById(id+"_contacted_at")||{}).value;
   if (val === "contacted" && contactedAt) {
-    var diff = Date.now() - new Date(contactedAt).getTime();
-    var days = Math.floor(diff / (1000*60*60*24));
-    agoEl.textContent = days === 0 ? "Contacted today" : days === 1 ? "Contacted 1 day ago" : "Contacted " + days + " days ago";
+    agoEl.textContent = _formatContactedAgo(contactedAt);
     agoEl.style.display = "";
   } else {
     agoEl.style.display = "none";
   }
 }
+setInterval(function() {
+  crew.forEach(function(id) { updateContactedAgo(id); });
+  talent.forEach(function(id) { updateContactedAgo(id); });
+}, 60000);
 var _declinedExpanded = {crew: true, talent: true};
 function updateDeclinedSection(type) {
   var listEl = document.getElementById(type+"-list");
@@ -651,7 +663,7 @@ function addCrew(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, crew));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div style="font-size:10px;color:var(--text-muted);margin:-6px 0 6px;display:none" id="${id}_contacted_ago"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -667,7 +679,7 @@ function addTalent(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div style="font-size:10px;color:var(--text-muted);margin:-6px 0 6px;display:none" id="${id}_contacted_ago"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="${id}_status_pill"></span><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
