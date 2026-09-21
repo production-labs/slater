@@ -667,7 +667,7 @@ function addCrew(afterId=null) {
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
-  } else { crew.push(id); document.getElementById("crew-list").appendChild(d); }
+  } else { crew.unshift(id); document.getElementById("crew-list").prepend(d); }
   updateCrewStatusPill(id, "tbd");
   updateCrewStatusBar();
   updateDeclinedSection("crew");
