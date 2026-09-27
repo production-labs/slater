@@ -150,16 +150,23 @@ function timestampForKey(date) {
   );
 }
 
-/** Read the last non-blank line of a file without loading the whole thing into memory. */
-function lastNonBlankLine(filePath, chunkBytes = 8192) {
+/**
+ * Read the last chunk of a file without loading the whole thing into memory.
+ * Used to sanity-check pg_dump's completion marker. Note: pg_dump 18+ wraps
+ * plain-format dumps in a trailing "\unrestrict <token>" psql guard command
+ * (a security feature, not an error), so the completion marker
+ * ("-- PostgreSQL database dump complete") is the second-to-last line, not
+ * strictly the last one. We search the whole tail chunk rather than just the
+ * final line so this keeps working across pg_dump versions/options.
+ */
+function tailText(filePath, chunkBytes = 8192) {
   const fd = fs.openSync(filePath, 'r');
   try {
     const size = fs.fstatSync(fd).size;
     const readSize = Math.min(chunkBytes, size);
     const buf = Buffer.alloc(readSize);
     fs.readSync(fd, buf, 0, readSize, size - readSize);
-    const lines = buf.toString('utf8').trim().split('\n');
-    return lines[lines.length - 1] || '';
+    return buf.toString('utf8');
   } finally {
     fs.closeSync(fd);
   }
@@ -282,9 +289,9 @@ async function main() {
       throw new Error(`Dump is suspiciously small (${dumpStats.size} bytes, expected at least ${MIN_DUMP_BYTES})`);
     }
 
-    const trailer = lastNonBlankLine(sqlPath);
-    if (!trailer.includes('PostgreSQL database dump complete')) {
-      throw new Error(`Dump file does not end with pg_dump's completion marker. Last line was: "${trailer}"`);
+    const tail = tailText(sqlPath);
+    if (!tail.includes('PostgreSQL database dump complete')) {
+      throw new Error(`Dump file is missing pg_dump's completion marker near the end of the file. Tail was: "${tail.trim().slice(-500)}"`);
     }
     log(`pg_dump OK: ${dumpStats.size} bytes, completion marker present.`);
 
