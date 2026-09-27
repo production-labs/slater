@@ -57,6 +57,28 @@ function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
+// Belt-and-suspenders: even though main() wraps everything in try/catch,
+// make sure a truly stray uncaught error still tries to notify before the
+// process dies, instead of vanishing into deploy logs nobody is watching.
+process.on('uncaughtException', async (err) => {
+  console.error(`[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err && err.stack ? err.stack : err}`);
+  try {
+    await notifyFailure('uncaughtException', err);
+  } catch (_) {
+    // best effort only
+  }
+  process.exit(1);
+});
+process.on('unhandledRejection', async (err) => {
+  console.error(`[${new Date().toISOString()}] UNHANDLED REJECTION: ${err && err.stack ? err.stack : err}`);
+  try {
+    await notifyFailure('unhandledRejection', err);
+  } catch (_) {
+    // best effort only
+  }
+  process.exit(1);
+});
+
 function requireEnv(names) {
   const missing = names.filter((n) => !process.env[n]);
   if (missing.length) {
@@ -228,21 +250,27 @@ async function pruneOldBackups(client) {
 
 async function main() {
   const startedAt = Date.now();
-  requireEnv([
-    'DATABASE_URL',
-    'R2_ACCESS_KEY_ID',
-    'R2_SECRET_ACCESS_KEY',
-    'R2_ENDPOINT',
-    'R2_BUCKET',
-  ]);
-
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slater-backup-'));
-  const now = new Date();
-  const key = `${BACKUP_PREFIX}-${timestampForKey(now)}.sql.gz`;
-  const sqlPath = path.join(tmpDir, 'dump.sql');
-  const gzPath = path.join(tmpDir, 'dump.sql.gz');
+  let tmpDir;
 
   try {
+    // Everything, including env validation, lives inside this try block.
+    // If validation (or anything else) throws before we get to the real
+    // work, we still want notifyFailure() to run below - a config mistake
+    // must never fail silently.
+    requireEnv([
+      'DATABASE_URL',
+      'R2_ACCESS_KEY_ID',
+      'R2_SECRET_ACCESS_KEY',
+      'R2_ENDPOINT',
+      'R2_BUCKET',
+    ]);
+
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slater-backup-'));
+    const now = new Date();
+    const key = `${BACKUP_PREFIX}-${timestampForKey(now)}.sql.gz`;
+    const sqlPath = path.join(tmpDir, 'dump.sql');
+    const gzPath = path.join(tmpDir, 'dump.sql.gz');
+
     log('Starting pg_dump...');
     runPgDump(process.env.DATABASE_URL, sqlPath);
 
@@ -297,12 +325,28 @@ async function main() {
     await notifyFailure('backup', err);
     process.exitCode = 1;
   } finally {
-    try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch (cleanupErr) {
-      log(`WARNING: failed to clean up temp dir ${tmpDir}: ${cleanupErr.message}`);
+    if (tmpDir) {
+      try {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      } catch (cleanupErr) {
+        log(`WARNING: failed to clean up temp dir ${tmpDir}: ${cleanupErr.message}`);
+      }
     }
   }
 }
 
-main();
+main().catch(async (err) => {
+  // Last-resort safety net. main() catches everything internally, so this
+  // should be unreachable - but if something truly unexpected escapes (a
+  // bug in the catch block itself, a rejected promise we missed), we still
+  // try to notify and always exit non-zero. A silent crash here is exactly
+  // the "backup job stops working and nobody notices" failure mode this
+  // whole job exists to prevent.
+  console.error(`[${new Date().toISOString()}] UNEXPECTED: error escaped main(): ${err && err.stack ? err.stack : err}`);
+  try {
+    await notifyFailure('unexpected (escaped main)', err);
+  } catch (_) {
+    // already logged inside notifyFailure
+  }
+  process.exit(1);
+});
