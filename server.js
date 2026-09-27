@@ -206,6 +206,9 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Read-only view of R2 backups (no restore/delete by design; see docs/RESTORE.md)
+app.use('/api/admin/backups', requireAdmin, require('./routes/adminBackups'));
+
 app.post('/api/admin/sync-prod-db', requireAdmin, (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ error: 'Not available in production' });

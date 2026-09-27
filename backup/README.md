@@ -39,20 +39,21 @@ directly as Railway service variables.
 
 ## Manually triggering a run
 
-Railway dashboard: slater-backup service > Deployments > Redeploy (or trigger
-a deploy from the latest image). Or via CLI:
+A redeploy does **not** run the job. Railway cron services only execute at
+their scheduled time. To run it now:
 
-```
-railway redeploy --service slater-backup --environment production --yes
-```
+1. slater-backup service > Settings > Cron Schedule: set it to a time a
+   couple of minutes from now, in UTC (e.g. `14 2 * * *` for 02:14 UTC).
+2. Watch the deploy logs for `BACKUP SUCCESS` or `FAILURE`. Runs start up
+   to about a minute after the scheduled minute.
+3. Set the schedule back to `0 9 * * *`.
 
-## Restoring a backup locally (do this after any script change)
+If you only need a one-off copy of production (not a test of the job
+itself), step 4a of `docs/RESTORE.md` is quicker.
 
-```
-gunzip -k slater-2026-09-26-090000.sql.gz
-createdb slater_restore_test
-psql slater_restore_test < slater-2026-09-26-090000.sql
-```
+## Restoring a backup
 
-Then spot-check row counts / a few known rows against production and drop
-the scratch database.
+See [`docs/RESTORE.md`](../docs/RESTORE.md). That is the single source for
+the restore procedure; the admin dashboard's Backups section shows the same
+file. After any change to `backup.js`, do the scratch-database restore in
+step 3 of that doc to prove the output is still usable.
