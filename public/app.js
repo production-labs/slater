@@ -4157,11 +4157,11 @@ function closeDailySidebar() {
 
 function loadProjectAndGoToCrew(key) {
   function doLoad() {
+    _beginProjectSwitch();
     currentSheetKey = key;
     localStorage.setItem("slater_last_project", key);
     API.getProject(key).then(function(result) {
-      if (result && result.data) {
-        loadFormData(result.data);
+      if (result && result.data && _applyLoadedProject(key, result.data)) {
         st("crew");
         closeDailySidebar();
         var sel = document.getElementById("lib-select");
@@ -4378,7 +4378,7 @@ function hasUnsavedChanges() {
 
 function openSheetFromSidebar(sheetKey, itemName) {
   function doOpen() {
-    clearTimeout(_autosaveTimer);
+    _beginProjectSwitch();
     _navigating = true;
     currentSheetKey = sheetKey;
     localStorage.setItem("slater_last_project", sheetKey);
@@ -4386,14 +4386,16 @@ function openSheetFromSidebar(sheetKey, itemName) {
     document.getElementById("lib-delete").style.display = "";
     document.getElementById("lib-duplicate").style.display = "";
     API.getProject(sheetKey).then(function(result) {
-      if (result && result.data) {
-        loadFormData(result.data);
-      } else {
-        var db2 = libLoad();
-        if (db2[sheetKey]) loadFormData(db2[sheetKey]);
+      var data = (result && result.data) ? result.data : _localProjectData(sheetKey);
+      try {
+        if (data) _applyLoadedProject(sheetKey, data);
+        else setStatus("Couldn't load this project. Please try again.", "err");
+      } finally {
+        // Always release the guard, or every later project switch is ignored
+        _navigating = false;
       }
+      if (currentSheetKey !== sheetKey) return;
       document.getElementById("lib-select").value = sheetKey;
-      _navigating = false;
       st("workback");
       setTimeout(function() {
         var items = document.querySelectorAll(".wb-item");
@@ -5931,9 +5933,44 @@ var _autosaveTimer = null;
 var _autosaveDelay = 10000; // 10 seconds after last change
 var _navigating = false; // true while switching projects via sidebar
 
+// Key of the project whose data is fully loaded into the form on this page.
+// Nothing is saved unless this matches currentSheetKey. Without this, a save
+// that fires while a project is still loading (tab click, pending autosave
+// timer, switching apps on a phone) writes the blank or previous form over
+// the project being opened.
+var _formKey = null;
+
+// Call before changing currentSheetKey. Flushes pending edits to the project
+// that is actually on screen, then blocks saving until the next project loads.
+function _beginProjectSwitch() {
+  if (_autosaveTimer) {
+    clearTimeout(_autosaveTimer);
+    _autosaveTimer = null;
+    if (currentSheetKey && _formKey === currentSheetKey) autosaveNow();
+  }
+  _formKey = null;
+}
+
+// Load a fetched project into the form, unless the user has already moved on
+// to a different project (stale response). Returns true if it was applied.
+function _applyLoadedProject(key, data) {
+  if (currentSheetKey !== key) return false;
+  loadFormData(data);
+  _formKey = key;
+  return true;
+}
+
+// localStorage fallback, only if it holds a full copy of the project. The
+// dropdown sync stores label-only stubs, and loading a stub blanks the form.
+function _localProjectData(key) {
+  var entry = libLoad()[key];
+  return (entry && entry.project_type !== undefined) ? entry : null;
+}
+
 function autosaveTrigger() {
   if (_navigating) return;
   if (!currentSheetKey) return; // only autosave existing projects
+  if (_formKey !== currentSheetKey) return; // project still loading
   clearTimeout(_autosaveTimer);
   _autosaveTimer = setTimeout(function() {
     autosaveNow();
@@ -5942,6 +5979,10 @@ function autosaveTrigger() {
 
 function autosaveNow() {
   if (!currentSheetKey) return;
+  if (_formKey !== currentSheetKey) {
+    console.warn("Autosave skipped: " + currentSheetKey + " has not finished loading");
+    return;
+  }
   var data = gather();
   var db = libLoad();
   if (!db[currentSheetKey]) return;
@@ -6761,11 +6802,12 @@ function libDuplicate() {
     var db = libLoad();
     db[newKey] = newData;
     libSaveAll(db);
+    _beginProjectSwitch();
     currentSheetKey = newKey;
     localStorage.setItem("slater_last_project", newKey);
     API.saveProject(newKey, newData.label, newData).then(function() {
       libRefreshDropdown(newKey);
-      loadFormData(newData);
+      if (!_applyLoadedProject(newKey, newData)) return;
       document.getElementById("lib-delete").style.display = "";
       document.getElementById("lib-duplicate").style.display = "";
       setStatus("Project duplicated.", "ok");
@@ -6899,22 +6941,21 @@ function libSelect() {
   if (_navigating) return;
   const key = document.getElementById("lib-select").value;
   if (!key) { libNew(); return; }
+  _beginProjectSwitch();
   currentSheetKey = key;
   localStorage.setItem("slater_last_project", key);
   document.getElementById("lib-delete").style.display = "";
   document.getElementById("lib-duplicate").style.display = "";
-  // Try server first, fall back to localStorage
+  // Try server first, fall back to a full localStorage copy
   API.getProject(key).then(function(result) {
-    if (result && result.data) {
-      loadFormData(result.data);
-    } else {
-      const db = libLoad();
-      if (db[key]) loadFormData(db[key]);
-    }
+    var data = (result && result.data) ? result.data : _localProjectData(key);
+    if (data) _applyLoadedProject(key, data);
+    else if (currentSheetKey === key) setStatus("Couldn't load this project. Please select it again.", "err");
   });
 }
 
 function libNew() {
+  _beginProjectSwitch();
   currentSheetKey = null;
   clearForm();
   libRefreshDropdown(null);
@@ -6928,6 +6969,10 @@ function libNew() {
 }
 
 function libSave() {
+  if (currentSheetKey && _formKey !== currentSheetKey) {
+    setStatus("This project hasn't finished loading yet. Wait a moment, then save.", "err");
+    return;
+  }
   const data = gather();
   const label = libLabel(data);
   const db = libLoad();
@@ -6959,6 +7004,7 @@ function doSave(data, label, key) {
   libSaveAll(db);
   _allProjectsCache[k] = { label: label, data: data };
   currentSheetKey = k;
+  _formKey = k; // the form now holds exactly what was saved under k
   document.getElementById("lib-delete").style.display = "";
   document.getElementById("lib-duplicate").style.display = "";
   mergeContactsFromSheet(data);
@@ -8245,7 +8291,7 @@ setTimeout(refreshWbDaySelector, 200);
       var sel = document.getElementById("lib-select");
       if (sel) sel.value = lastKey;
       if (result && result.data) {
-        loadFormData(result.data);
+        _applyLoadedProject(lastKey, result.data);
       } else if (result && result._unauthenticated) {
         // Session expired — preserve the key so it restores after re-login
         currentSheetKey = null;
