@@ -3330,6 +3330,8 @@ function acAttachTalent(id) {
 // Contacts modal
 let contactsCurrent = null;
 function openContacts() {
+  // Data model rewrite: new Contacts screen, opt-in per browser (?contacts=v2) until cutover.
+  if (window.ContactsV2 && ContactsV2.enabled()) return ContactsV2.open();
   function renderContacts(data) {
     contactsCurrent = JSON.parse(JSON.stringify(data));
     if (!contactsCurrent.staff)     contactsCurrent.staff     = [];
@@ -5903,8 +5905,8 @@ function applyCrop() {
   const scaleX = img.naturalWidth / dispW;
   const scaleY = img.naturalHeight / parseInt(container.style.height);
 
-  // Output at 240x240
-  const OUTPUT = 240;
+  // Output at 512x512 (raised from 240; logos are flat graphics so PNG stays small)
+  const OUTPUT = 512;
   canvas.width = OUTPUT;
   canvas.height = OUTPUT;
   const ctx = canvas.getContext("2d");

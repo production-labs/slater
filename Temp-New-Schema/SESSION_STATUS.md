@@ -110,7 +110,18 @@ Estimate: original was 12-16 working days; add ~3-5 days for the offline sync/th
    - Roles: delete refused (409 with usage counts) while used by contacts OR projects.data crew/talent/kp_cards `role_id`; otherwise archived. Re-creating an archived custom role revives the same id. Custom role may share a global role's name.
    - Schema changes this session (schema.sql updated; dev DB patched; fresh restore+migrate+test verified): `client_uid` + unique index on contacts/organizations/locations; `contact_roles.role_id` FK changed from RESTRICT to `DEFERRABLE INITIALLY DEFERRED` -- RESTRICT broke deleting a user (admin "delete user") whenever their contact had a custom role. Found by the test suite.
    - Known limits, fine for now: org pulls include base64 logos (initial sync could be a few MB with many logos; split logos out if it gets slow). Each old route file still opens its own pool; v2 shares one.
-6. Next: Session 3 -- Contacts modal rewrite (multi-role pills, new fields: union/gear/travel/notes, 512px logo crop), on top of `/api/v2`.
+6. ~~Session 3: Contacts modal rewrite~~ -- DONE 2026-10-03 (built + automated browser tests pass; awaiting John's hands-on review).
+   - New files: `public/contacts-v2.js`, `public/contacts-v2.css` (loaded by index.html). Old modal untouched.
+   - FEATURE FLAG, per browser: `?contacts=v2` turns the new screen on (localStorage `slater_contacts_v2`), `?contacts=v1` turns it off. Default OFF, so merging this to main changes nothing for users until cutover. `openContacts()` in app.js checks the flag first.
+   - Layout: tabs People / Organizations / Locations; list pane (search, Staff/Crew/Talent/Uncategorized chips with counts, state filter, Show archived) + detail form. Mobile <=768px: one pane at a time with Back.
+   - People: name + "Sort as", role pills (first = primary, click to promote, x to remove), grouped role picker (Staff, Crew by department, Talent; type to filter by name/abbr/department; "+ Create role" inline with category + department), organization select, phone/email/address/city/state, union status + travel (free text with suggestions), gear/kit, notes.
+   - Organizations: 512px cropped logo, "This is an agency" toggle reveals agency details (billing contact, invoicing email/text, default project type, timezone), Make/Clear default agency, "People at this organization" links.
+   - Locations: name, address, city/state/zip, nearest hospital, notes. (No auto hospital lookup here yet; the schedule card still does that.)
+   - Saving is per record, explicit Save (Cmd/Ctrl+S works), Unsaved-changes indicator + discard guard. Archive/Restore instead of delete. Online save merges with other-device edits on 409 (agreed three-way rule); offline queue is Session 7.
+   - app.js changes: flag check in `openContacts()`; crop tool output 240 -> 512 (affects old agency/company logo crops too, per answer #12).
+   - Tests: `scripts/e2e-contacts-v2.js` (14 browser steps via headless Chrome; puppeteer-core lives in /tmp, not package.json -- setup in file header). Bugs it caught and fixed: role picker auto-reopened after a pick and covered the fields below (next click picked a random role); mobile layout overflowed for long names and sat 60px low.
+   - Not wired yet (by design): schedule location dropdowns, crew/talent/KP autocomplete, client company autocomplete still read the OLD contacts blob (Sessions 4-5 + migration in 6). v2 tables are empty until the Session 6 migration, so testing means entering test data by hand.
+7. Next: Session 4 -- Project tab organization pickers (agency picker filtered by is_agency, client picker = all orgs) + doc branding + default org, on v2.
 
 ## Draft v2 changes beyond the 12 answers (for John's review)
 

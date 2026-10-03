@@ -1,0 +1,108 @@
+/* Contacts v2 (data-model-rewrite, Session 3).
+   Two-pane contacts manager on /api/v2. Uses the app's CSS variables
+   so it follows the theme. Mobile (<=768px): one pane at a time. */
+
+.cv2-box{width:1040px!important;max-width:96vw;height:84vh;max-height:84vh!important}
+.cv2-head-actions{display:flex;align-items:center;gap:8px}
+.cv2-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 12px}
+.cv2-tab{padding:9px 14px;font-size:13px;cursor:pointer;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
+.cv2-tab:hover{color:var(--text-primary)}
+.cv2-tab.active{color:var(--text-primary);border-bottom-color:var(--accent);font-weight:600}
+.cv2-tab .cv2-count{font-size:11px;color:var(--text-muted);margin-left:4px;font-weight:400}
+
+.cv2-main{flex:1;display:grid;grid-template-columns:340px minmax(0,1fr);min-height:0}
+.cv2-listpane{border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;min-width:0}
+.cv2-detailpane{display:flex;flex-direction:column;min-height:0;min-width:0}
+#contacts-v2-modal .lb:disabled{opacity:.4;cursor:default;pointer-events:none}
+
+/* list pane */
+.cv2-listtools{padding:10px 12px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border)}
+.cv2-searchrow{display:flex;gap:6px}
+.cv2-input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)}
+.cv2-input:focus{outline:none;border-color:var(--border-strong)}
+.cv2-chips{display:flex;flex-wrap:wrap;gap:4px}
+.cv2-chip{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:none;color:var(--text-muted);cursor:pointer;font-family:inherit}
+.cv2-chip:hover{color:var(--text-primary);border-color:var(--border-strong)}
+.cv2-chip.active{background:var(--charcoal);color:var(--bg);border-color:var(--charcoal)}
+.cv2-filterrow{display:flex;gap:6px;align-items:center}
+.cv2-filterrow select{flex:1}
+.cv2-archtoggle{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer}
+
+.cv2-list{flex:1;overflow-y:auto}
+.cv2-row{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer}
+.cv2-row:hover{background:var(--surface-2)}
+.cv2-row.active{background:var(--surface-3)}
+.cv2-row.archived{opacity:.55}
+.cv2-row-main{flex:1;min-width:0}
+.cv2-row-name{font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cv2-row-sub{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.cv2-row-logo{width:30px;height:30px;border-radius:5px;object-fit:contain;background:#fff;flex-shrink:0}
+.cv2-row-logo.empty{background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);font-weight:600}
+.cv2-badge{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-muted);margin-left:6px;font-weight:500;vertical-align:1px}
+.cv2-badge.accent{border-color:var(--accent);color:var(--accent)}
+.cv2-empty{padding:28px 16px;text-align:center;color:var(--text-muted);font-size:13px;line-height:1.5}
+
+/* detail pane */
+.cv2-detail-head{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid var(--border);min-height:52px}
+.cv2-detail-title{font-size:15px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cv2-back{display:none}
+.cv2-detail-body{flex:1;overflow-y:auto;padding:16px 20px}
+.cv2-detail-foot{display:flex;gap:8px;align-items:center;padding:12px 20px;border-top:1px solid var(--border)}
+.cv2-detail-foot .cv2-spacer{flex:1}
+.cv2-dirty{font-size:11px;color:var(--accent-yellow)}
+.cv2-grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.cv2-grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 14px}
+.cv2-section{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--border)}
+.cv2-hint{font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:12px;line-height:1.4}
+.cv2-check{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-primary);margin-bottom:14px;cursor:pointer;line-height:1.4}
+.cv2-check input{margin-top:3px}
+.cv2-req{color:var(--accent)}
+.cv2-banner{font-size:12px;padding:8px 12px;border-radius:6px;margin-bottom:14px;border:1px solid var(--border-strong);color:var(--text-primary);background:var(--surface-2)}
+.cv2-banner.warn{border-color:var(--accent-yellow)}
+.cv2-linklist{display:flex;flex-wrap:wrap;gap:6px}
+.cv2-link{font-size:12px;color:var(--text-primary);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;cursor:pointer;font-family:inherit}
+.cv2-link:hover{border-color:var(--border-strong)}
+
+/* logo */
+.cv2-logo{display:flex;gap:14px;align-items:center;margin-bottom:16px}
+.cv2-logo-img{width:72px;height:72px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid var(--border)}
+.cv2-logo-empty{width:72px;height:72px;border-radius:8px;border:1px dashed var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);cursor:pointer}
+.cv2-logo-btns{display:flex;gap:6px;flex-wrap:wrap}
+.cv2-small{font-size:11px!important;padding:4px 10px!important;min-height:unset!important}
+
+/* role pills + picker */
+.cv2-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.cv2-pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 4px 3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text-primary);cursor:pointer;user-select:none}
+.cv2-pill.primary{border-color:var(--accent)}
+.cv2-pill .cv2-pill-abbr{color:var(--text-muted);font-size:11px}
+.cv2-pill .cv2-pill-cat{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+.cv2-pill button{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;line-height:1;padding:2px 5px;border-radius:999px}
+.cv2-pill button:hover{color:var(--accent)}
+.cv2-pills-empty{font-size:12px;color:var(--text-muted);padding:3px 0}
+.cv2-picker{position:relative}
+.cv2-picker-list{display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;max-height:280px;overflow-y:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10}
+.cv2-picker-list.open{display:block}
+.cv2-picker-group{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px 4px}
+.cv2-picker-item{padding:6px 10px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.cv2-picker-item .cv2-pi-meta{font-size:11px;color:var(--text-muted)}
+.cv2-picker-item.active,.cv2-picker-item:hover{background:var(--surface-3)}
+.cv2-picker-item.create{color:var(--accent);border-top:1px solid var(--border)}
+.cv2-newrole{border:1px solid var(--border-strong);border-radius:6px;padding:12px;margin-top:8px;background:var(--surface-2)}
+.cv2-newrole .cv2-grid2{margin-top:8px}
+.cv2-newrole-btns{display:flex;gap:6px;justify-content:flex-end}
+
+.cv2-loading{padding:40px;text-align:center;color:var(--text-muted);font-size:13px}
+
+@media(max-width:768px){
+  #contacts-v2-modal{padding-top:0}
+  .cv2-box{width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;border-radius:0!important}
+  .cv2-main{grid-template-columns:minmax(0,1fr)}
+  .cv2-listpane{border-right:none}
+  .cv2-main.show-detail .cv2-listpane{display:none}
+  .cv2-main:not(.show-detail) .cv2-detailpane{display:none}
+  .cv2-back{display:inline-flex}
+  .cv2-grid2,.cv2-grid3{grid-template-columns:1fr}
+  .cv2-detail-body{padding:14px}
+  .cv2-row{padding:12px}
+  .cv2-chip{padding:6px 11px;font-size:12px;min-height:34px!important}
+}
