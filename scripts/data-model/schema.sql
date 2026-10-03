@@ -84,7 +84,7 @@ CREATE TRIGGER roles_touch BEFORE UPDATE ON roles
   FOR EACH ROW EXECUTE FUNCTION slater_touch_updated_at();
 
 -- "In-use roles cannot be deleted" is enforced two ways:
---   1. contact_roles.role_id ON DELETE RESTRICT (below).
+--   1. contact_roles.role_id deferred foreign key (below).
 --   2. Project crew/talent/KP entries reference role_id inside
 --      projects.data JSONB, which no FK can see. The delete
 --      endpoint must also check projects.data (Session 2).
@@ -131,6 +131,11 @@ CREATE TABLE IF NOT EXISTS organizations (
   legacy_agency_id     INTEGER,                 -- agencies.id, if migrated from there
   legacy_source        TEXT,                    -- 'agency' | 'contacts.companies' | 'project.client_company'
 
+  -- Offline-create idempotency: the client stamps a UUID on records
+  -- it creates; a retried POST with the same client_uid returns the
+  -- existing row instead of creating a duplicate.
+  client_uid           TEXT,
+
   archived_at          TIMESTAMPTZ,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -138,6 +143,8 @@ CREATE TABLE IF NOT EXISTS organizations (
 
 CREATE INDEX IF NOT EXISTS organizations_owner_sync_idx
   ON organizations (owner_id, updated_at);
+CREATE UNIQUE INDEX IF NOT EXISTS organizations_client_uid_uniq
+  ON organizations (owner_id, client_uid) WHERE client_uid IS NOT NULL;
 CREATE INDEX IF NOT EXISTS organizations_name_idx
   ON organizations (owner_id, lower(name));
 CREATE INDEX IF NOT EXISTS organizations_agency_idx
@@ -191,6 +198,8 @@ CREATE TABLE IF NOT EXISTS contacts (
   -- compare per bucket exactly. Safe to drop after cutover.
   legacy_bucket       TEXT,
 
+  client_uid          TEXT,                     -- offline-create idempotency (see organizations)
+
   archived_at         TIMESTAMPTZ,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -200,6 +209,8 @@ CREATE TABLE IF NOT EXISTS contacts (
 -- archived rows (tombstones), so no archived_at filter here.
 CREATE INDEX IF NOT EXISTS contacts_owner_sync_idx
   ON contacts (owner_id, updated_at);
+CREATE UNIQUE INDEX IF NOT EXISTS contacts_client_uid_uniq
+  ON contacts (owner_id, client_uid) WHERE client_uid IS NOT NULL;
 CREATE INDEX IF NOT EXISTS contacts_org_idx
   ON contacts (organization_id);
 CREATE INDEX IF NOT EXISTS contacts_sort_idx
@@ -219,7 +230,13 @@ CREATE TRIGGER contacts_touch BEFORE UPDATE ON contacts
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS contact_roles (
   contact_id  INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
-  role_id     INTEGER NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
+  -- DEFERRED check, not RESTRICT: both block deleting an in-use role,
+  -- but RESTRICT (and plain NO ACTION) check before the cascade from
+  -- a deleted user has removed that user's contacts, so deleting a
+  -- whole user would fail. Deferred checks at COMMIT, after the cascade.
+  -- Found by scripts/test-v2-api.js.
+  role_id     INTEGER NOT NULL REFERENCES roles(id)
+                ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED,
   sort_order  INTEGER NOT NULL DEFAULT 0,       -- pill order; first pill = primary display
   PRIMARY KEY (contact_id, role_id)
 );
@@ -262,6 +279,7 @@ CREATE TABLE IF NOT EXISTS locations (
   zip          TEXT,
   hospital     TEXT,                            -- same key as today (loc.hospital); auto-populated
   notes        TEXT,
+  client_uid   TEXT,                            -- offline-create idempotency (see organizations)
   archived_at  TIMESTAMPTZ,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -269,6 +287,8 @@ CREATE TABLE IF NOT EXISTS locations (
 
 CREATE INDEX IF NOT EXISTS locations_owner_sync_idx
   ON locations (owner_id, updated_at);
+CREATE UNIQUE INDEX IF NOT EXISTS locations_client_uid_uniq
+  ON locations (owner_id, client_uid) WHERE client_uid IS NOT NULL;
 
 DROP TRIGGER IF EXISTS locations_touch ON locations;
 CREATE TRIGGER locations_touch BEFORE UPDATE ON locations

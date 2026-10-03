@@ -102,7 +102,15 @@ Estimate: original was 12-16 working days; add ~3-5 days for the offline sync/th
    - `scripts/data-model/schema.sql`: approved schema (moved from `Temp-New-Schema/slater_schema_draft.sql`, which is now superseded -- edit schema.sql from here on).
    - `scripts/data-model/global-roles.js`: 74 global roles, source of truth for the seed. Re-runs update changed roles; roles removed from the list are reported, never deleted.
    - Verified: dry run, real run, re-run, remote guard (exit 2), current app boots and responds on the migrated dev DB.
-5. Next: Session 2 -- backend CRUD for contacts/orgs/roles/locations alongside the old endpoint, plus per-record sync endpoints (pull-since-cursor with ~10s overlap, push with baseline `updated_at` for conflict detection). Role delete must also scan `projects.data` for `role_id`.
+5. ~~Session 2: backend CRUD + sync endpoints~~ -- DONE 2026-10-03. `/api/v2/*` mounted in server.js behind requireAuth, alongside the untouched old endpoints. Frontend does not call it yet.
+   - Files: `routes/v2/{index,db,fields,resource,resources,roles}.js`; tests `scripts/test-v2-api.js` (25 tests, local DB only, creates + deletes its own temp users).
+   - Endpoints: `contacts`, `organizations`, `locations` each have GET (`?since=`), GET /:id, POST, PATCH /:id, DELETE /:id (archive), POST /:id/restore. `roles`: GET, POST, PATCH, DELETE, restore (custom only; global read-only = 403). `GET /sync?since=` returns all four + `default_organization_id` + `cursor` in one consistent snapshot. `GET/PUT /default-organization` (agency orgs only).
+   - Sync/conflict contract (Session 7 builds the client half): timestamps are fixed-width microsecond ISO strings (`2026-10-03T22:21:00.120000Z`), treat as opaque and echo back. PATCH needs `base_updated_at`; mismatch = 409 `{error:"conflict", current}`, nothing written. PATCH on archived row = 409 `archived`. Pull with `since` overlaps 10s and includes archived rows (tombstones). POST accepts `client_uid` for idempotent retries. Archive is not base-checked (delete wins; restore exists).
+   - Contacts: `role_ids` ordered array (pill order), replaced wholesale when sent. Only global or own roles; archived roles can stay but not be newly added. `organization_id` must be own org (archived allowed).
+   - Roles: delete refused (409 with usage counts) while used by contacts OR projects.data crew/talent/kp_cards `role_id`; otherwise archived. Re-creating an archived custom role revives the same id. Custom role may share a global role's name.
+   - Schema changes this session (schema.sql updated; dev DB patched; fresh restore+migrate+test verified): `client_uid` + unique index on contacts/organizations/locations; `contact_roles.role_id` FK changed from RESTRICT to `DEFERRABLE INITIALLY DEFERRED` -- RESTRICT broke deleting a user (admin "delete user") whenever their contact had a custom role. Found by the test suite.
+   - Known limits, fine for now: org pulls include base64 logos (initial sync could be a few MB with many logos; split logos out if it gets slow). Each old route file still opens its own pool; v2 shares one.
+6. Next: Session 3 -- Contacts modal rewrite (multi-role pills, new fields: union/gear/travel/notes, 512px logo crop), on top of `/api/v2`.
 
 ## Draft v2 changes beyond the 12 answers (for John's review)
 

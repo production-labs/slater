@@ -64,6 +64,9 @@ app.use('/api/projects', requireAuth, require('./routes/projects'));
 app.use('/api/receipts', requireAuth, require('./routes/receipts'));
 app.use('/api/ocr', requireAuth, require('./routes/ocr'));
 app.use('/api/licenses', require('./routes/licenses'));
+// New data model (data-model-rewrite). Requires scripts/migrate-data-model.js
+// to have been run; not called by the frontend until Session 3.
+app.use('/api/v2', requireAuth, require('./routes/v2'));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', version: '0.1.0' });
