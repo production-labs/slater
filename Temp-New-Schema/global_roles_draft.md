@@ -26,4 +26,4 @@ Host, Emcee (MC), Presenter, Moderator, Panelist, Subject Matter Expert (SME), I
 ## History
 - First list (74 roles) approved earlier on 2026-10-03; replaced by this list the same day.
 - Roles retired from the first list (archived by the seed, never hard-deleted): Account Manager, Client Contact, Client Stakeholder, Electric (now Electrician), Floor Manager, Grip / Electric, IT / Network Technician, Jib / Crane Operator, Managing Producer, On-Camera Talent, Project Manager, Replay Operator, Speaker.
-- OPEN: Managing Producer (MNG PRD) is on two of John's contacts in the old data (John McDonald, Kiko Toledo). Under the drop rule they migrate with no role unless it is added back.
+- DECIDED: retired roles stay off the built-in list (not industry standard). John adds any he wants as custom roles in his account. Managing Producer holders migrate with no role and are listed in the migration report.
