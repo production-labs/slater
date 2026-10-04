@@ -258,15 +258,33 @@
     root.addEventListener('input', onInput);
     root.addEventListener('change', onChange);
     root.addEventListener('keydown', onKeydown);
+    // Pressing on an item in any pick list (roles, state, country) must not
+    // take focus from the input: the blur handlers below close the list
+    // ~150ms after blur, and a real (human-speed) click often takes longer
+    // than that, so the release landed on nothing and the pick was lost.
+    // preventDefault on mousedown keeps focus; listPress also stops the
+    // timers from closing a list while a press (mouse or touch) is in progress.
+    var listPress = false;
+    root.addEventListener('mousedown', function (e) {
+      if (e.target.closest('.cv2-picker-list')) e.preventDefault();
+    });
+    root.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.cv2-picker-list')) listPress = true;
+    });
+    document.addEventListener('pointerup', function () { setTimeout(function () { listPress = false; }, 0); }, true);
+    document.addEventListener('pointercancel', function () { listPress = false; }, true);
     // The picker opens on click / typing / ArrowDown only, never just on
     // focus: after a pick, focus returns to the input, and an auto-opened
     // list would cover the fields below and swallow the next click.
     root.addEventListener('focusout', function (e) {
-      if (e.target.id === 'cv2-role-input') setTimeout(closePicker, 150);
+      // Timers re-check focus: a stale timer (field left, then re-entered or
+      // re-rendered within 150ms) must not close the list now in use.
+      function stillIn(id) { return document.activeElement && document.activeElement.id === id; }
+      if (e.target.id === 'cv2-role-input') setTimeout(function () { if (!listPress && !stillIn('cv2-role-input')) closePicker(); }, 150);
       if (e.target.id === 'cv2f_state' || e.target.id === 'cv2f_country') {
         e.target.removeAttribute('data-fresh'); // next click selects all again
         var k = e.target.id.slice(5);
-        setTimeout(function () { closeTA(k); commitTA(k); }, 150);
+        setTimeout(function () { if (listPress || stillIn('cv2f_' + k)) return; closeTA(k); commitTA(k); }, 150);
       }
     });
     document.getElementById('cv2-logo-file').addEventListener('change', onLogoFile);

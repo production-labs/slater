@@ -135,6 +135,17 @@ async function main() {
     const first = (await db.query(`SELECT r.name FROM contact_roles cr JOIN roles r ON r.id=cr.role_id WHERE cr.contact_id=$1 ORDER BY cr.sort_order LIMIT 1`, [c.id])).rows[0].name;
     assert(first === 'Gaffer', first);
   });
+  await step('human-speed click (300ms press) on a picker item still adds the role', async () => {
+    await page.click('#cv2-role-input');
+    await page.type('#cv2-role-input', 'engineer in');
+    await page.waitForSelector('#cv2-picker-list.open [data-act="pick-role"]', { timeout: 3000 });
+    const box = await (await page.$('#cv2-picker-list [data-act="pick-role"]')).boundingBox();
+    await page.mouse.move(box.x + 10, box.y + box.height / 2);
+    await page.mouse.down(); await sleep(300); await page.mouse.up();
+    await page.waitForFunction(() => /Engineer in Charge/.test(document.getElementById('cv2-pills').textContent), { timeout: 3000 });
+    await click('#cv2-save');
+    await page.waitForFunction(() => { const b = document.querySelector('#cv2-save'), d = document.getElementById('cv2-dirty'); return b && b.disabled && d && d.textContent === ''; }, { timeout: 5000 });
+  });
   await step('unsaved-changes guard on switching records', async () => {
     await click('[data-act="new"]'); await type('#cv2f_name', 'Talent Tina');
     await page.click('#cv2-role-input'); await page.type('#cv2-role-input', 'Host'); await sleep(100); await page.keyboard.press('Enter');
