@@ -328,6 +328,67 @@ async function run() {
     assert.equal((await api(A, 'POST', '/contacts', { name: 'X', role_ids: [custom.id] })).status, 400);
   });
 
+  console.log('\nPermanent delete');
+  await test('only archived records can be permanently deleted; tombstone reaches other devices', async () => {
+    const c = (await api(A, 'POST', '/contacts', { name: 'Purge Me', role_ids: [DP] })).body;
+    const before = (await api(A, 'GET', '/sync')).body.cursor;
+    let r = await api(A, 'DELETE', `/contacts/${c.id}/permanent`);
+    assert.equal(r.status, 409); assert.equal(r.body.error, 'not_archived');
+    await api(A, 'DELETE', `/contacts/${c.id}`);
+    assert.equal((await api(B, 'DELETE', `/contacts/${c.id}/permanent`)).status, 404, 'other user cannot');
+    r = await api(A, 'DELETE', `/contacts/${c.id}/permanent`);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal((await api(A, 'GET', `/contacts/${c.id}`)).status, 404, 'row gone');
+    const n = await admin.query('SELECT COUNT(*)::int n FROM contact_roles WHERE contact_id = $1', [c.id]);
+    assert.equal(n.rows[0].n, 0, 'role links gone');
+    const delta = (await api(A, 'GET', '/sync?since=' + encodeURIComponent(before))).body;
+    assert.ok(delta.deleted.some(d => d.table === 'contacts' && d.id === c.id), 'tombstone in delta sync');
+    assert.ok(delta.cursor >= before);
+    const per = (await api(A, 'GET', '/contacts?since=' + encodeURIComponent(before))).body;
+    assert.ok(per.deleted.some(d => d.id === c.id), 'tombstone in per-table pull');
+    assert.ok(!(await api(A, 'GET', '/sync')).body.contacts.some(x => x.id === c.id), 'not in full sync');
+  });
+  await test('refused while a project references it (any depth in project data)', async () => {
+    const c = (await api(A, 'POST', '/contacts', { name: 'On A Project' })).body;
+    const l = (await api(A, 'POST', '/locations', { name: 'Stage 9' })).body;
+    await api(A, 'DELETE', `/contacts/${c.id}`); await api(A, 'DELETE', `/locations/${l.id}`);
+    await admin.query(`INSERT INTO projects (key, label, data, owner_id) VALUES ($1, 'Big Shoot', $2, $3)`,
+      ['v2purge-' + Date.now(), JSON.stringify({ crew: [{ name: 'X', contact_id: c.id }], schedule: [{ day: 1, stops: [{ location_id: String(l.id) }] }] }), A]);
+    let r = await api(A, 'DELETE', `/contacts/${c.id}/permanent`);
+    assert.equal(r.status, 409); assert.equal(r.body.error, 'in_use'); assert.deepEqual(r.body.projects, ['Big Shoot']);
+    r = await api(A, 'DELETE', `/locations/${l.id}/permanent`);
+    assert.equal(r.status, 409, 'nested string id found'); assert.deepEqual(r.body.projects, ['Big Shoot']);
+    await admin.query(`DELETE FROM projects WHERE owner_id = $1 AND label = 'Big Shoot'`, [A]);
+    assert.equal((await api(A, 'DELETE', `/contacts/${c.id}/permanent`)).status, 200);
+    assert.equal((await api(A, 'DELETE', `/locations/${l.id}/permanent`)).status, 200);
+  });
+  await test('organizations: blocked by project agency/client columns; linked people get unlinked', async () => {
+    const o = (await api(A, 'POST', '/organizations', { name: 'Gone Corp' })).body;
+    const p = (await api(A, 'POST', '/contacts', { name: 'Works At Gone', organization_id: o.id })).body;
+    await api(A, 'DELETE', `/organizations/${o.id}`);
+    await admin.query(`INSERT INTO projects (key, label, data, owner_id, client_org_id) VALUES ($1, 'Client Job', '{}', $2, $3)`, ['v2purge-o-' + Date.now(), A, o.id]);
+    let r = await api(A, 'DELETE', `/organizations/${o.id}/permanent`);
+    assert.equal(r.status, 409); assert.deepEqual(r.body.projects, ['Client Job']);
+    await admin.query(`DELETE FROM projects WHERE owner_id = $1 AND label = 'Client Job'`, [A]);
+    r = await api(A, 'DELETE', `/organizations/${o.id}/permanent`);
+    assert.equal(r.status, 200);
+    const after = (await api(A, 'GET', `/contacts/${p.id}`)).body;
+    assert.equal(after.organization_id, null, 'person unlinked');
+    assert.ok(after.updated_at > p.updated_at, 'unlink bumps updated_at so devices sync it');
+  });
+  await test('custom roles: permanent delete only when archived and unused', async () => {
+    const role = (await api(A, 'POST', '/roles', { name: 'Purge Role', category: 'crew' })).body;
+    const holder = (await api(A, 'POST', '/contacts', { name: 'Role Holder', role_ids: [role.id] })).body;
+    assert.equal((await api(A, 'DELETE', `/roles/${role.id}/permanent`)).body.error, 'not_archived');
+    await api(A, 'PATCH', `/contacts/${holder.id}`, { role_ids: [], base_updated_at: holder.updated_at });
+    await api(A, 'DELETE', `/roles/${role.id}`);
+    const before = (await api(A, 'GET', '/sync')).body.cursor;
+    assert.equal((await api(A, 'DELETE', `/roles/${role.id}/permanent`)).status, 200);
+    const delta = (await api(A, 'GET', '/sync?since=' + encodeURIComponent(before))).body;
+    assert.ok(delta.deleted.some(d => d.table === 'roles' && d.id === role.id));
+    assert.equal((await api(A, 'DELETE', `/roles/${HOST}/permanent`)).status, 403, 'built-in roles never');
+  });
+
   console.log('\nDatabase');
   await test('database blocks hard-deleting an in-use role even outside the API', async () => {
     const r = (await api(B, 'POST', '/roles', { name: 'B Locked', category: 'crew' })).body;

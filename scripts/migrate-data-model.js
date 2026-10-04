@@ -40,7 +40,7 @@ const EXPECTED_NEW_COLUMNS = {
   projects: ['agency_org_id', 'client_org_id'],
 };
 
-const NEW_TABLES = ['roles', 'organizations', 'contacts', 'contact_roles', 'locations'];
+const NEW_TABLES = ['roles', 'organizations', 'contacts', 'contact_roles', 'locations', 'deleted_records'];
 const NEW_TRIGGERS = ['roles_touch', 'organizations_touch', 'contacts_touch', 'contact_roles_touch', 'locations_touch'];
 
 function describeTarget(url) {

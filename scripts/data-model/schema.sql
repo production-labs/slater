@@ -324,6 +324,28 @@ CREATE TRIGGER locations_touch BEFORE UPDATE ON locations
 
 
 -- ------------------------------------------------------------
+-- DELETED_RECORDS (sync tombstones for permanent deletes)
+-- Permanently deleting an archived contact / organization /
+-- location / custom role removes the row and every personal detail
+-- in it. Only this marker remains (which table, which id, when), so
+-- devices that were offline learn the record is gone and drop their
+-- copy instead of pushing it back (the old "deleted contacts come
+-- back" bug). Sync pulls return markers newer than the cursor.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS deleted_records (
+  id          BIGSERIAL PRIMARY KEY,
+  owner_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  table_name  TEXT NOT NULL
+                CHECK (table_name IN ('contacts', 'organizations', 'locations', 'roles')),
+  record_id   INTEGER NOT NULL,
+  deleted_at  TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX IF NOT EXISTS deleted_records_owner_sync_idx
+  ON deleted_records (owner_id, deleted_at);
+
+
+-- ------------------------------------------------------------
 -- USERS: additions
 -- ------------------------------------------------------------
 ALTER TABLE users

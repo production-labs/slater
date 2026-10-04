@@ -15,6 +15,7 @@ const express = require('express');
 const { pool, tx } = require('./db');
 const { HttpError, clean, parseId, handle } = require('./fields');
 const { maxCursor } = require('./resource');
+const { projectsReferencing, refuseIfUsed, tombstone, pullDeleted } = require('./purge');
 
 const CATEGORIES = ['staff', 'crew', 'talent'];
 const SPEC = {
@@ -77,7 +78,8 @@ const router = express.Router();
 router.get('/', handle(async (req, res) => {
   const since = req.query.since || null;
   const rows = await pull(pool, req.session.userId, since);
-  res.json({ rows, cursor: maxCursor(rows, since) });
+  const deleted = await pullDeleted(pool, req.session.userId, since, 'roles');
+  res.json({ rows, deleted, cursor: maxCursor(rows.concat(deleted.map(d => ({ updated_at: d.deleted_at }))), since) });
 }));
 
 router.post('/', handle(async (req, res) => {
@@ -152,6 +154,22 @@ router.delete('/:id', handle(async (req, res) => {
     return r.rows[0];
   });
   res.json(row);
+}));
+
+// Permanently delete an archived custom role nobody uses.
+router.delete('/:id/permanent', handle(async (req, res) => {
+  const userId = req.session.userId;
+  const id = parseId(req.params.id);
+  await tx(async client => {
+    const row = await fetchOwn(client, userId, id, true);
+    if (!row.archived_at) throw new HttpError(409, 'not_archived');
+    const used = await usage(client, userId, id);
+    if (used.contacts) throw new HttpError(409, 'in_use', { usage: used });
+    refuseIfUsed(await projectsReferencing(client, userId, 'role_id', id));
+    await client.query('DELETE FROM roles WHERE id = $1 AND owner_id = $2', [id, userId]);
+    await tombstone(client, userId, 'roles', id);
+  });
+  res.json({ deleted: true, id });
 }));
 
 router.post('/:id/restore', handle(async (req, res) => {

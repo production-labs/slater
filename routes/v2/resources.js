@@ -51,6 +51,7 @@ async function setContactRoles(client, userId, contactId, body) {
 
 const contacts = makeResource({
   table: 'contacts',
+  refKey: 'contact_id',
   spec: {
     organization_id:     { type: 'orgRef' },
     name:                { type: 'text', required: true },
@@ -78,6 +79,11 @@ const contacts = makeResource({
 
 const organizations = makeResource({
   table: 'organizations',
+  refKey: 'organization_id',
+  // Projects link orgs through real columns too (agency / client).
+  extraUsage: async (client, userId, id) => (await client.query(
+    `SELECT key, COALESCE(NULLIF(label, ''), data->>'project_title', key) AS label FROM projects
+      WHERE owner_id = $1 AND (agency_org_id = $2 OR client_org_id = $2)`, [userId, id])).rows,
   spec: {
     name:                 { type: 'text', required: true },
     is_agency:            { type: 'bool' },
@@ -108,6 +114,7 @@ const organizations = makeResource({
 
 const locations = makeResource({
   table: 'locations',
+  refKey: 'location_id',
   spec: {
     name:     { type: 'text', required: true },
     address:  { type: 'text' },

@@ -75,11 +75,16 @@
       if (!cur || r.updated_at >= cur.updated_at) store[table][r.id] = r;
     });
   }
+  // Permanent deletes from any device arrive as tombstones: drop local copies.
+  function applyDeleted(list) {
+    (list || []).forEach(function (d) { if (store[d.table]) delete store[d.table][d.id]; });
+  }
   function sync() {
     var q = store.cursor ? '?since=' + encodeURIComponent(store.cursor) : '';
     return req('GET', '/sync' + q).then(function (d) {
       if (!store.cursor) TABLES.forEach(function (t) { store[t] = {}; });
       TABLES.forEach(function (t) { absorb(t, d[t]); });
+      applyDeleted(d.deleted);
       store.defaultOrgId = d.default_organization_id;
       if (d.settings) store.settings = d.settings;
       if (d.cursor) store.cursor = d.cursor;
@@ -90,6 +95,7 @@
     if (store.archivedLoaded[table]) return Promise.resolve();
     return req('GET', '/' + table + '?since=' + encodeURIComponent('1970-01-01T00:00:00.000000Z')).then(function (d) {
       absorb(table, d.rows);
+      applyDeleted(d.deleted);
       store.archivedLoaded[table] = true;
     });
   }
@@ -496,8 +502,8 @@
     var title = isNew ? 'New ' + TAB_NOUN[ui.tab] : (r.name || '');
     var body = '';
     if (archived) body += '<div class="cv2-banner warn">' + (ui.tab === 'roles'
-      ? 'This role is deleted. It no longer appears in the role picker. Restore it to use or edit it again.'
-      : 'This ' + TAB_NOUN[ui.tab] + ' is archived. It is hidden from lists and pickers. Restore it to edit.') + '</div>';
+      ? 'This role is deleted. It no longer appears in the role picker. Restore it to use or edit it again, or delete it permanently.'
+      : 'This ' + TAB_NOUN[ui.tab] + ' is archived. It is hidden from lists and pickers. Restore it to edit, or delete it permanently.') + '</div>';
     if (ui.tab === 'people') body += personForm(r);
     else if (ui.tab === 'organizations') body += orgForm(r, isNew);
     else if (ui.tab === 'roles') body += roleForm(r, isNew);
@@ -508,7 +514,8 @@
     if (builtIn) {
       foot = '<span class="cv2-hint" style="margin:0">Built-in roles can\'t be changed. Use <strong>+ New</strong> to add your own.</span>';
     } else if (archived) {
-      foot = '<span class="cv2-spacer"></span><button class="lb primary" data-act="restore">Restore</button>';
+      foot = '<button class="lb danger" data-act="purge">Delete permanently</button>' +
+        '<span class="cv2-spacer"></span><button class="lb primary" data-act="restore">Restore</button>';
     } else {
       foot = (isNew ? '' : '<button class="lb danger" data-act="archive">' + (ui.tab === 'roles' ? 'Delete' : 'Archive') + '</button>') +
         '<span class="cv2-spacer"></span><span class="cv2-dirty" id="cv2-dirty"></span>' +
@@ -522,6 +529,9 @@
       '<div class="cv2-detail-foot">' + foot + '</div>';
 
     if (archived || builtIn) el.querySelectorAll('#cv2-form input, #cv2-form textarea, #cv2-form select').forEach(function (x) { x.disabled = true; });
+    // Archived: no editing actions either (logo, default agency...), but
+    // "go to person" links stay usable.
+    if (archived) el.querySelectorAll('#cv2-form button:not(.cv2-link)').forEach(function (x) { x.disabled = true; });
     if (ui.tab === 'people') renderPills();
     updateDirty();
   }
@@ -985,6 +995,42 @@
       });
     });
   }
+  // Permanently delete an archived record. The server refuses while a
+  // project uses it and leaves a tombstone so other devices drop it too.
+  function purge() {
+    var r = ui.baseline;
+    if (!r || !r.archived_at) return;
+    var table = TAB_TABLE[ui.tab];
+    var what = ui.tab === 'people' ? 'their name, contact details, roles and notes'
+      : ui.tab === 'organizations' ? 'its details and logo'
+      : ui.tab === 'roles' ? 'the role' : 'its details';
+    var extra = '';
+    if (ui.tab === 'organizations') {
+      var linked = rows('contacts', true).filter(function (c) { return c.organization_id === r.id; }).length;
+      if (linked) extra = ' ' + linked + (linked === 1 ? ' person is' : ' people are') + ' linked to it and will be unlinked.';
+    }
+    confirmBox('Delete permanently', 'Permanently delete "' + r.name + '"? This removes ' + what + ' for good and cannot be undone.' + extra, function () {
+      req('DELETE', '/' + table + '/' + r.id + '/permanent').then(function () {
+        delete store[table][r.id];
+        ui.sel = null; ui.baseline = null; ui.dirty = false;
+        renderAll();
+        toast('Deleted permanently.');
+        sync().then(renderAll, function () {}); // pick up side effects (e.g. unlinked people)
+      }, function (e) {
+        var d = e.data || {};
+        if (e.status === 409 && d.error === 'in_use') {
+          var msg = d.projects && d.projects.length
+            ? 'It is used on ' + (d.usage.projects === 1 ? 'this project' : 'these projects') + ': ' + d.projects.join(', ') +
+              (d.usage.projects > d.projects.length ? ' and ' + (d.usage.projects - d.projects.length) + ' more' : '') +
+              '. Remove it from ' + (d.usage.projects === 1 ? 'that project' : 'those projects') + ' first.'
+            : 'It is still used by ' + d.usage.contacts + (d.usage.contacts === 1 ? ' person' : ' people') + '. Remove it from them first.';
+          return confirmBox('Can\'t delete yet', '"' + r.name + '" can\'t be deleted. ' + msg, null);
+        }
+        if (e.status === 409 && d.error === 'not_archived') return toast('Archive it first, then delete it.', 'err');
+        toast(e.message, 'err');
+      });
+    });
+  }
   function restore() {
     var r = ui.baseline;
     req('POST', '/' + TAB_TABLE[ui.tab] + '/' + r.id + '/restore').then(function (row) {
@@ -1046,6 +1092,8 @@
     if (!t || t.disabled) return;
     var act = t.getAttribute('data-act');
     var id = t.getAttribute('data-id');
+    var EDIT_ACTS = ['logo-upload', 'logo-crop', 'logo-remove', 'set-default', 'clear-default', 'pill-primary', 'pill-remove', 'pick-role', 'create-role', 'ta-pick'];
+    if (ui.baseline && ui.baseline.archived_at && EDIT_ACTS.indexOf(act) !== -1) return; // archived = read-only
     switch (act) {
       case 'close': return close();
       case 'tab': return switchTab(t.getAttribute('data-tab'));
@@ -1057,6 +1105,7 @@
       case 'save': return save();
       case 'archive': return archive();
       case 'restore': return restore();
+      case 'purge': return purge();
       case 'set-default': return setDefault(ui.baseline.id);
       case 'clear-default': return setDefault(null);
       case 'goto-person':

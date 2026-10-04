@@ -8,6 +8,8 @@
 //   PATCH  /:id                          partial update; requires base_updated_at
 //   DELETE /:id                          archive (soft delete = sync tombstone)
 //   POST   /:id/restore                  un-archive
+//   DELETE /:id/permanent                permanently delete an ARCHIVED record
+//                                        (refused while any project references it)
 //
 // Sync contract (Session 7 builds the client half):
 //   - Without ?since: active rows only (initial load).
@@ -26,6 +28,7 @@
 const express = require('express');
 const { pool, tx } = require('./db');
 const { HttpError, clean, parseId, handle } = require('./fields');
+const { projectsReferencing, refuseIfUsed, tombstone, pullDeleted } = require('./purge');
 
 const Regions = require('../../public/regions');
 
@@ -89,7 +92,8 @@ function makeResource(cfg) {
   router.get('/', handle(async (req, res) => {
     const since = req.query.since || null;
     const rows = await pull(pool, req.session.userId, since);
-    res.json({ rows, cursor: maxCursor(rows, since) });
+    const deleted = await pullDeleted(pool, req.session.userId, since, table);
+    res.json({ rows, deleted, cursor: maxCursor(rows.concat(deleted.map(d => ({ updated_at: d.deleted_at }))), since) });
   }));
 
   router.get('/:id', handle(async (req, res) => {
@@ -178,6 +182,21 @@ function makeResource(cfg) {
       return cur; // already-archived rows are returned as-is (idempotent)
     });
     res.json(row);
+  }));
+
+  router.delete('/:id/permanent', handle(async (req, res) => {
+    const userId = req.session.userId;
+    const id = parseId(req.params.id);
+    await tx(async client => {
+      const r = await client.query(`SELECT archived_at FROM ${table} WHERE id = $1 AND owner_id = $2 FOR UPDATE`, [id, userId]);
+      if (!r.rows.length) throw new HttpError(404, 'Not found');
+      if (!r.rows[0].archived_at) throw new HttpError(409, 'not_archived');
+      refuseIfUsed(await projectsReferencing(client, userId, cfg.refKey, id));
+      if (cfg.extraUsage) refuseIfUsed(await cfg.extraUsage(client, userId, id));
+      await client.query(`DELETE FROM ${table} WHERE id = $1 AND owner_id = $2`, [id, userId]);
+      await tombstone(client, userId, table, id);
+    });
+    res.json({ deleted: true, id });
   }));
 
   router.post('/:id/restore', handle(async (req, res) => {

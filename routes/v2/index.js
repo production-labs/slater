@@ -7,6 +7,8 @@
 //     One round trip for offline sync. Same rules as each resource's
 //     GET (see resource.js), across all four tables, plus the user's
 //     default organization id. Use the returned cursor for the next call.
+//     With ?since, `deleted` lists permanently deleted records
+//     ({ table, id, deleted_at }): drop them from the local copy.
 //
 //   GET /api/v2/settings                    -> { default_country }
 //   PUT /api/v2/settings                    { default_country: "US" }
@@ -20,6 +22,7 @@ const { pool, tx } = require('./db');
 const { HttpError, handle } = require('./fields');
 const Regions = require('../../public/regions');
 const { maxCursor } = require('./resource');
+const { pullDeleted } = require('./purge');
 const { contacts, organizations, locations } = require('./resources');
 const roles = require('./roles');
 
@@ -55,8 +58,9 @@ router.get('/sync', handle(async (req, res) => {
         await getDefaultOrg(client, userId),
       ];
       const settings = await getSettings(client, userId);
+      const deleted = await pullDeleted(client, userId, since, null); // permanent-delete tombstones
       await client.query('COMMIT');
-      return { contacts: c, organizations: o, locations: l, roles: r, default_organization_id: d, settings };
+      return { contacts: c, organizations: o, locations: l, roles: r, deleted, default_organization_id: d, settings };
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
       throw err;
@@ -64,7 +68,8 @@ router.get('/sync', handle(async (req, res) => {
       client.release();
     }
   })();
-  out.cursor = maxCursor([...out.contacts, ...out.organizations, ...out.locations, ...out.roles], since);
+  out.cursor = maxCursor([...out.contacts, ...out.organizations, ...out.locations, ...out.roles,
+    ...out.deleted.map(x => ({ updated_at: x.deleted_at }))], since);
   res.json(out);
 }));
 

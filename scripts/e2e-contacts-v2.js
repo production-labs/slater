@@ -340,6 +340,49 @@ async function main() {
     assert(l.state === 'Greater London' && l.country === 'GB', 'abroad address: ' + l.state + '/' + l.country);
     assert(await page.$$eval('.cv2-row-sub', els => els.some(e => /London, Greater London, United Kingdom/.test(e.textContent))), 'list shows country abroad');
   });
+  await step('archived location can be deleted permanently (gone even from Show archived)', async () => {
+    await click('[data-act="archive"]');
+    await T('#modal-overlay.open');
+    await page.evaluate(() => document.getElementById('modal-ok').click());
+    await page.waitForFunction(() => /Building 92/.test(document.getElementById('cv2-list').textContent), { timeout: 5000 }); // Show archived is still on
+    await click('.cv2-row.archived');
+    await click('[data-act="purge"]');
+    await T('#modal-overlay.open');
+    assert(/cannot be undone/.test(await page.$eval('#modal-msg', e => e.textContent)), 'warns');
+    await page.evaluate(() => document.getElementById('modal-ok').click());
+    await page.waitForFunction(() => !/Building 92/.test(document.getElementById('cv2-list').textContent), { timeout: 5000 });
+    const n = (await db.query(`SELECT COUNT(*)::int n FROM locations WHERE owner_id=$1`, [userId])).rows[0].n;
+    assert(n === 0, 'row removed');
+    const t = (await db.query(`SELECT COUNT(*)::int n FROM deleted_records WHERE owner_id=$1 AND table_name='locations'`, [userId])).rows[0].n;
+    assert(t === 1, 'tombstone written');
+    await page.click('#cv2-arch'); // Show archived off
+  });
+  await step('permanent delete of a person on a project is blocked with the project named', async () => {
+    await click('[data-act="tab"][data-tab="people"]');
+    const tina = await contact('Talent Tina');
+    await db.query(`INSERT INTO projects (key, label, data, owner_id) VALUES ($1, 'Spring Keynote', $2, $3)`,
+      ['e2e-' + Date.now(), JSON.stringify({ talent: [{ name: 'Talent Tina', contact_id: tina.id }] }), userId]);
+    const rows = await page.$$('.cv2-row');
+    for (const r of rows) if (/Talent Tina/.test(await r.evaluate(e => e.textContent))) { await r.click(); break; }
+    await click('[data-act="archive"]');
+    await T('#modal-overlay.open');
+    await page.evaluate(() => document.getElementById('modal-ok').click());
+    await page.waitForFunction(() => !/Talent Tina/.test(document.getElementById('cv2-list').textContent), { timeout: 5000 }); // archived + redrawn
+    await click('#cv2-arch');
+    await page.waitForFunction(() => /Talent Tina/.test(document.getElementById('cv2-list').textContent), { timeout: 5000 });
+    await sleep(300); // Show archived redraws the list twice
+    await page.evaluate(() => [...document.querySelectorAll('.cv2-row.archived')].find(r => /Talent Tina/.test(r.textContent)).click());
+    await click('[data-act="purge"]');
+    await T('#modal-overlay.open');
+    await page.evaluate(() => document.getElementById('modal-ok').click());
+    await page.waitForFunction(() => /Spring Keynote/.test(document.getElementById('modal-msg').textContent) && document.getElementById('modal-overlay').classList.contains('open'), { timeout: 5000 });
+    await page.evaluate(() => modalCancel());
+    assert(await contact('Talent Tina'), 'still exists');
+    await db.query(`DELETE FROM projects WHERE owner_id=$1`, [userId]);
+    await click('[data-act="restore"]');
+    await page.waitForFunction(() => !document.querySelector('.cv2-row.archived'), { timeout: 5000 });
+    await page.click('#cv2-arch');
+  });
   await step('names with HTML are shown as text, not markup', async () => {
     await click('[data-act="tab"][data-tab="people"]');
     await click('[data-act="new"]');
