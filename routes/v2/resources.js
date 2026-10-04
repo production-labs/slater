@@ -61,6 +61,7 @@ const contacts = makeResource({
     city:                { type: 'text' },
     state:               { type: 'text' },
     zip:                 { type: 'text' },
+    title:               { type: 'text' },
     union_status:        { type: 'text' },
     gear_kit:            { type: 'text', multiline: true },
     travel_availability: { type: 'text' },

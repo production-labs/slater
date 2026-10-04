@@ -345,7 +345,7 @@
         if (ui.cat !== 'all' && ui.cat !== 'none' && cats.indexOf(ui.cat) === -1) return false;
         if (ui.state && (c.state || '').toUpperCase() !== ui.state) return false;
         if (!q) return true;
-        var hay = [c.name, c.email, c.phone, c.city, c.state, c.union_status, orgName(c.organization_id)]
+        var hay = [c.name, c.title, c.email, c.phone, c.city, c.state, c.union_status, orgName(c.organization_id)]
           .concat((c.role_ids || []).map(function (id) { var r = role(id); return r ? r.name + ' ' + (r.abbreviation || '') : ''; }))
           .join(' ').toLowerCase();
         return hay.indexOf(q) !== -1;
@@ -375,7 +375,7 @@
       var sub, lead = '';
       if (ui.tab === 'people') {
         var roles = (r.role_ids || []).map(function (id) { return roleLabel(role(id)); });
-        sub = [roles.join(', '), orgName(r.organization_id), [r.city, r.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+        sub = [roles.join(', '), r.title, orgName(r.organization_id), [r.city, r.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
       } else if (ui.tab === 'organizations') {
         lead = r.logo ? '<img class="cv2-row-logo" src="' + esc(r.logo) + '" alt="">' : '<div class="cv2-row-logo empty">' + esc((r.name || '?').charAt(0).toUpperCase()) + '</div>';
         if (r.is_agency) name += '<span class="cv2-badge">Agency</span>';
@@ -466,7 +466,10 @@
         '<div id="cv2-newrole"></div>' +
       '</div>' +
       '<div class="cv2-hint">The first role is the primary one. Click a role to make it primary.</div>' +
-      fieldHtml('Organization', 'organization_id', c.organization_id == null ? '' : String(c.organization_id), { type: 'select', options: orgOpts }) +
+      '<div class="cv2-grid2">' +
+        fieldHtml('Title', 'title', c.title, { placeholder: 'Job title, e.g. VP of Marketing' }) +
+        fieldHtml('Organization', 'organization_id', c.organization_id == null ? '' : String(c.organization_id), { type: 'select', options: orgOpts }) +
+      '</div>' +
       '<div class="cv2-grid2">' +
         fieldHtml('Phone', 'phone', c.phone, { cls: 'fmt-phone', placeholder: '(206) 555-0100', inputType: 'tel' }) +
         fieldHtml('Email', 'email', c.email, { inputType: 'email' }) +
@@ -546,7 +549,7 @@
 
   // Read the open form into a plain object of fields.
   var FORM_FIELDS = {
-    people: ['name', 'sort_last_name', 'organization_id', 'phone', 'email', 'address', 'city', 'state', 'zip', 'union_status', 'travel_availability', 'gear_kit', 'notes'],
+    people: ['name', 'sort_last_name', 'title', 'organization_id', 'phone', 'email', 'address', 'city', 'state', 'zip', 'union_status', 'travel_availability', 'gear_kit', 'notes'],
     organizations: ['name', 'is_agency', 'website', 'phone', 'address', 'city', 'state', 'zip', 'notes', 'contact_name', 'contact_email', 'contact_phone', 'invoicing_email', 'invoicing_text', 'default_project_type', 'timezone'],
     locations: ['name', 'address', 'city', 'state', 'zip', 'hospital', 'notes'],
   };

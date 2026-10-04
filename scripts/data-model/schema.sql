@@ -181,6 +181,9 @@ CREATE TABLE IF NOT EXISTS contacts (
   city                TEXT,
   state               TEXT,
   zip                 TEXT,
+  -- Job title, mostly for talent / interview subjects and client contacts
+  -- ("Chief Executive Officer and President"). Not a production role.
+  title               TEXT,
 
   -- Production fields, full UI in Session 3 (answer #7).
   -- Free text rather than enums/booleans: "IATSE 600", "Non-union",
@@ -222,6 +225,7 @@ CREATE INDEX IF NOT EXISTS contacts_city_state_idx
 -- Added after the first dev runs (John, 2026-10-03). Keeps re-runs working
 -- on databases whose contacts table predates the column.
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS zip TEXT;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS title TEXT;
 
 DROP TRIGGER IF EXISTS contacts_touch ON contacts;
 CREATE TRIGGER contacts_touch BEFORE UPDATE ON contacts
