@@ -1,12 +1,18 @@
 # Data Model Rewrite: Session Status
 
-Last updated: 2026-10-03
+Last updated: 2026-10-03 (end of day)
 
 ## Where we are
 
-- Branch: `data-model-rewrite` (created from `main`). Confirm you are on it before any change. As of 2026-09-30, branch is 1 commit behind `main` (missing `6565fa5`, the autosave-overwrite fix) -- fast-forward/rebase before starting Session 1, no conflicts expected.
-- Phase: **all 12 questions answered (2026-09-30). Ready to start Session 1.** No code written, nothing committed.
-- Draft schema: `Temp-New-Schema/slater_schema_draft.sql` -- updated to v2 on 2026-10-03 with all 12 answers. Awaiting John's review (see "Draft v2 changes" below).
+**PICK UP HERE (end of day 2026-10-03):** Sessions 1-3 done and committed (last commit `714b824`, pushed to `origin/data-model-rewrite`; nothing on `main`, nothing deployed). Session 3 (new Contacts screen) is feature-complete per John's testing feedback today. **Next: Session 4** (Project tab agency/client pickers on v2, see item 7 under "Next step"). Before starting: ask John if he found anything else in Contacts while testing.
+
+- Branch: `data-model-rewrite`. Confirm you are on it before any change. Level with `main` as of 2026-10-03 (main has had no new commits; re-check with `git rev-list --left-right --count main...data-model-rewrite` and merge main in if it moved).
+- Schema lives in `scripts/data-model/schema.sql` (the `slater_schema_draft.sql` in this folder is SUPERSEDED, history only). Built-in roles: `scripts/data-model/global-roles.js` (80 roles). Apply/re-apply to the LOCAL dev DB with `node scripts/migrate-data-model.js` (one transaction, refuses non-local DB, idempotent).
+- Local dev DB (`slater_dev`) state: schema applied; John's old contacts copied into v2 with `scripts/dev-copy-contacts-to-v2.js` and since edited by John by hand (he archived duplicates, removed custom roles, etc.). Don't wipe it without asking. John McDonald + Kiko Toledo still hold the retired built-in "Managing Producer"; John will re-add it as a custom role himself.
+- New Contacts screen is behind a per-browser flag: `http://localhost:3000/?contacts=v2` (off: `?contacts=v1`). Default off.
+- Tests (all local only, all passing at end of day): `node scripts/test-v2-api.js` (31 API tests) and `NODE_PATH=/tmp/cv2-e2e/node_modules node scripts/e2e-contacts-v2.js` (22 headless-Chrome steps; if /tmp was cleared, first `npm i --prefix /tmp/cv2-e2e puppeteer-core`). Run both after any change.
+- Local server: Claude was running it in the background; it is stopped at end of day. Start with `cd ~/Sites/slater && node server.js`. Restart after any change to `server.js` or `routes/`; page-only changes (`public/`) just need a browser refresh.
+- Backups of the dev DB taken today: `/tmp/slater_dev_before_session1.dump`, `/tmp/slater_dev_before_devcopy.dump` (/tmp may be cleared on reboot).
 
 ## Hard rules (from John)
 
@@ -97,7 +103,7 @@ Estimate: original was 12-16 working days; add ~3-5 days for the offline sync/th
 1. ~~Fast-forward/rebase onto `main`~~ -- DONE (branch level with main as of 2026-10-03).
 2. ~~Update `slater_schema_draft.sql` to reflect all 12 answers~~ -- DONE 2026-10-03 (draft v2). Ran clean twice (idempotent) against a scratch DB on PG 18; triggers and constraints smoke-tested. Pending John's review of the open points below.
 3. ~~Draft the starter global role list~~ -- APPROVED 2026-10-03: `Temp-New-Schema/global_roles_draft.md` (74 roles: 16 staff, 48 crew, 10 talent). John's answers: alias list YES; EIC = Engineer in Charge (Staff); add `roles.department` (done in schema draft); Editor -> Crew/Post; list fine as long as users can add custom roles (already designed).
-4. ~~Session 1 (schema DDL + role seed)~~ -- DONE 2026-10-03, applied to local `slater_dev` only (backup taken first: `/tmp/slater_dev_before_session1.dump`). Not committed to git yet.
+4. ~~Session 1 (schema DDL + role seed)~~ -- DONE 2026-10-03, applied to local `slater_dev` only (backup taken first: `/tmp/slater_dev_before_session1.dump`). Committed (`bb1c0ca`).
    - `scripts/migrate-data-model.js`: runner. One transaction; fingerprints existing tables (row counts + md5 of users.contacts, projects.data, agencies, licenses) before/after and rolls back on ANY difference; checks existing tables only gained the expected columns; checks tables/triggers/role counts. `--dry-run` rolls back. Refuses non-local DB without `--allow-remote`. Idempotent (re-run: 0 inserted, 74 unchanged).
    - `scripts/data-model/schema.sql`: approved schema (moved from `Temp-New-Schema/slater_schema_draft.sql`, which is now superseded -- edit schema.sql from here on).
    - `scripts/data-model/global-roles.js`: 74 global roles, source of truth for the seed. Re-runs update changed roles; roles removed from the list are reported, never deleted.
@@ -121,7 +127,12 @@ Estimate: original was 12-16 working days; add ~3-5 days for the offline sync/th
    - app.js changes: flag check in `openContacts()`; crop tool output 240 -> 512 (affects old agency/company logo crops too, per answer #12).
    - Tests: `scripts/e2e-contacts-v2.js` (14 browser steps via headless Chrome; puppeteer-core lives in /tmp, not package.json -- setup in file header). Bugs it caught and fixed: human-speed clicks on pick-list items were lost (list closed on blur before mouse-up; found by John adding EIC to Nick Vettorel, now covered by a 300ms-press test); role picker auto-reopened after a pick and covered the fields below (next click picked a random role); mobile layout overflowed for long names and sat 60px low.
    - Not wired yet (by design): schedule location dropdowns, crew/talent/KP autocomplete, client company autocomplete still read the OLD contacts blob (Sessions 4-5 + migration in 6). v2 tables are empty until the Session 6 migration, so testing means entering test data by hand.
-7. Next: Session 4 -- Project tab organization pickers (agency picker filtered by is_agency, client picker = all orgs) + doc branding + default org, on v2.
+7. **NEXT: Session 4** -- Project tab organization pickers on v2, behind the same `?contacts=v2` flag (old pickers stay the default until cutover).
+   - Agency picker: organizations WHERE is_agency (active). Client/company picker: ALL active orgs (replaces free-text `client_company` + companies autocomplete). New projects default the agency to `users.default_organization_id`.
+   - Store links in `projects.agency_org_id` / `client_org_id` (real columns, already in schema) AND keep writing the old `data.agency_id` / `data.client_company` text for rollback until cutover. Decide with John how the projects route saves the new columns (projects are saved as a whole JSON blob today, `routes/projects.js`).
+   - Doc branding (Agency / Client logo) + call sheet / expense report agency info (billing contact name/email/phone, invoicing email/text) read from the org. Docs print an address's country ONLY when it differs from `users.default_country`.
+   - Replace the old Agency Manager modal (`openAgencyManager`, app.js ~5392) with the Organizations tab, or point it there.
+   - Watch-outs: permanent delete already refuses orgs referenced by `agency_org_id`/`client_org_id`; keep that working. Run both test suites and extend the browser test for the pickers.
 
 ## Draft v2 changes beyond the 12 answers (for John's review)
 
