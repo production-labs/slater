@@ -27,7 +27,21 @@ const express = require('express');
 const { pool, tx } = require('./db');
 const { HttpError, clean, parseId, handle } = require('./fields');
 
+const Regions = require('../../public/regions');
+
 const OVERLAP = "interval '10 seconds'";
+
+// US/CA states become their postal code when state and country arrive
+// together (the v2 client always sends both if either changed). Other
+// countries keep state as typed. Country is inferred only if sent as null.
+function normalize(values) {
+  if ('state' in values && 'country' in values) {
+    const r = Regions.normalizeAddress(values.state, values.country);
+    values.state = r.state;
+    values.country = r.country;
+  }
+  return values;
+}
 const CLIENT_UID_MAX = 100;
 
 function makeResource(cfg) {
@@ -86,7 +100,7 @@ function makeResource(cfg) {
 
   router.post('/', handle(async (req, res) => {
     const userId = req.session.userId;
-    const values = clean(spec, req.body, { partial: false });
+    const values = normalize(clean(spec, req.body, { partial: false }));
     let clientUid = req.body.client_uid ?? null;
     if (clientUid !== null && (typeof clientUid !== 'string' || !clientUid || clientUid.length > CLIENT_UID_MAX)) {
       throw new HttpError(400, 'client_uid must be a short string');
@@ -121,7 +135,7 @@ function makeResource(cfg) {
     const id = parseId(req.params.id);
     const base = req.body && req.body.base_updated_at;
     if (!base || typeof base !== 'string') throw new HttpError(400, 'base_updated_at is required');
-    const values = clean(spec, req.body, { partial: true });
+    const values = normalize(clean(spec, req.body, { partial: true }));
 
     const row = await tx(async client => {
       const lock = await client.query(

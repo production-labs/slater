@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS organizations (
   city                 TEXT,
   state                TEXT,
   zip                  TEXT,
+  country              TEXT CHECK (country ~ '^[A-Z]{2}$'),  -- ISO 3166-1 alpha-2
   notes                TEXT,
 
   -- Billing contact: plain fields, not a linked contact (answer #5).
@@ -150,6 +151,8 @@ CREATE INDEX IF NOT EXISTS organizations_name_idx
 CREATE INDEX IF NOT EXISTS organizations_agency_idx
   ON organizations (owner_id) WHERE is_agency AND archived_at IS NULL;
 
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS country TEXT CHECK (country ~ '^[A-Z]{2}$');
+
 DROP TRIGGER IF EXISTS organizations_touch ON organizations;
 CREATE TRIGGER organizations_touch BEFORE UPDATE ON organizations
   FOR EACH ROW EXECUTE FUNCTION slater_touch_updated_at();
@@ -181,6 +184,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   city                TEXT,
   state               TEXT,
   zip                 TEXT,
+  country             TEXT CHECK (country ~ '^[A-Z]{2}$'),  -- ISO 3166-1 alpha-2
   -- Job title, mostly for talent / interview subjects and client contacts
   -- ("Chief Executive Officer and President"). Not a production role.
   title               TEXT,
@@ -226,6 +230,14 @@ CREATE INDEX IF NOT EXISTS contacts_city_state_idx
 -- on databases whose contacts table predates the column.
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS zip TEXT;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS country TEXT CHECK (country ~ '^[A-Z]{2}$');
+
+-- Addresses (contacts, organizations, locations), John 2026-10-03:
+--   country: ISO 3166-1 alpha-2 code, NULL = unknown (treated as the user's
+--     default country). New records start with users.default_country.
+--   state: for US and CA, the 2-letter postal code (WA, BC); for every
+--     other country free text as typed. public/regions.js normalizes.
+--   Docs print the country only when it differs from the user's default.
 
 DROP TRIGGER IF EXISTS contacts_touch ON contacts;
 CREATE TRIGGER contacts_touch BEFORE UPDATE ON contacts
@@ -286,6 +298,7 @@ CREATE TABLE IF NOT EXISTS locations (
   city         TEXT,
   state        TEXT,
   zip          TEXT,
+  country      TEXT CHECK (country ~ '^[A-Z]{2}$'),  -- ISO 3166-1 alpha-2
   hospital     TEXT,                            -- same key as today (loc.hospital); auto-populated
   notes        TEXT,
   client_uid   TEXT,                            -- offline-create idempotency (see organizations)
@@ -298,6 +311,8 @@ CREATE INDEX IF NOT EXISTS locations_owner_sync_idx
   ON locations (owner_id, updated_at);
 CREATE UNIQUE INDEX IF NOT EXISTS locations_client_uid_uniq
   ON locations (owner_id, client_uid) WHERE client_uid IS NOT NULL;
+
+ALTER TABLE locations ADD COLUMN IF NOT EXISTS country TEXT CHECK (country ~ '^[A-Z]{2}$');
 
 DROP TRIGGER IF EXISTS locations_touch ON locations;
 CREATE TRIGGER locations_touch BEFORE UPDATE ON locations
@@ -314,6 +329,12 @@ CREATE TRIGGER locations_touch BEFORE UPDATE ON locations
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS default_organization_id INTEGER
     REFERENCES organizations(id) ON DELETE SET NULL;
+
+-- Default country for new addresses and for deciding when docs print a
+-- country. Everyone starts as US; editable in My Info.
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS default_country TEXT NOT NULL DEFAULT 'US'
+    CHECK (default_country ~ '^[A-Z]{2}$');
 
 -- Replaces agencies.is_default. One default per user, enforced by
 -- structure. The picker should only offer is_agency orgs here.

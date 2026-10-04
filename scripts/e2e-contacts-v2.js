@@ -103,7 +103,7 @@ async function main() {
     await page.waitForFunction(() => document.querySelectorAll('#cv2-pills .cv2-pill').length === 3, { timeout: 5000 });
     await type('#cv2f_phone', '2065550100');
     await type('#cv2f_city', 'Tacoma');
-    await type('#cv2f_state', 'WA');
+    await type('#cv2f_state', 'washington');
     await type('#cv2f_zip', '98402');
     await type('#cv2f_title', 'Lighting Lead');
     await type('#cv2f_union_status', 'IATSE Local 600');
@@ -115,6 +115,7 @@ async function main() {
     assert(c, 'not in DB');
     assert(c.phone === '(206) 555-0100', 'phone formatted: ' + c.phone);
     assert(c.zip === '98402', 'zip: ' + c.zip);
+    assert(c.state === 'WA' && c.country === 'US', 'state/country: ' + c.state + '/' + c.country);
     assert(c.title === 'Lighting Lead', 'title: ' + c.title);
     assert(c.gear_kit === 'FX6 package\nAputure 600d x2', 'gear multiline: ' + JSON.stringify(c.gear_kit));
     const roles = (await db.query(`SELECT r.name, r.owner_id, r.department FROM contact_roles cr JOIN roles r ON r.id=cr.role_id WHERE cr.contact_id=$1 ORDER BY cr.sort_order`, [c.id])).rows;
@@ -168,6 +169,12 @@ async function main() {
     await type('#cv2f_name', 'Worktank');
     await page.click('#cv2f_is_agency');
     await T('#cv2-agency-section');
+    await page.click('#cv2f_state'); await page.type('#cv2f_state', 'brit'); await sleep(150);
+    await page.waitForSelector('#cv2-ta-state.open [data-idx="0"]', { timeout: 3000 });
+    await page.click('#cv2-ta-state [data-idx="0"]');
+    assert(await page.$eval('#cv2f_state', e => e.value) === 'BC', 'picked BC');
+    assert(await page.$eval('#cv2f_country', e => e.value) === 'Canada', 'country followed province');
+    assert(await page.$eval('#cv2-state-label', e => e.textContent) === 'Province', 'label is Province');
     await type('#cv2f_contact_name', 'Billing Person');
     await type('#cv2f_invoicing_email', 'ap@worktank.example');
     const input = await page.$('#cv2-logo-file');
@@ -182,6 +189,7 @@ async function main() {
     await page.waitForFunction(() => document.querySelector('.cv2-detail-title').textContent === 'Worktank' && !document.querySelector('[data-act="cancel-new"]'), { timeout: 5000 });
     const o = (await db.query(`SELECT * FROM organizations WHERE owner_id=$1 AND name='Worktank'`, [userId])).rows[0];
     assert(o && o.is_agency && o.contact_name === 'Billing Person', 'org fields');
+    assert(o.state === 'BC' && o.country === 'CA', 'org address: ' + o.state + '/' + o.country);
     assert(/^data:image\/png;base64,/.test(o.logo), 'logo png');
     const dims = await page.evaluate(src => new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.src = src; }), o.logo);
     assert(dims[0] === 512 && dims[1] === 512, 'logo is ' + dims);
@@ -228,7 +236,14 @@ async function main() {
     await click('[data-act="tab"][data-tab="locations"]');
     await click('[data-act="new"]');
     await type('#cv2f_name', 'Building 92');
-    await type('#cv2f_city', 'Redmond');
+    await type('#cv2f_city', 'London');
+    await page.click('#cv2f_country'); // one click selects the whole value
+    await page.type('#cv2f_country', 'united k'); await sleep(150);
+    await page.keyboard.press('Enter');
+    assert(await page.$eval('#cv2f_country', e => e.value) === 'United Kingdom', 'country picked');
+    await type('#cv2f_state', 'Greater London');
+    await sleep(100);
+    assert(!(await page.$('#cv2-ta-state.open')), 'no US list abroad');
     await click('#cv2-save');
     await page.waitForFunction(() => document.querySelector('.cv2-detail-title').textContent === 'Building 92' && !document.querySelector('[data-act="cancel-new"]'), { timeout: 5000 });
     await click('[data-act="archive"]');
@@ -240,8 +255,10 @@ async function main() {
     await click('.cv2-row');
     await click('[data-act="restore"]');
     await page.waitForFunction(() => !document.querySelector('.cv2-row.archived'), { timeout: 5000 });
-    const l = (await db.query(`SELECT archived_at FROM locations WHERE owner_id=$1`, [userId])).rows[0];
+    const l = (await db.query(`SELECT archived_at, state, country FROM locations WHERE owner_id=$1`, [userId])).rows[0];
     assert(l && l.archived_at === null, 'restored in DB');
+    assert(l.state === 'Greater London' && l.country === 'GB', 'abroad address: ' + l.state + '/' + l.country);
+    assert(await page.$$eval('.cv2-row-sub', els => els.some(e => /London, Greater London, United Kingdom/.test(e.textContent))), 'list shows country abroad');
   });
   await step('names with HTML are shown as text, not markup', async () => {
     await click('[data-act="tab"][data-tab="people"]');
@@ -251,6 +268,21 @@ async function main() {
     await sleep(800);
     assert(!(await page.evaluate(() => window.__xss)), 'script ran');
     assert(await page.$$eval('.cv2-row-name', els => els.some(e => e.textContent.includes('<img'))), 'name not shown literally');
+  });
+  await step('My Info: default country setting drives new addresses', async () => {
+    await page.evaluate(() => document.querySelector('#contacts-v2-modal [data-act="close"]').click());
+    await page.evaluate(() => openMyInfo());
+    await T('#myinfo_country');
+    await page.waitForFunction(() => document.getElementById('myinfo_country').value === 'US', { timeout: 3000 });
+    await page.select('#myinfo_country', 'CA');
+    await page.evaluate(() => saveMyInfo());
+    await page.waitForFunction(async () => (await (await fetch('/api/v2/settings')).json()).default_country === 'CA', { timeout: 5000 });
+    await page.evaluate(() => openContacts());
+    await click('[data-act="tab"][data-tab="people"]');
+    await click('[data-act="new"]');
+    assert(await page.$eval('#cv2f_country', e => e.value) === 'Canada', 'new person defaults to Canada');
+    await click('[data-act="cancel-new"]');
+    await page.evaluate(() => fetch('/api/v2/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ default_country: 'US' }) }));
   });
   await step('reopen: data reloads from server', async () => {
     await page.reload({ waitUntil: 'networkidle2' });

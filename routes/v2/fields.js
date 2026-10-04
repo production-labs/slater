@@ -6,7 +6,10 @@
 //   bool   strict true/false
 //   image  data:image/png|jpeg;base64,... up to ~3 MB of text (logos are 512x512 PNG)
 //   orgRef organization id owned by the same user (ownership checked by caller)
+//   country ISO 3166-1 alpha-2 code from public/regions.js (case-insensitive in, uppercase out)
 // Empty strings are stored as NULL so "no value" has exactly one representation.
+
+const Regions = require('../../public/regions');
 
 class HttpError extends Error {
   constructor(status, message, extra) {
@@ -37,6 +40,13 @@ function cleanValue(col, def, raw) {
 
   if (typeof raw === 'number') raw = String(raw);
   if (typeof raw !== 'string') throw new HttpError(400, `${col} must be text`);
+
+  if (def.type === 'country') {
+    const c = raw.trim().toUpperCase();
+    if (c === '') return null;
+    if (!Regions.isCountry(c)) throw new HttpError(400, `${col} must be a 2-letter country code`);
+    return c;
+  }
 
   if (def.type === 'image') {
     if (raw === '') return null;

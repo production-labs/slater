@@ -8,6 +8,9 @@
 //     GET (see resource.js), across all four tables, plus the user's
 //     default organization id. Use the returned cursor for the next call.
 //
+//   GET /api/v2/settings                    -> { default_country }
+//   PUT /api/v2/settings                    { default_country: "US" }
+//
 //   GET /api/v2/default-organization        -> { organization_id }
 //   PUT /api/v2/default-organization        { organization_id: <id> | null }
 //     Must be an active organization with is_agency = true.
@@ -15,6 +18,7 @@
 const express = require('express');
 const { pool, tx } = require('./db');
 const { HttpError, handle } = require('./fields');
+const Regions = require('../../public/regions');
 const { maxCursor } = require('./resource');
 const { contacts, organizations, locations } = require('./resources');
 const roles = require('./roles');
@@ -29,6 +33,10 @@ router.use('/roles', roles.router);
 async function getDefaultOrg(db, userId) {
   const r = await db.query('SELECT default_organization_id FROM users WHERE id = $1', [userId]);
   return r.rows[0] ? r.rows[0].default_organization_id : null;
+}
+async function getSettings(db, userId) {
+  const r = await db.query('SELECT default_country FROM users WHERE id = $1', [userId]);
+  return { default_country: r.rows[0] ? r.rows[0].default_country : 'US' };
 }
 
 router.get('/sync', handle(async (req, res) => {
@@ -46,8 +54,9 @@ router.get('/sync', handle(async (req, res) => {
         await roles.pull(client, userId, since),
         await getDefaultOrg(client, userId),
       ];
+      const settings = await getSettings(client, userId);
       await client.query('COMMIT');
-      return { contacts: c, organizations: o, locations: l, roles: r, default_organization_id: d };
+      return { contacts: c, organizations: o, locations: l, roles: r, default_organization_id: d, settings };
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
       throw err;
@@ -57,6 +66,18 @@ router.get('/sync', handle(async (req, res) => {
   })();
   out.cursor = maxCursor([...out.contacts, ...out.organizations, ...out.locations, ...out.roles], since);
   res.json(out);
+}));
+
+router.get('/settings', handle(async (req, res) => {
+  res.json(await getSettings(pool, req.session.userId));
+}));
+
+router.put('/settings', handle(async (req, res) => {
+  const raw = req.body && req.body.default_country;
+  const code = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+  if (!Regions.isCountry(code)) throw new HttpError(400, 'default_country must be a 2-letter country code');
+  await pool.query('UPDATE users SET default_country = $2 WHERE id = $1', [req.session.userId, code]);
+  res.json({ default_country: code });
 }));
 
 router.get('/default-organization', handle(async (req, res) => {

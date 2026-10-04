@@ -52,6 +52,9 @@
 .cv2-dirty{font-size:11px;color:var(--accent-yellow)}
 .cv2-grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .cv2-grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 14px}
+.cv2-grid4{display:grid;grid-template-columns:1.5fr 1fr .9fr 1.4fr;gap:0 14px}
+.cv2-grid4 .cv2-picker-list{min-width:240px}
+.cv2-grid4 > .fl:last-child .cv2-picker-list{left:auto;right:0}
 .cv2-section{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--border)}
 .cv2-hint{font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:12px;line-height:1.4}
 .cv2-check{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-primary);margin-bottom:14px;cursor:pointer;line-height:1.4}
@@ -102,6 +105,7 @@
   .cv2-main:not(.show-detail) .cv2-detailpane{display:none}
   .cv2-back{display:inline-flex}
   .cv2-grid2,.cv2-grid3{grid-template-columns:1fr}
+  .cv2-grid4{grid-template-columns:1fr 1fr}
   .cv2-detail-body{padding:14px}
   .cv2-row{padding:12px}
   .cv2-chip{padding:6px 11px;font-size:12px;min-height:34px!important}

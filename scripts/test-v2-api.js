@@ -240,6 +240,32 @@ async function run() {
     assert.equal(p.body.city, 'Redmond');
   });
 
+  console.log('\nAddresses + settings');
+  await test('country codes validated; US/CA states normalized when sent with country', async () => {
+    let r = await api(A, 'POST', '/contacts', { name: 'Addr 1', state: 'washington' });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.deepEqual([r.body.state, r.body.country], ['WA', 'US'], 'name -> code, country inferred');
+    r = await api(A, 'POST', '/contacts', { name: 'Addr 2', state: 'ontario', country: null });
+    assert.deepEqual([r.body.state, r.body.country], ['ON', 'CA']);
+    r = await api(A, 'POST', '/locations', { name: 'Addr 3', state: 'Greater London', country: 'gb' });
+    assert.deepEqual([r.body.state, r.body.country], ['Greater London', 'GB'], 'abroad: free text, code uppercased');
+    const p = await api(A, 'PATCH', `/locations/${r.body.id}`, { state: 'bc', country: 'CA', base_updated_at: r.body.updated_at });
+    assert.deepEqual([p.body.state, p.body.country], ['BC', 'CA']);
+    assert.equal((await api(A, 'POST', '/contacts', { name: 'X', country: 'Canada' })).status, 400);
+    assert.equal((await api(A, 'POST', '/contacts', { name: 'X', country: 'XX' })).status, 400);
+    const o = await api(A, 'POST', '/organizations', { name: 'Maple Media', city: 'Vancouver', state: 'British Columbia', country: 'CA' });
+    assert.deepEqual([o.body.state, o.body.country], ['BC', 'CA']);
+  });
+  await test('settings: default country (get, set, validate, in sync)', async () => {
+    assert.deepEqual((await api(A, 'GET', '/settings')).body, { default_country: 'US' });
+    assert.equal((await api(A, 'PUT', '/settings', { default_country: 'ca' })).body.default_country, 'CA');
+    assert.equal((await api(A, 'PUT', '/settings', { default_country: 'XX' })).status, 400);
+    assert.equal((await api(A, 'PUT', '/settings', {})).status, 400);
+    assert.equal((await api(A, 'GET', '/sync')).body.settings.default_country, 'CA');
+    assert.equal((await api(B, 'GET', '/settings')).body.default_country, 'US', 'per user');
+    await api(A, 'PUT', '/settings', { default_country: 'US' });
+  });
+
   console.log('\nRoles');
   let custom;
   await test('create custom role; duplicate is 409; same name as global allowed', async () => {

@@ -6,6 +6,13 @@
 //
 //   node scripts/dev-copy-contacts-to-v2.js john@vandonald.com          copy (re-runnable: skips rows already copied)
 //   node scripts/dev-copy-contacts-to-v2.js john@vandonald.com --wipe   remove everything this script created
+//   node scripts/dev-copy-contacts-to-v2.js john@vandonald.com --fix-addresses
+//        normalize state/country on ALL of the user's v2 rows (same rule as below)
+//
+// Address rule (same as the Session 6 migration will use):
+//   recognizable US state / CA province -> postal code + that country
+//   no state at all                     -> user's default country
+//   anything else with no country       -> left blank, listed for review
 //
 // Every row it creates is tagged client_uid = 'devcopy:...', so --wipe never
 // touches records created by hand in the new screen. Custom roles it created
@@ -13,6 +20,7 @@
 
 require('dotenv').config({ quiet: true });
 const { Pool } = require('pg');
+const Regions = require('../public/regions');
 
 const url = new URL(process.env.DATABASE_URL);
 if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname)) {
@@ -20,6 +28,14 @@ if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname)) {
 }
 const email = process.argv[2];
 const WIPE = process.argv.includes('--wipe');
+const FIX = process.argv.includes('--fix-addresses');
+
+// Returns { state, country, review } per the address rule above.
+function cleanAddress(state, country, defaultCountry) {
+  const r = Regions.normalizeAddress(state, country || null);
+  if (!r.state && !r.country) return { state: null, country: defaultCountry, review: false };
+  return { state: r.state, country: r.country, review: !r.country };
+}
 if (!email || email.startsWith('--')) { console.error('Usage: node scripts/dev-copy-contacts-to-v2.js <email> [--wipe]'); process.exit(2); }
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -33,9 +49,30 @@ async function main() {
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
-    const u = await c.query('SELECT id, contacts FROM users WHERE lower(email) = lower($1)', [email]);
+    const u = await c.query('SELECT id, contacts, default_country FROM users WHERE lower(email) = lower($1)', [email]);
     if (!u.rows.length) throw new Error('No user ' + email);
     const userId = u.rows[0].id;
+    const defaultCountry = u.rows[0].default_country || 'US';
+
+    if (FIX) {
+      const review = [];
+      let changed = 0;
+      for (const tb of ['contacts', 'organizations', 'locations']) {
+        const rows = (await c.query(`SELECT id, name, state, country FROM ${tb} WHERE owner_id = $1`, [userId])).rows;
+        for (const r of rows) {
+          const a = cleanAddress(r.state, r.country, defaultCountry);
+          if (a.review) review.push(`${tb}: ${r.name} (state "${r.state}")`);
+          if (a.state !== r.state || a.country !== r.country) {
+            await c.query(`UPDATE ${tb} SET state = $2, country = $3 WHERE id = $1`, [r.id, a.state, a.country]);
+            changed++;
+          }
+        }
+      }
+      await c.query('COMMIT');
+      console.log(`Addresses normalized: ${changed} rows updated.`);
+      if (review.length) console.log('Needs a country (unrecognized state):\n  ' + review.join('\n  '));
+      return;
+    }
 
     if (WIPE) {
       const created = await c.query(`SELECT DISTINCT cr.role_id FROM contact_roles cr JOIN contacts ct ON ct.id = cr.contact_id
@@ -80,6 +117,9 @@ async function main() {
       return r.id;
     }
     async function insert(table, uid, cols) {
+      const a = cleanAddress(cols.state, cols.country, defaultCountry);
+      cols.state = a.state; cols.country = a.country;
+      if (a.review) report.notes.push(`${table} "${cols.name}": unrecognized state "${a.state}", country left blank`);
       const keys = Object.keys(cols);
       const r = await c.query(
         `INSERT INTO ${table} (owner_id, client_uid, ${keys.join(', ')}) VALUES ($1, $2, ${keys.map((_, i) => '$' + (i + 3)).join(', ')})

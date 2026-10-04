@@ -36,7 +36,7 @@ const FINGERPRINTS = {
 
 // Expected column additions to existing tables. Anything else changing is a failure.
 const EXPECTED_NEW_COLUMNS = {
-  users: ['default_organization_id'],
+  users: ['default_organization_id', 'default_country'],
   projects: ['agency_org_id', 'client_org_id'],
 };
 

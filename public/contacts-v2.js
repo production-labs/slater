@@ -67,7 +67,7 @@
 
   // ---------------------------------------------------------------- store
   var TABLES = ['contacts', 'organizations', 'locations', 'roles'];
-  var store = { contacts: {}, organizations: {}, locations: {}, roles: {}, defaultOrgId: null, cursor: null, loaded: false, archivedLoaded: {} };
+  var store = { contacts: {}, organizations: {}, locations: {}, roles: {}, defaultOrgId: null, settings: { default_country: 'US' }, cursor: null, loaded: false, archivedLoaded: {} };
 
   function absorb(table, rows) {
     (rows || []).forEach(function (r) {
@@ -81,6 +81,7 @@
       if (!store.cursor) TABLES.forEach(function (t) { store[t] = {}; });
       TABLES.forEach(function (t) { absorb(t, d[t]); });
       store.defaultOrgId = d.default_organization_id;
+      if (d.settings) store.settings = d.settings;
       if (d.cursor) store.cursor = d.cursor;
       store.loaded = true;
     });
@@ -103,6 +104,7 @@
     if (key === 'role_ids') return (v || []).slice();
     if (key === 'is_agency') return !!v;
     if (key === 'organization_id') return v === '' || v == null ? null : Number(v);
+    if (key === 'country') return v ? String(v).trim().toUpperCase() || null : null;
     if (v == null) return null;
     v = String(v);
     if (!MULTILINE[key]) v = v.trim();
@@ -114,6 +116,10 @@
     Object.keys(edited).forEach(function (k) {
       if (!same(norm(k, baseline[k]), norm(k, edited[k]))) out[k] = norm(k, edited[k]);
     });
+    // The server normalizes state against country, so send them as a pair.
+    if (('state' in out || 'country' in out) && 'state' in edited && 'country' in edited) {
+      out.state = norm('state', edited.state); out.country = norm('country', edited.country);
+    }
     return out;
   }
 
@@ -257,6 +263,11 @@
     // list would cover the fields below and swallow the next click.
     root.addEventListener('focusout', function (e) {
       if (e.target.id === 'cv2-role-input') setTimeout(closePicker, 150);
+      if (e.target.id === 'cv2f_state' || e.target.id === 'cv2f_country') {
+        e.target.removeAttribute('data-fresh'); // next click selects all again
+        var k = e.target.id.slice(5);
+        setTimeout(function () { closeTA(k); commitTA(k); }, 150);
+      }
     });
     document.getElementById('cv2-logo-file').addEventListener('change', onLogoFile);
   }
@@ -345,14 +356,14 @@
         if (ui.cat !== 'all' && ui.cat !== 'none' && cats.indexOf(ui.cat) === -1) return false;
         if (ui.state && (c.state || '').toUpperCase() !== ui.state) return false;
         if (!q) return true;
-        var hay = [c.name, c.title, c.email, c.phone, c.city, c.state, c.union_status, orgName(c.organization_id)]
+        var hay = [c.name, c.title, c.email, c.phone, c.city, c.state, c.country && Regions.countryName(c.country), c.union_status, orgName(c.organization_id)]
           .concat((c.role_ids || []).map(function (id) { var r = role(id); return r ? r.name + ' ' + (r.abbreviation || '') : ''; }))
           .join(' ').toLowerCase();
         return hay.indexOf(q) !== -1;
       });
       list.sort(function (a, b) { return byText(sortKey(a), sortKey(b)); });
     } else {
-      if (q) list = list.filter(function (r) { return [r.name, r.city, r.state, r.address, r.website].join(' ').toLowerCase().indexOf(q) !== -1; });
+      if (q) list = list.filter(function (r) { return [r.name, r.city, r.state, r.country && Regions.countryName(r.country), r.address, r.website].join(' ').toLowerCase().indexOf(q) !== -1; });
       list.sort(function (a, b) { return byText((a.name || '').toLowerCase(), (b.name || '').toLowerCase()); });
     }
     return list;
@@ -375,14 +386,14 @@
       var sub, lead = '';
       if (ui.tab === 'people') {
         var roles = (r.role_ids || []).map(function (id) { return roleLabel(role(id)); });
-        sub = [roles.join(', '), r.title, orgName(r.organization_id), [r.city, r.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+        sub = [roles.join(', '), r.title, orgName(r.organization_id), placeLine(r)].filter(Boolean).join(' · ');
       } else if (ui.tab === 'organizations') {
         lead = r.logo ? '<img class="cv2-row-logo" src="' + esc(r.logo) + '" alt="">' : '<div class="cv2-row-logo empty">' + esc((r.name || '?').charAt(0).toUpperCase()) + '</div>';
         if (r.is_agency) name += '<span class="cv2-badge">Agency</span>';
         if (store.defaultOrgId === r.id) name += '<span class="cv2-badge accent">Default</span>';
-        sub = [r.website, [r.city, r.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+        sub = [r.website, placeLine(r)].filter(Boolean).join(' · ');
       } else {
-        sub = [r.address, [r.city, r.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+        sub = [r.address, placeLine(r)].filter(Boolean).join(' · ');
       }
       return '<div class="' + cls + '" data-act="select" data-id="' + r.id + '">' + lead +
         '<div class="cv2-row-main"><div class="cv2-row-name">' + name + '</div>' +
@@ -448,6 +459,126 @@
     updateDirty();
   }
 
+  // ------------------------------------------------------------ addresses
+  // State: US/CA get a type-ahead of states/provinces and store the postal
+  // code (typing "washington" saves WA and sets the country). Any other
+  // country: free text. Country: type-ahead, stored as the ISO code.
+  // Shared list + rules: public/regions.js (also used by the server).
+  var Regions = window.SlaterRegions;
+  function defaultCountry() { return (store.settings && store.settings.default_country) || 'US'; }
+  function stateLabel(country) { return country === 'CA' ? 'Province' : (country === 'US' || !country) ? 'State' : 'State / region'; }
+  function addressHtml(r) {
+    var isNew = ui.sel === 'new';
+    var country = isNew ? defaultCountry() : (r.country || null);
+    return '' +
+      fieldHtml('Address', 'address', r.address) +
+      '<div class="cv2-grid4">' +
+        fieldHtml('City', 'city', r.city) +
+        '<div class="fl"><label for="cv2f_state" id="cv2-state-label">' + stateLabel(country) + '</label>' +
+          '<div class="cv2-picker"><input type="text" id="cv2f_state" data-field="state" autocomplete="off" value="' + esc(r.state) + '">' +
+          '<div class="cv2-picker-list" id="cv2-ta-state"></div></div></div>' +
+        fieldHtml('Zip', 'zip', r.zip) +
+        '<div class="fl"><label for="cv2f_country">Country</label>' +
+          '<div class="cv2-picker"><input type="text" id="cv2f_country" data-field="country" autocomplete="off" data-code="' + esc(country || '') + '" value="' + esc(country ? Regions.countryName(country) : '') + '">' +
+          '<div class="cv2-picker-list" id="cv2-ta-country"></div></div></div>' +
+      '</div>';
+  }
+  function countryInput() { return document.getElementById('cv2f_country'); }
+  function currentCountry() {
+    var el = countryInput();
+    if (!el) return null;
+    var typed = el.value.trim();
+    if (!typed) return null;
+    return Regions.resolveCountry(typed) || el.getAttribute('data-code') || null;
+  }
+  function setCountry(code) {
+    var el = countryInput();
+    if (!el) return;
+    el.setAttribute('data-code', code || '');
+    el.value = code ? Regions.countryName(code) : '';
+    var lbl = document.getElementById('cv2-state-label');
+    if (lbl) lbl.textContent = stateLabel(code);
+  }
+  // State + country from the form, normalized exactly like the server does.
+  function readAddress() {
+    var st = document.getElementById('cv2f_state');
+    if (!st) return null;
+    return Regions.normalizeAddress(st.value, currentCountry());
+  }
+  // "Seattle, WA" at home; "London, United Kingdom" abroad.
+  function placeLine(r) {
+    var parts = [r.city, r.state].filter(Boolean).join(', ');
+    if (r.country && r.country !== defaultCountry()) parts = [parts, Regions.countryName(r.country)].filter(Boolean).join(', ');
+    return parts;
+  }
+
+  var ta = { key: null, idx: -1 };
+  function taItems(key) {
+    var el = document.getElementById('cv2f_' + key);
+    var q = el ? el.value : '';
+    if (key === 'country') {
+      return Regions.searchCountries(q, 60).map(function (c) { return { value: c.code, label: c.name, meta: c.code }; });
+    }
+    var country = currentCountry();
+    if (country && !Regions.hasRegionList(country)) return []; // free text abroad
+    return Regions.searchRegions(q, country, 80).map(function (r) {
+      return { value: r.code, label: r.name, meta: r.code + (r.country === country ? '' : ' · ' + (r.country === 'CA' ? 'Canada' : 'US')), country: r.country };
+    });
+  }
+  function openTA(key) {
+    var list = document.getElementById('cv2-ta-' + key);
+    if (!list) return;
+    if (ta.key !== key) { ta.key = key; ta.idx = -1; }
+    var items = taItems(key);
+    if (!items.length) { list.classList.remove('open'); return; }
+    list.innerHTML = items.map(function (it, i) {
+      return '<div class="cv2-picker-item' + (i === ta.idx ? ' active' : '') + '" data-act="ta-pick" data-key="' + key + '" data-idx="' + i + '">' +
+        '<span>' + esc(it.label) + '</span><span class="cv2-pi-meta">' + esc(it.meta) + '</span></div>';
+    }).join('');
+    list.classList.add('open');
+    var active = list.querySelector('.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  }
+  function closeTA(only) {
+    ['state', 'country'].forEach(function (k) {
+      if (only && k !== only) return;
+      var l = document.getElementById('cv2-ta-' + k); if (l) l.classList.remove('open');
+    });
+    if (!only || ta.key === only) { ta.key = null; ta.idx = -1; }
+  }
+  function pickTA(key, idx) {
+    var it = taItems(key)[idx];
+    if (!it) return;
+    if (key === 'country') {
+      setCountry(it.value);
+    } else {
+      document.getElementById('cv2f_state').value = it.value;
+      if (it.country && currentCountry() !== it.country) setCountry(it.country);
+    }
+    closeTA();
+    updateDirty();
+  }
+  // On leaving a field: tidy what was typed ("washington" -> WA + US).
+  function commitTA(key) {
+    if (key === 'country') {
+      var el = countryInput();
+      if (!el) return;
+      var typed = el.value.trim();
+      if (!typed) setCountry(null);
+      else {
+        var code = Regions.resolveCountry(typed);
+        if (code) setCountry(code);
+        else { setCountry(el.getAttribute('data-code') || null); toast('Unknown country "' + typed + '". Pick one from the list.', 'err'); }
+      }
+    } else {
+      var a = readAddress();
+      if (!a) return;
+      document.getElementById('cv2f_state').value = a.state || '';
+      if (a.country !== currentCountry()) setCountry(a.country);
+    }
+    updateDirty();
+  }
+
   function personForm(c) {
     var orgOpts = [['', 'None']].concat(rows('organizations')
       .sort(function (a, b) { return byText(a.name.toLowerCase(), b.name.toLowerCase()); })
@@ -474,12 +605,7 @@
         fieldHtml('Phone', 'phone', c.phone, { cls: 'fmt-phone', placeholder: '(206) 555-0100', inputType: 'tel' }) +
         fieldHtml('Email', 'email', c.email, { inputType: 'email' }) +
       '</div>' +
-      fieldHtml('Address', 'address', c.address) +
-      '<div class="cv2-grid3">' +
-        fieldHtml('City', 'city', c.city) +
-        fieldHtml('State', 'state', c.state, { placeholder: 'WA' }) +
-        fieldHtml('Zip', 'zip', c.zip) +
-      '</div>' +
+      addressHtml(c) +
       '<div class="cv2-section">Production details</div>' +
       '<div class="cv2-grid2">' +
         fieldHtml('Union status', 'union_status', c.union_status, { list: 'cv2-union-list', placeholder: 'e.g. IATSE Local 600, Non-union' }) +
@@ -512,10 +638,7 @@
         fieldHtml('Website', 'website', o.website, { placeholder: 'example.com' }) +
         fieldHtml('Phone', 'phone', o.phone, { cls: 'fmt-phone', inputType: 'tel' }) +
       '</div>' +
-      fieldHtml('Address', 'address', o.address) +
-      '<div class="cv2-grid3">' +
-        fieldHtml('City', 'city', o.city) + fieldHtml('State', 'state', o.state) + fieldHtml('Zip', 'zip', o.zip) +
-      '</div>' +
+      addressHtml(o) +
       fieldHtml('Notes', 'notes', o.notes, { type: 'textarea' }) +
       '<div id="cv2-agency-section"' + (agencyChecked ? '' : ' style="display:none"') + '>' +
         '<div class="cv2-section">Agency details</div>' +
@@ -539,27 +662,27 @@
   function locationForm(l) {
     return '' +
       fieldHtml('Name', 'name', l.name, { required: true, placeholder: 'e.g. Building 92, Studio B' }) +
-      fieldHtml('Address', 'address', l.address) +
-      '<div class="cv2-grid3">' +
-        fieldHtml('City', 'city', l.city) + fieldHtml('State', 'state', l.state) + fieldHtml('Zip', 'zip', l.zip) +
-      '</div>' +
+      addressHtml(l) +
       fieldHtml('Nearest hospital', 'hospital', l.hospital, { type: 'textarea', placeholder: 'Name and address of the nearest emergency room' }) +
       fieldHtml('Notes', 'notes', l.notes, { type: 'textarea', placeholder: 'Parking, load-in, access, contacts on site...' });
   }
 
   // Read the open form into a plain object of fields.
   var FORM_FIELDS = {
-    people: ['name', 'sort_last_name', 'title', 'organization_id', 'phone', 'email', 'address', 'city', 'state', 'zip', 'union_status', 'travel_availability', 'gear_kit', 'notes'],
-    organizations: ['name', 'is_agency', 'website', 'phone', 'address', 'city', 'state', 'zip', 'notes', 'contact_name', 'contact_email', 'contact_phone', 'invoicing_email', 'invoicing_text', 'default_project_type', 'timezone'],
-    locations: ['name', 'address', 'city', 'state', 'zip', 'hospital', 'notes'],
+    people: ['name', 'sort_last_name', 'title', 'organization_id', 'phone', 'email', 'address', 'city', 'state', 'zip', 'country', 'union_status', 'travel_availability', 'gear_kit', 'notes'],
+    organizations: ['name', 'is_agency', 'website', 'phone', 'address', 'city', 'state', 'zip', 'country', 'notes', 'contact_name', 'contact_email', 'contact_phone', 'invoicing_email', 'invoicing_text', 'default_project_type', 'timezone'],
+    locations: ['name', 'address', 'city', 'state', 'zip', 'country', 'hospital', 'notes'],
   };
   function readForm() {
     var out = {};
     FORM_FIELDS[ui.tab].forEach(function (k) {
       var el = document.getElementById('cv2f_' + k);
       if (!el) return;
+      if (k === 'state' || k === 'country') return; // handled by readAddress()
       out[k] = el.type === 'checkbox' ? el.checked : el.value;
     });
+    var addr = readAddress();
+    if (addr) { out.state = addr.state; out.country = addr.country; }
     if (ui.tab === 'people') out.role_ids = ui.formRoles.slice();
     if (ui.tab === 'organizations') out.logo = ui.formLogo;
     return out;
@@ -572,6 +695,7 @@
     if (ui.sel === 'new') {
       ui.dirty = Object.keys(form).some(function (k) {
         var v = norm(k, form[k]);
+        if (k === 'country') return v != null && v !== defaultCountry();
         return k === 'role_ids' ? v.length > 0 : k === 'is_agency' ? v : v != null;
       });
     } else {
@@ -773,6 +897,7 @@
     var form = readForm();
     renderDetail();
     Object.keys(form).forEach(function (k) {
+      if (k === 'country') return setCountry(form.country);
       var el = document.getElementById('cv2f_' + k);
       if (!el) return;
       if (el.type === 'checkbox') el.checked = !!form[k]; else el.value = form[k] == null ? '' : form[k];
@@ -801,6 +926,11 @@
   function onClick(e) {
     if (e.target === root) return close(); // backdrop click
     if (e.target.id === 'cv2-role-input') return openPicker();
+    if (e.target.id === 'cv2f_state' || e.target.id === 'cv2f_country') {
+      // Pick-from-list fields: select the current value so typing replaces it.
+      if (e.target.getAttribute('data-fresh') !== '0') { e.target.select(); e.target.setAttribute('data-fresh', '0'); }
+      return openTA(e.target.id.slice(5));
+    }
     var t = e.target.closest('[data-act]');
     if (!t || t.disabled) return;
     var act = t.getAttribute('data-act');
@@ -827,6 +957,7 @@
       case 'logo-crop': return ui.formLogo && cropLogo(ui.formLogo);
       case 'logo-remove': ui.formLogo = null; return renderDetailKeepForm();
       case 'pick-role': return addRole(Number(id));
+      case 'ta-pick': return pickTA(t.getAttribute('data-key'), Number(t.getAttribute('data-idx')));
       case 'create-role': return showNewRoleForm(document.getElementById('cv2-role-input').value.trim());
       case 'newrole-cancel': document.getElementById('cv2-newrole').innerHTML = ''; return;
       case 'newrole-save': return saveNewRole();
@@ -844,6 +975,7 @@
     var t = e.target;
     if (t.id === 'cv2-q') { ui.q = t.value; return renderList(); }
     if (t.id === 'cv2-role-input') { ui.pickerIdx = -1; return openPicker(); }
+    if (t.id === 'cv2f_state' || t.id === 'cv2f_country') { ta.idx = -1; openTA(t.id.slice(5)); return setTimeout(updateDirty, 0); }
     if (t.hasAttribute('data-field')) setTimeout(updateDirty, 0); // after the global phone formatter
   }
   function onChange(e) {
@@ -869,6 +1001,18 @@
   }
   function onKeydown(e) {
     var t = e.target;
+    if (t.id === 'cv2f_state' || t.id === 'cv2f_country') {
+      var key = t.id.slice(5);
+      var list = document.getElementById('cv2-ta-' + key);
+      var open = list && list.classList.contains('open');
+      var n = list ? list.querySelectorAll('[data-idx]').length : 0;
+      if (e.key === 'ArrowDown') { e.preventDefault(); ta.idx = open ? Math.min(ta.idx + 1, n - 1) : -1; return openTA(key); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); ta.idx = Math.max(ta.idx - 1, 0); return openTA(key); }
+      if (e.key === 'Enter' && open) { e.preventDefault(); return pickTA(key, ta.idx >= 0 ? ta.idx : 0); }
+      if (e.key === 'Escape' && open) { e.stopPropagation(); return closeTA(); }
+      if (e.key === 'Tab' && open && ta.idx >= 0) { pickTA(key, ta.idx); }
+      return;
+    }
     if (t.id === 'cv2-role-input') {
       var items = document.querySelectorAll('#cv2-picker-list [data-idx]');
       var isOpen = document.getElementById('cv2-picker-list').classList.contains('open');
@@ -890,6 +1034,58 @@
     if ((e.metaKey || e.ctrlKey) && e.key === 's' && ui.sel != null) { e.preventDefault(); return save(); }
     if (e.key === 'Enter' && (t.id === 'cv2-nr-name' || t.id === 'cv2-nr-abbr' || t.id === 'cv2-nr-dept')) { e.preventDefault(); return saveNewRole(); }
   }
+
+  // ------------------------------------------------- My Info: default country
+  // Adds a "Default country" select to the existing My Info modal, only when
+  // the v2 flag is on (the column exists only after the new-schema migration).
+  // Wraps openMyInfo / saveMyInfo from app.js; the inline onclick handlers
+  // look these globals up at call time, so the wrappers take effect.
+  function hookMyInfo() {
+    var origOpen = window.openMyInfo, origSave = window.saveMyInfo;
+    if (typeof origOpen !== 'function' || typeof origSave !== 'function') return;
+    function field() {
+      var sel = document.getElementById('myinfo_country');
+      if (sel) return sel;
+      var tz = document.getElementById('myinfo_timezone');
+      if (!tz) return null;
+      var tzField = tz.closest('.fl');
+      var wrap = document.createElement('div');
+      wrap.className = 'fl';
+      wrap.style.marginBottom = '12px';
+      wrap.innerHTML = '<label for="myinfo_country">Default country</label>' +
+        '<div class="select-wrap"><select id="myinfo_country" style="' + esc(tz.getAttribute('style') || '') + '">' +
+        Regions.countries().map(function (c) { return '<option value="' + c.code + '">' + esc(c.name) + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.4">New addresses start in this country. Call sheets and docs only print a country when it is different.</div>';
+      tzField.parentNode.insertBefore(wrap, tzField);
+      return document.getElementById('myinfo_country');
+    }
+    window.openMyInfo = function () {
+      var out = origOpen.apply(this, arguments);
+      var sel = field();
+      if (sel) {
+        sel.value = defaultCountry();
+        sel.setAttribute('data-orig', sel.value);
+        req('GET', '/settings').then(function (d) {
+          store.settings = d;
+          sel.value = d.default_country;
+          sel.setAttribute('data-orig', d.default_country);
+        }, function () { /* keep cached value */ });
+      }
+      return out;
+    };
+    window.saveMyInfo = function () {
+      var sel = document.getElementById('myinfo_country');
+      if (sel && sel.value && sel.value !== sel.getAttribute('data-orig')) {
+        req('PUT', '/settings', { default_country: sel.value }).then(function (d) {
+          store.settings = d;
+          if (root && root.classList.contains('open')) renderList();
+        }, function (e) { toast('Could not save default country: ' + e.message, 'err'); });
+      }
+      return origSave.apply(this, arguments);
+    };
+  }
+  if (localStorage.getItem(FLAG_KEY) === '1') hookMyInfo();
 
   window.ContactsV2 = {
     enabled: function () { return localStorage.getItem(FLAG_KEY) === '1'; },
