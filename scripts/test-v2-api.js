@@ -82,10 +82,10 @@ async function run() {
   console.log('\nContacts');
   let c1;
   await test('create contact with ordered roles', async () => {
-    const r = await api(A, 'POST', '/contacts', { name: '  Shaun Smith ', email: 's@x.com', zip: ' 98402 ', title: 'VP of Marketing', role_ids: [GAFFER, DP], client_uid: 'uid-1' });
+    const r = await api(A, 'POST', '/contacts', { name: '  Shaun   Smith ', email: 's@x.com', zip: ' 98402 ', title: 'VP of Marketing', role_ids: [GAFFER, DP], client_uid: 'uid-1' });
     assert.equal(r.status, 201, JSON.stringify(r.body));
     c1 = r.body;
-    assert.equal(c1.name, 'Shaun Smith', 'name trimmed');
+    assert.equal(c1.name, 'Shaun Smith', 'name trimmed, inner spaces collapsed');
     assert.deepEqual(c1.role_ids, [GAFFER, DP], 'role order kept');
     assert.equal(c1.phone, null, 'missing field stored as null');
     assert.equal(c1.zip, '98402', 'zip trimmed + stored');

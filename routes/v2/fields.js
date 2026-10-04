@@ -2,7 +2,8 @@
 //
 // Each resource declares a spec: { column: { type, required?, multiline? } }.
 // Types:
-//   text   single-line, trimmed, max 2,000 chars (multiline: not trimmed, max 20,000)
+//   text   single-line, trimmed + inner whitespace collapsed, max 2,000 chars
+//          (multiline: kept as typed, max 20,000)
 //   bool   strict true/false
 //   image  data:image/png|jpeg;base64,... up to ~3 MB of text (logos are 512x512 PNG)
 //   orgRef organization id owned by the same user (ownership checked by caller)
@@ -56,7 +57,9 @@ function cleanValue(col, def, raw) {
   }
 
   // text
-  const v = def.multiline ? raw : raw.trim();
+  // Single-line text: trim and collapse runs of whitespace ("Nick  Vettorel"
+  // -> "Nick Vettorel"). Multiline text keeps its spacing.
+  const v = def.multiline ? raw : raw.replace(/\s+/g, ' ').trim();
   const max = def.multiline ? MULTILINE_MAX : TEXT_MAX;
   if (v.length > max) throw new HttpError(400, `${col} is too long (max ${max} characters)`);
   return v === '' ? null : v;

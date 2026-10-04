@@ -107,7 +107,7 @@
     if (key === 'country') return v ? String(v).trim().toUpperCase() || null : null;
     if (v == null) return null;
     v = String(v);
-    if (!MULTILINE[key]) v = v.trim();
+    if (!MULTILINE[key]) v = v.replace(/\s+/g, ' ').trim(); // same as the server
     return v === '' ? null : v;
   }
   function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }

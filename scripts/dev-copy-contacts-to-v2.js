@@ -42,7 +42,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const ALIASES = { 'prod': 'Producer' }; // Session 6 grows this from real data
 const BUCKET_CAT = { staff: 'staff', crew: 'crew', talent: 'talent' };
 const ROLE_FIELD = { staff: 'role', crew: 'position', talent: 'title' };
-const t = v => (v == null ? '' : String(v)).trim();
+const t = v => (v == null ? '' : String(v)).replace(/\s+/g, ' ').trim(); // collapse extra spaces (migration rule)
 const n = v => t(v) || null;
 
 async function main() {
