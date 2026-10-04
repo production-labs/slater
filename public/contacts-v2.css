@@ -14,6 +14,9 @@
 .cv2-listpane{border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;min-width:0}
 .cv2-detailpane{display:flex;flex-direction:column;min-height:0;min-width:0}
 #contacts-v2-modal .lb:disabled{opacity:.4;cursor:default;pointer-events:none}
+#contacts-v2-modal .cv2-detail-body input:disabled,#contacts-v2-modal .cv2-detail-body select:disabled,#contacts-v2-modal .cv2-detail-body textarea:disabled{opacity:.55;cursor:default;background:var(--surface-2)}
+#contacts-v2-modal .cv2-detail-body input:disabled::placeholder,#contacts-v2-modal .cv2-detail-body textarea:disabled::placeholder{color:transparent}
+.cv2-row-name .cv2-pill-abbr{color:var(--text-muted);font-weight:400;font-size:11px;margin-left:3px}
 
 /* list pane */
 .cv2-listtools{padding:10px 12px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border)}

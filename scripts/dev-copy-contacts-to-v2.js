@@ -93,10 +93,10 @@ async function main() {
     }
 
     const blob = u.rows[0].contacts || {};
-    const report = { contacts: 0, organizations: 0, locations: 0, skipped: 0, rolesMatched: {}, rolesCreated: [], notes: [] };
+    const report = { contacts: 0, organizations: 0, locations: 0, skipped: 0, rolesMatched: {}, rolesDropped: [], notes: [] };
 
     // Role lookup: global + user's custom, by lower(name) and lower(abbreviation).
-    const roleRows = (await c.query('SELECT id, name, abbreviation, category FROM roles WHERE (owner_id IS NULL OR owner_id = $1) AND archived_at IS NULL', [userId])).rows;
+    const roleRows = (await c.query('SELECT id, name, abbreviation, category FROM roles WHERE owner_id IS NULL AND archived_at IS NULL')).rows; // built-in list only
     const byKey = new Map();
     for (const r of roleRows) {
       byKey.set(r.name.toLowerCase(), r);
@@ -108,13 +108,10 @@ async function main() {
       const viaAlias = ALIASES[key] && byKey.get(ALIASES[key].toLowerCase());
       const hit = viaAlias || byKey.get(key);
       if (hit) { report.rolesMatched[text] = hit.name; return hit.id; }
-      const ins = await c.query(`INSERT INTO roles (owner_id, name, category, sort_order) VALUES ($1, $2, $3, 9000)
-                                 ON CONFLICT (owner_id, lower(name)) WHERE owner_id IS NOT NULL DO UPDATE SET name = roles.name
-                                 RETURNING id, name, abbreviation, category`, [userId, t(text), category]);
-      const r = ins.rows[0];
-      byKey.set(key, r);
-      report.rolesCreated.push(`${r.name} (${category})`);
-      return r.id;
+      // No match on the built-in list: drop it (John, 2026-10-03). The person
+      // comes over without that role; listed in the report for follow-up.
+      report.rolesDropped.push(`${t(text)} (${category})`);
+      return null;
     }
     async function insert(table, uid, cols) {
       const a = cleanAddress(cols.state, cols.country, defaultCountry);
@@ -208,7 +205,7 @@ async function main() {
     console.log(`Copied for ${email}: ${report.contacts} people, ${report.organizations} organizations, ${report.locations} locations` +
       (report.skipped ? ` (${report.skipped} already copied, skipped)` : ''));
     console.log('Roles matched:', Object.entries(report.rolesMatched).map(([k, v]) => `${k} -> ${v}`).join(', ') || 'none');
-    console.log('Custom roles created:', report.rolesCreated.join(', ') || 'none');
+    console.log('Unmatched roles dropped (person kept, no role):', [...new Set(report.rolesDropped)].join(', ') || 'none');
     report.notes.forEach(x => console.log('Note:', x));
   } catch (e) {
     await c.query('ROLLBACK').catch(() => {});

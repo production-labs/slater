@@ -40,8 +40,13 @@ async function pull(db, userId, since) {
             AND updated_at > $2::timestamptz - interval '10 seconds'
           ORDER BY updated_at, id`, [userId, since])
     : await db.query(
+        // Active roles, plus archived/retired ones still attached to one of
+        // this user's contacts (so their pills can show the real name).
         `SELECT ${SELECT} FROM roles
-          WHERE (owner_id IS NULL OR owner_id = $1) AND archived_at IS NULL
+          WHERE (owner_id IS NULL OR owner_id = $1)
+            AND (archived_at IS NULL OR EXISTS (
+                  SELECT 1 FROM contact_roles cr JOIN contacts c ON c.id = cr.contact_id
+                   WHERE cr.role_id = roles.id AND c.owner_id = $1))
           ORDER BY category, sort_order, lower(name)`, [userId]);
   return r.rows;
 }

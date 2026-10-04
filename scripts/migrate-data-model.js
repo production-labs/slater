@@ -89,11 +89,14 @@ async function seedRoles(client) {
     else if (res.rows[0].inserted) counts.inserted++;
     else counts.updated++;
   }
-  // Global roles in the DB that are no longer in the seed list: report, never delete.
+  // Global roles no longer on the list: archive (never hard-delete). Anyone
+  // who already has one keeps it; it just can't be newly picked.
   const names = GLOBAL_ROLES.map(r => r.name.toLowerCase());
-  const extra = await client.query(
-    `SELECT name FROM roles WHERE owner_id IS NULL AND NOT (lower(name) = ANY($1)) ORDER BY name`, [names]);
-  counts.notInSeed = extra.rows.map(x => x.name);
+  const retired = await client.query(
+    `UPDATE roles SET archived_at = clock_timestamp()
+      WHERE owner_id IS NULL AND archived_at IS NULL AND NOT (lower(name) = ANY($1))
+      RETURNING name`, [names]);
+  counts.retired = retired.rows.map(x => x.name).sort();
   return counts;
 }
 
@@ -134,7 +137,7 @@ async function verify(client, before, after, colsBefore) {
     `SELECT category, COUNT(*)::int AS n FROM roles WHERE owner_id IS NULL AND archived_at IS NULL GROUP BY category`);
   const gotByCat = Object.fromEntries(rc.rows.map(x => [x.category, x.n]));
   for (const [cat, n] of Object.entries(expectedByCat)) {
-    if (gotByCat[cat] < n || gotByCat[cat] === undefined) problems.push(`global ${cat} roles: expected at least ${n}, found ${gotByCat[cat] || 0}`);
+    if (gotByCat[cat] !== n) problems.push(`active global ${cat} roles: expected ${n}, found ${gotByCat[cat] || 0}`);
   }
 
   return { problems, gotByCat, expectedByCat };
@@ -164,7 +167,7 @@ async function main() {
 
     const seed = await seedRoles(client);
     console.log(`Global roles: ${seed.inserted} inserted, ${seed.updated} updated, ${seed.unchanged} unchanged (${GLOBAL_ROLES.length} in seed list)`);
-    if (seed.notInSeed.length) console.log(`  NOTE: global roles in DB but not in seed list (left alone): ${seed.notInSeed.join(', ')}`);
+    if (seed.retired.length) console.log(`  Retired (archived) global roles no longer on the list: ${seed.retired.join(', ')}`);
 
     const after = await fingerprint(client);
     const { problems, gotByCat, expectedByCat } = await verify(client, before, after, colsBefore);

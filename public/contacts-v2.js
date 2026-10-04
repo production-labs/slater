@@ -214,8 +214,8 @@
   var UNION_SUGGESTIONS = ['Non-union', 'IATSE', 'IATSE Local 600', 'IATSE Local 488', 'IATSE Local 15', 'IBEW', 'NABET-CWA', 'SAG-AFTRA', 'DGA', 'Teamsters Local 399'];
   var TRAVEL_SUGGESTIONS = ['Local only', 'Regional (drive)', 'Will travel (domestic)', 'Will travel (international, has passport)'];
 
-  var TAB_TABLE = { people: 'contacts', organizations: 'organizations', locations: 'locations' };
-  var TAB_NOUN = { people: 'person', organizations: 'organization', locations: 'location' };
+  var TAB_TABLE = { people: 'contacts', organizations: 'organizations', locations: 'locations', roles: 'roles' };
+  var TAB_NOUN = { people: 'person', organizations: 'organization', locations: 'location', roles: 'role' };
 
   // ---------------------------------------------------------------- state
   var ui = {
@@ -322,16 +322,17 @@
   }
 
   function renderTabs() {
-    var counts = { people: rows('contacts').length, organizations: rows('organizations').length, locations: rows('locations').length };
-    document.getElementById('cv2-tabs').innerHTML = ['people', 'organizations', 'locations'].map(function (t) {
-      var label = t === 'people' ? 'People' : t === 'organizations' ? 'Organizations' : 'Locations';
+    var counts = { people: rows('contacts').length, organizations: rows('organizations').length, locations: rows('locations').length, roles: rows('roles').length };
+    var LABELS = { people: 'People', organizations: 'Organizations', locations: 'Locations', roles: 'Roles' };
+    document.getElementById('cv2-tabs').innerHTML = ['people', 'organizations', 'locations', 'roles'].map(function (t) {
+      var label = LABELS[t];
       return '<button class="cv2-tab' + (ui.tab === t ? ' active' : '') + '" data-act="tab" data-tab="' + t + '">' + label +
         (store.loaded ? '<span class="cv2-count">' + counts[t] + '</span>' : '') + '</button>';
     }).join('');
   }
 
   function renderTools() {
-    var html = '<div class="cv2-searchrow"><input class="cv2-input" id="cv2-q" placeholder="Search ' + (ui.tab === 'people' ? 'name, role, city, company...' : ui.tab) + '" value="' + esc(ui.q) + '" autocomplete="off">' +
+    var html = '<div class="cv2-searchrow"><input class="cv2-input" id="cv2-q" placeholder="Search ' + (ui.tab === 'people' ? 'name, role, city, company...' : ui.tab === 'roles' ? 'roles or abbreviations' : ui.tab) + '" value="' + esc(ui.q) + '" autocomplete="off">' +
       '<button class="lb primary cv2-small" data-act="new" title="Add">+ New</button></div>';
     if (ui.tab === 'people') {
       var all = rows('contacts');
@@ -350,13 +351,21 @@
       html += '<div class="cv2-filterrow"><div class="select-wrap"><select class="cv2-input" id="cv2-state"><option value="">All states</option>' +
         stateOpts.map(function (s) { return '<option' + (ui.state === s ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('') +
         '</select></div>' + archToggle() + '</div>';
+    } else if (ui.tab === 'roles') {
+      var rl = rows('roles');
+      var rc = { all: rl.length, mine: 0, staff: 0, crew: 0, talent: 0 };
+      rl.forEach(function (r) { rc[r.category]++; if (!r.is_global) rc.mine++; });
+      html += '<div class="cv2-chips">' + [['all', 'All'], ['mine', 'Your roles'], ['staff', 'Staff'], ['crew', 'Crew'], ['talent', 'Talent']].map(function (p) {
+        return '<button class="cv2-chip' + (ui.cat === p[0] ? ' active' : '') + '" data-act="cat" data-cat="' + p[0] + '">' + p[1] + ' ' + rc[p[0]] + '</button>';
+      }).join('') + '</div>';
+      html += '<div class="cv2-filterrow" style="justify-content:flex-end">' + archToggle('Show deleted') + '</div>';
     } else {
       html += '<div class="cv2-filterrow" style="justify-content:flex-end">' + archToggle() + '</div>';
     }
     document.getElementById('cv2-tools').innerHTML = html;
   }
-  function archToggle() {
-    return '<label class="cv2-archtoggle"><input type="checkbox" id="cv2-arch"' + (ui.showArchived ? ' checked' : '') + '> Show archived</label>';
+  function archToggle(label) {
+    return '<label class="cv2-archtoggle"><input type="checkbox" id="cv2-arch"' + (ui.showArchived ? ' checked' : '') + '> ' + (label || 'Show archived') + '</label>';
   }
 
   // ----------------------------------------------------------------- list
@@ -380,6 +389,13 @@
         return hay.indexOf(q) !== -1;
       });
       list.sort(function (a, b) { return byText(sortKey(a), sortKey(b)); });
+    } else if (ui.tab === 'roles') {
+      list = list.filter(function (r) {
+        if (r.archived_at && r.is_global) return false; // retired built-ins never listed
+        if (ui.cat === 'mine' && r.is_global) return false;
+        if (['staff', 'crew', 'talent'].indexOf(ui.cat) !== -1 && r.category !== ui.cat) return false;
+        return !q || [r.name, r.abbreviation, r.department].join(' ').toLowerCase().indexOf(q) !== -1;
+      });
     } else {
       if (q) list = list.filter(function (r) { return [r.name, r.city, r.state, r.country && Regions.countryName(r.country), r.address, r.website].join(' ').toLowerCase().indexOf(q) !== -1; });
       list.sort(function (a, b) { return byText((a.name || '').toLowerCase(), (b.name || '').toLowerCase()); });
@@ -387,10 +403,37 @@
     return list;
   }
 
+  function roleUsers(roleId) {
+    return rows('contacts').filter(function (c) { return (c.role_ids || []).indexOf(roleId) !== -1; })
+      .sort(function (a, b) { return byText(sortKey(a), sortKey(b)); });
+  }
+  function roleRowHtml(r) {
+    var n = roleUsers(r.id).length;
+    var cls = 'cv2-row' + (String(ui.sel) === String(r.id) ? ' active' : '') + (r.archived_at ? ' archived' : '');
+    var name = esc(r.name) + (r.abbreviation ? ' <span class="cv2-pill-abbr">' + esc(r.abbreviation) + '</span>' : '') +
+      (r.archived_at ? '<span class="cv2-badge">Deleted</span>' : '') + (!r.is_global ? '<span class="cv2-badge accent">Yours</span>' : '');
+    var sub = [CAT_LABEL[r.category], r.department, n ? n + (n === 1 ? ' person' : ' people') : ''].filter(Boolean).join(' · ');
+    return '<div class="' + cls + '" data-act="select" data-id="' + r.id + '"><div class="cv2-row-main"><div class="cv2-row-name">' + name + '</div>' +
+      '<div class="cv2-row-sub">' + esc(sub) + '</div></div></div>';
+  }
+  function renderRoleList(el, list) {
+    var mine = list.filter(function (r) { return !r.is_global; })
+      .sort(function (a, b) { return byText(a.category + a.name.toLowerCase(), b.category + b.name.toLowerCase()); });
+    var builtIn = list.filter(function (r) { return r.is_global; });
+    var html = '';
+    if (mine.length) html += '<div class="cv2-picker-group" style="padding:10px 12px 4px">Your roles</div>' + mine.map(roleRowHtml).join('');
+    else if (ui.cat === 'mine') html += '<div class="cv2-empty">You have no custom roles.<br>Use <strong>+ New</strong>, or create one from a person\'s role picker.</div>';
+    roleGroups(builtIn).forEach(function (g) {
+      html += '<div class="cv2-picker-group" style="padding:10px 12px 4px">' + esc(g.label) + '</div>' + g.items.map(roleRowHtml).join('');
+    });
+    el.innerHTML = html || '<div class="cv2-empty">Nothing matches these filters.</div>';
+  }
+
   function renderList() {
     var el = document.getElementById('cv2-list');
     if (!store.loaded) return;
     var list = filteredRows();
+    if (ui.tab === 'roles') return renderRoleList(el, list);
     if (!list.length) {
       var anyAtAll = rows(TAB_TABLE[ui.tab], true).length;
       el.innerHTML = '<div class="cv2-empty">' + (anyAtAll || ui.q || ui.cat !== 'all' || ui.state
@@ -452,16 +495,22 @@
     var archived = !!r.archived_at;
     var title = isNew ? 'New ' + TAB_NOUN[ui.tab] : (r.name || '');
     var body = '';
-    if (archived) body += '<div class="cv2-banner warn">This ' + TAB_NOUN[ui.tab] + ' is archived. It is hidden from lists and pickers. Restore it to edit.</div>';
+    if (archived) body += '<div class="cv2-banner warn">' + (ui.tab === 'roles'
+      ? 'This role is deleted. It no longer appears in the role picker. Restore it to use or edit it again.'
+      : 'This ' + TAB_NOUN[ui.tab] + ' is archived. It is hidden from lists and pickers. Restore it to edit.') + '</div>';
     if (ui.tab === 'people') body += personForm(r);
     else if (ui.tab === 'organizations') body += orgForm(r, isNew);
+    else if (ui.tab === 'roles') body += roleForm(r, isNew);
     else body += locationForm(r);
 
     var foot = '';
-    if (archived) {
+    var builtIn = ui.tab === 'roles' && !isNew && r.is_global;
+    if (builtIn) {
+      foot = '<span class="cv2-hint" style="margin:0">Built-in roles can\'t be changed. Use <strong>+ New</strong> to add your own.</span>';
+    } else if (archived) {
       foot = '<span class="cv2-spacer"></span><button class="lb primary" data-act="restore">Restore</button>';
     } else {
-      foot = (isNew ? '' : '<button class="lb danger" data-act="archive">Archive</button>') +
+      foot = (isNew ? '' : '<button class="lb danger" data-act="archive">' + (ui.tab === 'roles' ? 'Delete' : 'Archive') + '</button>') +
         '<span class="cv2-spacer"></span><span class="cv2-dirty" id="cv2-dirty"></span>' +
         (isNew ? '<button class="lb" data-act="cancel-new">Cancel</button>' : '') +
         '<button class="lb primary" data-act="save" id="cv2-save">' + (isNew ? 'Create' : 'Save') + '</button>';
@@ -472,7 +521,7 @@
       '<div class="cv2-detail-body" id="cv2-form">' + body + '</div>' +
       '<div class="cv2-detail-foot">' + foot + '</div>';
 
-    if (archived) el.querySelectorAll('#cv2-form input, #cv2-form textarea, #cv2-form select, #cv2-form button').forEach(function (x) { x.disabled = true; });
+    if (archived || builtIn) el.querySelectorAll('#cv2-form input, #cv2-form textarea, #cv2-form select').forEach(function (x) { x.disabled = true; });
     if (ui.tab === 'people') renderPills();
     updateDirty();
   }
@@ -677,6 +726,27 @@
         people.map(function (c) { return '<button class="cv2-link" data-act="goto-person" data-id="' + c.id + '">' + esc(c.name) + '</button>'; }).join('') + '</div>' : '');
   }
 
+  function roleForm(r, isNew) {
+    var cat = isNew ? (['staff', 'crew', 'talent'].indexOf(ui.cat) !== -1 ? ui.cat : 'crew') : r.category;
+    document.getElementById('cv2-dept-list').innerHTML = crewDepartments().map(function (d) { return '<option value="' + esc(d) + '">'; }).join('');
+    var users = isNew ? [] : roleUsers(r.id);
+    return '' +
+      (!isNew && r.is_global ? '<div class="cv2-banner">Built-in role. Every Slater account has it.</div>' : '') +
+      '<div class="cv2-grid2">' +
+        fieldHtml('Role name', 'name', r.name, { required: true, placeholder: 'e.g. Drone Pilot (FAA Part 107)' }) +
+        fieldHtml('Abbreviation', 'abbreviation', r.abbreviation, { placeholder: 'Optional, e.g. DP' }) +
+      '</div>' +
+      '<div class="cv2-grid2">' +
+        fieldHtml('Category', 'category', cat, { type: 'select', options: [['staff', 'Staff'], ['crew', 'Crew'], ['talent', 'Talent']] }) +
+        '<div id="cv2-dept-wrap"' + (cat === 'crew' ? '' : ' style="display:none"') + '>' +
+          fieldHtml('Department', 'department', r.department, { list: 'cv2-dept-list', placeholder: 'Optional, e.g. Camera' }) + '</div>' +
+      '</div>' +
+      '<div class="cv2-hint">Category decides where people with this role appear (Staff, Crew or Talent filters). Department groups crew roles in the picker.</div>' +
+      (isNew ? '' : '<div class="cv2-section">People with this role</div>' + (users.length
+        ? '<div class="cv2-linklist">' + users.map(function (c) { return '<button class="cv2-link" data-act="goto-person" data-id="' + c.id + '">' + esc(c.name) + '</button>'; }).join('') + '</div>'
+        : '<div class="cv2-hint" style="margin:0">Nobody has this role yet.</div>'));
+  }
+
   function locationForm(l) {
     return '' +
       fieldHtml('Name', 'name', l.name, { required: true, placeholder: 'e.g. Building 92, Studio B' }) +
@@ -690,6 +760,7 @@
     people: ['name', 'sort_last_name', 'title', 'organization_id', 'phone', 'email', 'address', 'city', 'state', 'zip', 'country', 'union_status', 'travel_availability', 'gear_kit', 'notes'],
     organizations: ['name', 'is_agency', 'website', 'phone', 'address', 'city', 'state', 'zip', 'country', 'notes', 'contact_name', 'contact_email', 'contact_phone', 'invoicing_email', 'invoicing_text', 'default_project_type', 'timezone'],
     locations: ['name', 'address', 'city', 'state', 'zip', 'country', 'hospital', 'notes'],
+    roles: ['name', 'abbreviation', 'category', 'department'],
   };
   function readForm() {
     var out = {};
@@ -703,6 +774,7 @@
     if (addr) { out.state = addr.state; out.country = addr.country; }
     if (ui.tab === 'people') out.role_ids = ui.formRoles.slice();
     if (ui.tab === 'organizations') out.logo = ui.formLogo;
+    if (ui.tab === 'roles' && out.category !== 'crew') out.department = null; // departments are for crew
     return out;
   }
   function updateDirty() {
@@ -714,6 +786,7 @@
       ui.dirty = Object.keys(form).some(function (k) {
         var v = norm(k, form[k]);
         if (k === 'country') return v != null && v !== defaultCountry();
+        if (k === 'category') return false; // pre-selected, not a user edit
         return k === 'role_ids' ? v.length > 0 : k === 'is_agency' ? v : v != null;
       });
     } else {
@@ -732,7 +805,7 @@
     el.innerHTML = ui.formRoles.map(function (id, i) {
       var r = role(id);
       return '<span class="cv2-pill' + (i === 0 ? ' primary' : '') + '" data-act="pill-primary" data-id="' + id + '" title="' + (i === 0 ? 'Primary role' : 'Click to make primary') + '">' +
-        esc(r ? r.name : 'Archived role') +
+        esc(r ? r.name : 'Removed role') + (r && r.archived_at ? ' <span class="cv2-pill-cat">' + (r.is_global ? 'retired' : 'deleted') + '</span>' : '') +
         (r && r.abbreviation && r.abbreviation !== r.name ? ' <span class="cv2-pill-abbr">' + esc(r.abbreviation) + '</span>' : '') +
         (r ? ' <span class="cv2-pill-cat">' + esc(CAT_LABEL[r.category]) + '</span>' : '') +
         (disabled ? '' : '<button data-act="pill-remove" data-id="' + id + '" title="Remove role">&#x2715;</button>') + '</span>';
@@ -881,15 +954,35 @@
     var r = ui.baseline;
     if (!r) return;
     var extra = ui.tab === 'organizations' && store.defaultOrgId === r.id ? ' It is your default agency; the default will be cleared.' : '';
-    confirmBox('Archive ' + TAB_NOUN[ui.tab], 'Archive "' + r.name + '"? It will be hidden from lists and pickers. You can restore it any time with Show archived.' + extra, function () {
+    if (ui.tab === 'roles') {
+      var users = roleUsers(r.id);
+      if (users.length) {
+        confirmBox('Role in use', '"' + r.name + '" is used by ' + users.map(function (c) { return c.name; }).join(', ') +
+          '. Remove it from ' + (users.length === 1 ? 'that person' : 'those people') + ' first, then delete it.', null);
+        return;
+      }
+    }
+    var title = ui.tab === 'roles' ? 'Delete role' : 'Archive ' + TAB_NOUN[ui.tab];
+    var msg = ui.tab === 'roles'
+      ? 'Delete "' + r.name + '"? It will no longer appear in the role picker. You can restore it with Show deleted.'
+      : 'Archive "' + r.name + '"? It will be hidden from lists and pickers. You can restore it any time with Show archived.' + extra;
+    confirmBox(title, msg, function () {
       req('DELETE', '/' + TAB_TABLE[ui.tab] + '/' + r.id).then(function (row) {
         absorb(TAB_TABLE[ui.tab], [row]);
         if (ui.tab === 'organizations' && store.defaultOrgId === r.id) store.defaultOrgId = null;
         ui.dirty = false;
         if (ui.showArchived) { ui.baseline = row; } else { ui.sel = null; ui.baseline = null; }
         renderAll();
-        toast('Archived.');
-      }, function (e) { toast(e.message, 'err'); });
+        toast(ui.tab === 'roles' ? 'Role deleted.' : 'Archived.');
+      }, function (e) {
+        if (e.status === 409 && e.data && e.data.usage) {
+          var u = e.data.usage, parts = [];
+          if (u.contacts) parts.push(u.contacts + (u.contacts === 1 ? ' person' : ' people'));
+          if (u.projects) parts.push(u.projects + (u.projects === 1 ? ' project' : ' projects'));
+          return toast('Still used by ' + parts.join(' and ') + '. Remove it there first.', 'err');
+        }
+        toast(e.message, 'err');
+      });
     });
   }
   function restore() {
@@ -1006,6 +1099,10 @@
         loadArchived(table).then(renderList, function (er) { toast(er.message, 'err'); });
       }
       return renderList();
+    }
+    if (t.id === 'cv2f_category') {
+      var dw = document.getElementById('cv2-dept-wrap');
+      if (dw) dw.style.display = t.value === 'crew' ? '' : 'none';
     }
     if (t.id === 'cv2-nr-cat') {
       document.getElementById('cv2-nr-dept-wrap').style.display = t.value === 'crew' ? '' : 'none';

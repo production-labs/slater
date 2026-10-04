@@ -242,6 +242,75 @@ async function main() {
     assert(after.city === 'Olympia' && after.notes === 'Set by other device', JSON.stringify({ city: after.city, notes: after.notes }));
   });
 
+  console.log('\nRoles tab');
+  await step('built-in roles are listed read-only, grouped, with no Save/Delete', async () => {
+    await click('[data-act="tab"][data-tab="roles"]');
+    await page.waitForFunction(() => /Crew: Camera/.test(document.getElementById('cv2-list').textContent), { timeout: 3000 });
+    const rows = await page.$$('.cv2-row');
+    for (const r of rows) if (/^Gaffer/.test(await r.evaluate(e => e.querySelector('.cv2-row-name').textContent))) { await r.click(); break; }
+    await T('.cv2-banner');
+    await shot('10-roles-builtin');
+    assert(!(await page.$('#cv2-save')) && !(await page.$('[data-act="archive"]')), 'no save/delete on built-in');
+    assert(await page.$eval('#cv2f_name', e => e.disabled), 'fields disabled');
+    assert(await page.$$eval('[data-act="goto-person"]', b => b.some(x => /Shaun/.test(x.textContent))), 'shows people with role');
+  });
+  await step('rename a custom role; people who have it update', async () => {
+    await click('[data-act="cat"][data-cat="mine"]');
+    await page.waitForFunction(() => /Drone Wrangler/.test(document.getElementById('cv2-list').textContent), { timeout: 3000 });
+    await click('.cv2-row');
+    await type('#cv2f_name', 'Drone Pilot');
+    await type('#cv2f_abbreviation', 'FAA107');
+    await click('#cv2-save');
+    await page.waitForFunction(() => { const b = document.querySelector('#cv2-save'), d = document.getElementById('cv2-dirty'); return b && b.disabled && d && d.textContent === ''; }, { timeout: 5000 });
+    const r = (await db.query(`SELECT name, abbreviation FROM roles WHERE owner_id=$1 AND name='Drone Pilot'`, [userId])).rows[0];
+    assert(r && r.abbreviation === 'FAA107', 'renamed in DB');
+    await click('[data-act="goto-person"]');
+    await page.waitForFunction(() => /Drone Pilot/.test(document.getElementById('cv2-pills').textContent), { timeout: 3000 });
+  });
+  await step('deleting an in-use role explains who uses it; after removing, delete + restore work', async () => {
+    await click('[data-act="tab"][data-tab="roles"]');
+    await click('[data-act="cat"][data-cat="mine"]');
+    await click('.cv2-row');
+    await click('[data-act="archive"]');
+    await T('#modal-overlay.open');
+    const msg = await page.$eval('#modal-msg', e => e.textContent);
+    assert(/used by Shaun Smith/.test(msg), msg);
+    await page.evaluate(() => modalCancel());
+    // remove it from Shaun
+    await click('[data-act="goto-person"]');
+    await page.waitForSelector('#cv2-pills [data-act="pill-remove"]');
+    const pills = await page.$$('#cv2-pills .cv2-pill');
+    for (const pl of pills) if (/Drone Pilot/.test(await pl.evaluate(e => e.textContent))) { await (await pl.$('[data-act="pill-remove"]')).click(); break; }
+    await click('#cv2-save');
+    await page.waitForFunction(() => { const b = document.querySelector('#cv2-save'), d = document.getElementById('cv2-dirty'); return b && b.disabled && d && d.textContent === ''; }, { timeout: 5000 });
+    // now delete
+    await click('[data-act="tab"][data-tab="roles"]');
+    await click('[data-act="cat"][data-cat="mine"]');
+    await click('.cv2-row');
+    await click('[data-act="archive"]');
+    await T('#modal-overlay.open');
+    await page.evaluate(() => document.getElementById('modal-ok').click());
+    await page.waitForFunction(() => /no custom roles/.test(document.getElementById('cv2-list').textContent), { timeout: 5000 });
+    const gone = (await db.query(`SELECT archived_at FROM roles WHERE owner_id=$1 AND name='Drone Pilot'`, [userId])).rows[0];
+    assert(gone && gone.archived_at, 'archived in DB');
+    await page.click('#cv2-arch');
+    await page.waitForFunction(() => /Drone Pilot/.test(document.getElementById('cv2-list').textContent), { timeout: 5000 });
+    await click('.cv2-row.archived');
+    await click('[data-act="restore"]');
+    await page.waitForFunction(() => !document.querySelector('.cv2-row.archived'), { timeout: 5000 });
+    await page.click('#cv2-arch');
+  });
+  await step('+ New on the Roles tab creates a custom role', async () => {
+    await click('[data-act="new"]');
+    await type('#cv2f_name', 'Spider Cam Operator');
+    await page.select('#cv2f_category', 'crew');
+    await type('#cv2f_department', 'Camera');
+    await click('#cv2-save');
+    await page.waitForFunction(() => document.querySelector('.cv2-detail-title').textContent === 'Spider Cam Operator' && !document.querySelector('[data-act="cancel-new"]'), { timeout: 5000 });
+    const r = (await db.query(`SELECT category, department FROM roles WHERE owner_id=$1 AND name='Spider Cam Operator'`, [userId])).rows[0];
+    assert(r && r.category === 'crew' && r.department === 'Camera', JSON.stringify(r));
+  });
+
   console.log('\nLocations / archive');
   await step('create location, archive, show archived, restore', async () => {
     await click('[data-act="tab"][data-tab="locations"]');

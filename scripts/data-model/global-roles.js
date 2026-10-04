@@ -1,30 +1,29 @@
-// Starter global roles (roles.owner_id = NULL), approved by John 2026-10-03.
+// Built-in global roles (roles.owner_id = NULL). List revised by John 2026-10-03.
 // Source of truth for the seed. Re-running the migration updates existing
-// global roles to match this list (matched by lowercased name) and inserts
-// missing ones. Roles removed from this list are NOT deleted from the DB;
-// the migration reports them instead.
+// global roles to match this list (matched by lowercased name), inserts
+// missing ones, and ARCHIVES global roles that are no longer on the list
+// (archived roles stay attached to anyone who has them, but can't be newly
+// picked). Nothing is hard-deleted.
 //
 // Entries are [name, abbreviation]. Crew entries take their department
-// from the group they sit in. sort_order is assigned from position: category base + 10 per entry,
-// with each crew department starting on its own hundred.
+// from the group they sit in. sort_order is assigned from position:
+// category base + 10 per entry, with each crew department on its own hundred.
 
 const STAFF = [
   ['Executive Producer', 'EP'],
   ['Producer', null],
-  ['Managing Producer', 'MNG PRD'],
-  ['Engineer in Charge', 'EIC'],
   ['Senior Producer', 'Sr. Producer'],
-  ['Associate Producer', 'AP'],
   ['Line Producer', null],
+  ['Associate Producer', 'AP'],
   ['Production Manager', 'PM'],
   ['Production Coordinator', null],
-  ['Project Manager', null],
-  ['Account Manager', null],
+  ['Post Producer', null],
+  ['Engineer in Charge', 'EIC'],
   ['Director', null],
+  ['Assistant Director', '1st AD'],
   ['Creative Director', 'CD'],
   ['Writer', null],
-  ['Client Contact', null],
-  ['Client Stakeholder', null],
+  ['Showrunner', null],
 ];
 
 // [department, base sort_order, roles]
@@ -37,51 +36,51 @@ const CREW_DEPARTMENTS = [
     ['Digital Imaging Technician', 'DIT'],
     ['Steadicam Operator', null],
     ['Drone Operator', null],
-    ['Jib / Crane Operator', null],
+    ['Media Manager', null],
     ['Photographer', null],
   ]],
   ['Lighting and Grip', 1100, [
+    ['Lighting Director', 'LD'],
     ['Gaffer', null],
-    ['Key Grip', null],
     ['Best Boy Electric', 'BBE'],
+    ['Key Grip', null],
     ['Best Boy Grip', 'BBG'],
-    ['Electric', null],
+    ['Electrician', null],
     ['Grip', null],
-    ['Grip / Electric', 'G&E'],
   ]],
   ['Audio', 1200, [
-    ['Sound Mixer', null],
-    ['Boom Operator', null],
     ['A1 (Audio Engineer)', 'A1'],
     ['A2 (Audio Assistant)', 'A2'],
+    ['Sound Mixer', null],
+    ['Boom Operator', null],
+    ['RF Technician', null],
   ]],
   ['Live and Broadcast', 1300, [
     ['Technical Director', 'TD'],
     ['Broadcast Engineer', null],
     ['Video Engineer / Shader', 'V1'],
     ['Graphics Operator', 'GFX'],
-    ['Replay Operator', 'EVS'],
     ['Streaming Engineer', null],
     ['Playback Operator', null],
     ['Teleprompter Operator', 'Prompter'],
     ['Stage Manager', 'SM'],
-    ['Floor Manager', 'FM'],
     ['LED / Screens Technician', null],
-    ['IT / Network Technician', null],
+    ['Virtual Event Producer', null],
   ]],
-  ['Art, Wardrobe and Makeup', 1500, [
+  ['Art and Wardrobe', 1500, [
     ['Production Designer', null],
     ['Art Director', null],
     ['Set Dresser', null],
     ['Prop Master', null],
     ['Wardrobe Stylist', null],
-    ['Hair and Makeup Artist', 'HMU'],
   ]],
   ['Production Support', 1600, [
-    ['Assistant Director', '1st AD'],
+    ['2nd Assistant Director', '2nd AD'],
     ['Script Supervisor', null],
     ['Production Assistant', 'PA'],
     ['Location Manager', null],
+    ['Hair and Makeup Artist', 'HMU'],
+    ['Captioner', 'CART'],
     ['Craft Services', 'Crafty'],
     ['Driver', null],
   ]],
@@ -89,21 +88,29 @@ const CREW_DEPARTMENTS = [
     ['Editor', null],
     ['Assistant Editor', 'AE'],
     ['Motion Graphics Artist', null],
+    ['Animator', null],
     ['Colorist', null],
+    ['VFX Artist', null],
+    ['Audio Post Mixer', null],
+    ['Sound Designer', null],
+    ['Dialogue Editor', null],
+    ['ADR Mixer', null],
+    ['Composer', null],
   ]],
 ];
 
 const TALENT = [
   ['Host', null],
+  ['Emcee', 'MC'],
   ['Presenter', null],
-  ['Speaker', null],
   ['Moderator', null],
-  ['On-Camera Talent', null],
+  ['Panelist', null],
+  ['Subject Matter Expert', 'SME'],
+  ['Interview Subject', null],
+  ['Executive', null],
   ['Actor', null],
   ['Voiceover Artist', 'VO'],
-  ['Interview Subject', null],
-  ['Subject Matter Expert', 'SME'],
-  ['Panelist', null],
+  ['Background / Extra', null],
 ];
 
 function build() {
