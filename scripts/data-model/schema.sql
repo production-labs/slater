@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   address             TEXT,
   city                TEXT,
   state               TEXT,
+  zip                 TEXT,
 
   -- Production fields, full UI in Session 3 (answer #7).
   -- Free text rather than enums/booleans: "IATSE 600", "Non-union",
@@ -217,6 +218,10 @@ CREATE INDEX IF NOT EXISTS contacts_sort_idx
   ON contacts (owner_id, lower(COALESCE(sort_last_name, name)));
 CREATE INDEX IF NOT EXISTS contacts_city_state_idx
   ON contacts (owner_id, lower(state), lower(city));
+
+-- Added after the first dev runs (John, 2026-10-03). Keeps re-runs working
+-- on databases whose contacts table predates the column.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS zip TEXT;
 
 DROP TRIGGER IF EXISTS contacts_touch ON contacts;
 CREATE TRIGGER contacts_touch BEFORE UPDATE ON contacts

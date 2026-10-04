@@ -472,9 +472,10 @@
         fieldHtml('Email', 'email', c.email, { inputType: 'email' }) +
       '</div>' +
       fieldHtml('Address', 'address', c.address) +
-      '<div class="cv2-grid2">' +
+      '<div class="cv2-grid3">' +
         fieldHtml('City', 'city', c.city) +
         fieldHtml('State', 'state', c.state, { placeholder: 'WA' }) +
+        fieldHtml('Zip', 'zip', c.zip) +
       '</div>' +
       '<div class="cv2-section">Production details</div>' +
       '<div class="cv2-grid2">' +
@@ -545,7 +546,7 @@
 
   // Read the open form into a plain object of fields.
   var FORM_FIELDS = {
-    people: ['name', 'sort_last_name', 'organization_id', 'phone', 'email', 'address', 'city', 'state', 'union_status', 'travel_availability', 'gear_kit', 'notes'],
+    people: ['name', 'sort_last_name', 'organization_id', 'phone', 'email', 'address', 'city', 'state', 'zip', 'union_status', 'travel_availability', 'gear_kit', 'notes'],
     organizations: ['name', 'is_agency', 'website', 'phone', 'address', 'city', 'state', 'zip', 'notes', 'contact_name', 'contact_email', 'contact_phone', 'invoicing_email', 'invoicing_text', 'default_project_type', 'timezone'],
     locations: ['name', 'address', 'city', 'state', 'zip', 'hospital', 'notes'],
   };

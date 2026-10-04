@@ -104,6 +104,7 @@ async function main() {
     await type('#cv2f_phone', '2065550100');
     await type('#cv2f_city', 'Tacoma');
     await type('#cv2f_state', 'WA');
+    await type('#cv2f_zip', '98402');
     await type('#cv2f_union_status', 'IATSE Local 600');
     await type('#cv2f_gear_kit', 'FX6 package\nAputure 600d x2');
     await shot('03-new-person-form');
@@ -112,6 +113,7 @@ async function main() {
     const c = await contact('Shaun Smith');
     assert(c, 'not in DB');
     assert(c.phone === '(206) 555-0100', 'phone formatted: ' + c.phone);
+    assert(c.zip === '98402', 'zip: ' + c.zip);
     assert(c.gear_kit === 'FX6 package\nAputure 600d x2', 'gear multiline: ' + JSON.stringify(c.gear_kit));
     const roles = (await db.query(`SELECT r.name, r.owner_id, r.department FROM contact_roles cr JOIN roles r ON r.id=cr.role_id WHERE cr.contact_id=$1 ORDER BY cr.sort_order`, [c.id])).rows;
     assert(JSON.stringify(roles.map(r => r.name)) === JSON.stringify(['Director of Photography', 'Gaffer', 'Drone Wrangler']), JSON.stringify(roles));

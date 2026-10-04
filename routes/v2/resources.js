@@ -60,6 +60,7 @@ const contacts = makeResource({
     address:             { type: 'text' },
     city:                { type: 'text' },
     state:               { type: 'text' },
+    zip:                 { type: 'text' },
     union_status:        { type: 'text' },
     gear_kit:            { type: 'text', multiline: true },
     travel_availability: { type: 'text' },
