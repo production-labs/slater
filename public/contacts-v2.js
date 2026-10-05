@@ -5,9 +5,10 @@
 // default and only opens when enabled for this browser:
 //   ?contacts=v2   turn on   (remembered in localStorage)
 //   ?contacts=v1   turn off
-// Nothing else in the app reads v2 data yet: schedule location dropdowns,
-// crew/talent autocomplete and client branding still use the old contacts
-// blob until Sessions 4-5 and the Session 6 migration.
+// Project tab agency/client pickers read organizations from this store
+// (project-orgs-v2.js, Session 4; listens for 'slater:v2-changed').
+// Schedule location dropdowns and crew/talent autocomplete still use the old
+// contacts blob until Session 5 and the Session 6 migration.
 //
 // Saving: per record. Only the fields the user changed are sent, with the
 // baseline updated_at. If the record changed elsewhere (409 conflict), the
@@ -69,15 +70,28 @@
   var TABLES = ['contacts', 'organizations', 'locations', 'roles'];
   var store = { contacts: {}, organizations: {}, locations: {}, roles: {}, defaultOrgId: null, settings: { default_country: 'US' }, cursor: null, loaded: false, archivedLoaded: {} };
 
+  // Other parts of the app (project organization pickers) listen for
+  // 'slater:v2-changed' to redraw when the store changes. Batched per tick.
+  var notifyPending = false;
+  function notify() {
+    if (notifyPending) return;
+    notifyPending = true;
+    setTimeout(function () {
+      notifyPending = false;
+      window.dispatchEvent(new CustomEvent('slater:v2-changed'));
+    }, 0);
+  }
   function absorb(table, rows) {
     (rows || []).forEach(function (r) {
       var cur = store[table][r.id];
       if (!cur || r.updated_at >= cur.updated_at) store[table][r.id] = r;
     });
+    if (rows && rows.length) notify();
   }
   // Permanent deletes from any device arrive as tombstones: drop local copies.
   function applyDeleted(list) {
     (list || []).forEach(function (d) { if (store[d.table]) delete store[d.table][d.id]; });
+    if (list && list.length) notify();
   }
   function sync() {
     var q = store.cursor ? '?since=' + encodeURIComponent(store.cursor) : '';
@@ -89,7 +103,14 @@
       if (d.settings) store.settings = d.settings;
       if (d.cursor) store.cursor = d.cursor;
       store.loaded = true;
+      notify();
     });
+  }
+  // One sync at a time; callers that arrive mid-sync share it.
+  var syncing = null;
+  function syncShared() {
+    if (!syncing) syncing = sync().then(function () { syncing = null; }, function (e) { syncing = null; throw e; });
+    return syncing;
   }
   function loadArchived(table) {
     if (store.archivedLoaded[table]) return Promise.resolve();
@@ -296,15 +317,18 @@
     document.getElementById('cv2-logo-file').addEventListener('change', onLogoFile);
   }
 
-  function open() {
+  function open(tab) {
     build();
+    if (tab && TAB_TABLE[tab] && tab !== ui.tab && !ui.dirty) {
+      ui.tab = tab; ui.sel = null; ui.baseline = null; ui.q = ''; ui.cat = 'all'; ui.state = '';
+    }
     root.classList.add('open');
     if (!store.loaded) {
       document.getElementById('cv2-list').innerHTML = '<div class="cv2-loading">Loading contacts...</div>';
       document.getElementById('cv2-detail').innerHTML = '';
     }
     renderAll();
-    sync().then(renderAll, function (e) {
+    syncShared().then(renderAll, function (e) {
       if (!store.loaded) document.getElementById('cv2-list').innerHTML = '<div class="cv2-empty">Could not load contacts.<br>' + esc(e.message) + '</div>';
       else toast('Could not refresh contacts: ' + e.message, 'err');
     });
@@ -1045,6 +1069,7 @@
   function setDefault(orgId) {
     req('PUT', '/default-organization', { organization_id: orgId }).then(function (d) {
       store.defaultOrgId = d.organization_id;
+      notify();
       renderList(); renderDetailKeepForm();
       toast(orgId ? 'Default agency set.' : 'Default agency cleared.');
     }, function (e) { toast(e.message, 'err'); });
@@ -1254,6 +1279,25 @@
   window.ContactsV2 = {
     enabled: function () { return localStorage.getItem(FLAG_KEY) === '1'; },
     open: open,
+    // Used by project-orgs-v2.js (Session 4).
+    sync: syncShared,
+    store: store,
+    defaultCountry: defaultCountry,
+    // Quick-add from the project client picker: creates the organization
+    // with just a name. Resolves to the new row.
+    // The initial sync only brings active rows. A project can link an
+    // archived organization, so fetch it on demand. Resolves to the row,
+    // or null if it no longer exists.
+    fetchOne: function (table, id) {
+      return req('GET', '/' + table + '/' + id).then(function (row) {
+        absorb(table, [row]);
+        return row;
+      }, function (e) { if (e.status === 404) return null; throw e; });
+    },
+    createOrganization: function (name) {
+      return saveRecord('organizations', null, { name: name, country: defaultCountry() })
+        .then(function (res) { return res.row; });
+    },
     _store: store, // for debugging in the console during the rewrite
   };
 })();

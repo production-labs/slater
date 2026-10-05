@@ -5231,7 +5231,25 @@ function saveAgencyData(data) {
 // ── Loaded agencies cache ─────────────────────────────────────────────────────
 var _loadedAgencies = [];
 
+// ── Project organization links on v2 (data-model-rewrite, Session 4) ─────────
+// With the v2 contacts flag on (?contacts=v2), the project's agency and client
+// are organizations from Contacts, held here by id. public/project-orgs-v2.js
+// draws the pickers and answers the doc helpers below. The server copies the
+// ids into projects.agency_org_id / client_org_id (the source of truth).
+// Flag off: none of this runs and the old agency/company pickers are used.
+var _orgLinks = { agency_org_id: null, client_org_id: null, legacy_agency_id: null, legacy_client: "" };
+function orgsV2On() {
+  try {
+    var q = new URLSearchParams(location.search).get("contacts");
+    if (q === "v2") return true;
+    if (q === "v1") return false;
+    return localStorage.getItem("slater_contacts_v2") === "1";
+  } catch (e) { return false; }
+}
+function orgsV2() { return orgsV2On() && window.ProjectOrgsV2 ? window.ProjectOrgsV2 : null; }
+
 function refreshAgencySelector() {
+  if (orgsV2On()) { if (window.ProjectOrgsV2) ProjectOrgsV2.render(); return; }
   var sel = document.getElementById("project_agency_id");
   if (!sel) return;
   var current = sel.value;
@@ -5392,6 +5410,8 @@ function applyAgencySettings(data) {
 var _agencyEditing = null; // null = list view, object = form view
 
 function openAgencyManager() {
+  // v2: agencies are organizations; manage them in Contacts > Organizations.
+  if (orgsV2On() && window.ContactsV2) { ContactsV2.open("organizations"); return; }
   _agencyEditing = null;
   document.getElementById("agency-manager-modal").classList.add("open");
   renderAgencyManager();
@@ -5612,6 +5632,8 @@ function getAgencyLogoB64() {
 }
 
 function getAgencyInfo() {
+  var _v2 = orgsV2();
+  if (_v2) { var _v2Info = _v2.agencyInfo(); if (_v2Info) return _v2Info; }
   var agencyEl = document.getElementById("project_agency_id");
   var agencyId = agencyEl ? agencyEl.value || null : null;
   if (agencyId && _loadedAgencies.length) {
@@ -5651,10 +5673,19 @@ function getAgencyInfo() {
   return loadAgencyData();
 }
 
-function lookupCompanyLogo(companyName) {
-  if (!companyName) return null;
+// Client company record for branding: { name, logo } or null.
+// v2: the linked client organization (or an org with that exact name);
+// otherwise, and as a fallback before the migration, the old companies list.
+function findClientCompany(companyName) {
+  var _v2 = orgsV2();
+  if (_v2) { var org = _v2.clientOrg(companyName); if (org) return org; }
+  if (!companyName || !companyName.trim()) return null;
   var db = loadContacts();
-  var co = (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === (companyName||"").trim().toLowerCase(); });
+  return (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === companyName.trim().toLowerCase(); }) || null;
+}
+
+function lookupCompanyLogo(companyName) {
+  var co = findClientCompany(companyName);
   if (!co || !co.logo) return null;
   if (co.logo.includes("image/svg")) return null;
   return co.logo.split(",")[1] || null;
@@ -5671,8 +5702,7 @@ function updateBrandingPreview() {
   } else if (val === "client") {
     var companyEl = document.getElementById("client_company");
     var companyName = companyEl ? companyEl.value.trim() : "";
-    var db = loadContacts();
-    var co = companyName ? (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === companyName.toLowerCase(); }) : null;
+    var co = findClientCompany(companyName);
     if (co && co.logo) {
       preview.src = co.logo;
       preview.style.display = "";
@@ -5704,8 +5734,7 @@ function updateBrandingWarning() {
     warn.style.display = "";
     return;
   }
-  var db = loadContacts();
-  var co = (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === companyName.toLowerCase(); });
+  var co = findClientCompany(companyName);
   if (!co || !co.logo) {
     warn.textContent = "No logo on file for this company. Add one in Contacts.";
     warn.style.display = "";
@@ -5715,6 +5744,7 @@ function updateBrandingWarning() {
 }
 
 function acAttachCompany() {
+  if (orgsV2On()) return; // v2: project-orgs-v2.js attaches the organization picker
   var nameEl = document.getElementById("client_company");
   if (!nameEl || nameEl._acCoAttached) return;
   nameEl._acCoAttached = true;
@@ -7068,9 +7098,12 @@ function modalCancel() {
 
 // ── Gather all form data ──────────────────────────────────────────────────
 function gather() {
-  return {
+  var _v2Links = orgsV2On();
+  var _d = {
     project_type:v("project_type")||"live_event",
-    agency_id: (function(){ var el=document.getElementById("project_agency_id"); return el?el.value||null:null; })(),
+    // v2: the select holds organization ids; the server rewrites agency_id
+    // to the old-format agency for rollback, so send back what we loaded.
+    agency_id: _v2Links ? _orgLinks.legacy_agency_id : (function(){ var el=document.getElementById("project_agency_id"); return el?el.value||null:null; })(),
     doc_branding:(function(){ var el=document.querySelector('input[name="doc_branding"]:checked'); return el?el.value:"agency"; })(),
     project_title:v("project_title"), client:v("client_company"), client_company:v("client_company"), client_name:v("client_name"), billing_code:v("billing_code"),
     kp_cards: kp.map(function(id) { return {_id:id, role:v(id+"_role")||"", name:v(id+"_name")||"", phone:v(id+"_phone")||"", email:v(id+"_email")||"", status:v(id+"_status")||"tbd"}; }),
@@ -7101,6 +7134,11 @@ function gather() {
     expenses: getExpenses(),
     notes: notesGetData(),
   };
+  if (_v2Links) {
+    _d.agency_org_id = _orgLinks.agency_org_id || null;
+    _d.client_org_id = _orgLinks.client_org_id || null;
+  }
+  return _d;
 }
 
 // ── Load form data from a saved object ───────────────────────────────────
@@ -7111,8 +7149,18 @@ function loadFormData(data) {
   s("project_title", data.project_title);
   s("client_company", data.client_company||data.client||"");
   s("client_name", data.client_name||""); s("billing_code", data.billing_code);
-  var agencySelEl = document.getElementById("project_agency_id");
-  if (agencySelEl && data.agency_id) agencySelEl.value = data.agency_id;
+  if (orgsV2On()) {
+    _orgLinks = {
+      agency_org_id: data.agency_org_id || null,
+      client_org_id: data.client_org_id || null,
+      legacy_agency_id: data.agency_id || null,
+      legacy_client: data.client_company || data.client || "",
+    };
+    if (window.ProjectOrgsV2) ProjectOrgsV2.onProjectLoaded();
+  } else {
+    var agencySelEl = document.getElementById("project_agency_id");
+    if (agencySelEl && data.agency_id) agencySelEl.value = data.agency_id;
+  }
   var dbEl = document.querySelector('input[name="doc_branding"][value="' + (data.doc_branding||"agency") + '"]');
   if (dbEl) dbEl.checked = true;
   updateBrandingWarning();
@@ -7204,6 +7252,10 @@ function clearForm() {
    "hospital","breakfast","lunch","sunrise","sunset"
   ].forEach(function(id) { const e = document.getElementById(id); if(e) e.value = ""; });
   const ptReset = document.getElementById("project_type"); if(ptReset) ptReset.value = "location_shoot";
+  if (orgsV2On()) {
+    _orgLinks = { agency_org_id: null, client_org_id: null, legacy_agency_id: null, legacy_client: "" };
+    if (window.ProjectOrgsV2) ProjectOrgsV2.onProjectCleared();
+  }
   var dbReset = document.querySelector('input[name="doc_branding"][value="agency"]'); if(dbReset) dbReset.checked = true;
   updateBrandingWarning();
   const kdReset = document.getElementById("kickoff_date_iso"); if(kdReset) kdReset.value = "";
@@ -7983,6 +8035,7 @@ async function generateDoc() {
             if (ag.address) lines.push(pr([tx(ag.address,{s:16})],{a:AlignmentType.CENTER}));
             var csz = [ag.city||"",ag.state||""].filter(Boolean).join(", ")+(ag.zip?" "+ag.zip:"");
             if (csz.trim()) lines.push(pr([tx(csz.trim(),{s:16})],{a:AlignmentType.CENTER}));
+            if (ag.country_label) lines.push(pr([tx(ag.country_label,{s:16})],{a:AlignmentType.CENTER}));
             if (ag.phone) lines.push(pr([tx(ag.phone,{s:16})],{a:AlignmentType.CENTER}));
             return lines;
           })():[pr([tx("")])]}),
@@ -8346,6 +8399,7 @@ document.getElementById("notes-search-clear").addEventListener("click", function
 API.getAgencies().then(function(agencies) {
   _loadedAgencies = agencies || [];
   refreshAgencySelector();
+  if (orgsV2On()) return; // v2: project-orgs-v2.js applies the default organization
   var def = _loadedAgencies.find(function(a) { return a.is_default; }) || _loadedAgencies[0];
   if (def) applyAgencyDefaults(def);
   else applyAgencySettings();

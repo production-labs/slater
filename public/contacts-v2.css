@@ -113,3 +113,8 @@
   .cv2-row{padding:12px}
   .cv2-chip{padding:6px 11px;font-size:12px;min-height:34px!important}
 }
+
+/* Project tab organization picker (project-orgs-v2.js, Session 4) */
+.po2-hint{font-size:12px;color:var(--text-muted);margin-top:4px}
+.po2-hint a{color:var(--accent);text-decoration:underline;cursor:pointer}
+.ac-item.po2-add strong{color:var(--accent)}

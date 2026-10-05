@@ -80,6 +80,9 @@ const contacts = makeResource({
 const organizations = makeResource({
   table: 'organizations',
   refKey: 'organization_id',
+  // Read-only: lets the project picker map an old project's data.agency_id
+  // to its organization before the migration fills agency_org_id.
+  extraSelect: 't.legacy_agency_id',
   // Projects link orgs through real columns too (agency / client).
   extraUsage: async (client, userId, id) => (await client.query(
     `SELECT key, COALESCE(NULLIF(label, ''), data->>'project_title', key) AS label FROM projects

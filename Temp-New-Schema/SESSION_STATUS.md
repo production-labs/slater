@@ -1,10 +1,10 @@
 # Data Model Rewrite: Session Status
 
-Last updated: 2026-10-03 (end of day)
+Last updated: 2026-10-04
 
 ## Where we are
 
-**PICK UP HERE (end of day 2026-10-03):** Sessions 1-3 done and committed (last commit `714b824`, pushed to `origin/data-model-rewrite`; nothing on `main`, nothing deployed). Session 3 (new Contacts screen) is feature-complete per John's testing feedback today. **Next: Session 4** (Project tab agency/client pickers on v2, see item 7 under "Next step"). Before starting: ask John if he found anything else in Contacts while testing.
+**PICK UP HERE (2026-10-04):** Session 4 done, tested by John and committed. Next: Session 5 (item 8 under "Next step"; use Opus). Earlier note: Sessions 1-3 done and committed (last commit `714b824`, pushed to `origin/data-model-rewrite`; nothing on `main`, nothing deployed). Session 3 (new Contacts screen) is feature-complete per John's testing feedback today. **Next: Session 4** (Project tab agency/client pickers on v2, see item 7 under "Next step"). Before starting: ask John if he found anything else in Contacts while testing.
 
 - Branch: `data-model-rewrite`. Confirm you are on it before any change. Level with `main` as of 2026-10-03 (main has had no new commits; re-check with `git rev-list --left-right --count main...data-model-rewrite` and merge main in if it moved).
 - Schema lives in `scripts/data-model/schema.sql` (the `slater_schema_draft.sql` in this folder is SUPERSEDED, history only). Built-in roles: `scripts/data-model/global-roles.js` (80 roles). Apply/re-apply to the LOCAL dev DB with `node scripts/migrate-data-model.js` (one transaction, refuses non-local DB, idempotent).
@@ -127,12 +127,31 @@ Estimate: original was 12-16 working days; add ~3-5 days for the offline sync/th
    - app.js changes: flag check in `openContacts()`; crop tool output 240 -> 512 (affects old agency/company logo crops too, per answer #12).
    - Tests: `scripts/e2e-contacts-v2.js` (14 browser steps via headless Chrome; puppeteer-core lives in /tmp, not package.json -- setup in file header). Bugs it caught and fixed: human-speed clicks on pick-list items were lost (list closed on blur before mouse-up; found by John adding EIC to Nick Vettorel, now covered by a 300ms-press test); role picker auto-reopened after a pick and covered the fields below (next click picked a random role); mobile layout overflowed for long names and sat 60px low.
    - Not wired yet (by design): schedule location dropdowns, crew/talent/KP autocomplete, client company autocomplete still read the OLD contacts blob (Sessions 4-5 + migration in 6). v2 tables are empty until the Session 6 migration, so testing means entering test data by hand.
-7. **NEXT: Session 4** -- Project tab organization pickers on v2, behind the same `?contacts=v2` flag (old pickers stay the default until cutover).
+7. ~~Session 4: Project tab organization pickers~~ -- DONE 2026-10-04, all tests pass, John tested by hand (all 6 checks OK), committed. Same `?contacts=v2` flag.
+   - Server `routes/projects.js`: save copies `data.agency_org_id` / `client_org_id` into the columns (only the user's own orgs; others -> NULL + `org_link_warnings` in the response); key missing (old pickers) = column kept; bundle copy always rewritten to match the column; v2 saves rewrite `data.agency_id` to the org's `legacy_agency_id` for rollback. GET overlays the columns onto `data` (column wins). Checks once whether the columns exist, so production without the migration behaves exactly as before.
+   - `routes/v2/resources.js`: organizations now also return read-only `legacy_agency_id`.
+   - New `public/project-orgs-v2.js`: reuses the existing Agency dropdown (agency orgs only, "(default)", linked archived/non-agency org stays shown with a note) and Company field (picker over all active orgs, "+ Add ... to organizations", exact-name match links on blur, unmatched text stays plain text with a hint). New projects get the default org + its timezone/project type/header logo. Linked archived orgs are fetched on demand (initial sync only has active rows). Old projects link on load the way the migration will: agency by legacy id, client by exact name.
+   - `app.js`: `_orgLinks` state + `orgsV2On()`; v2 branches in `getAgencyInfo`, new `findClientCompany` (used by `lookupCompanyLogo`, branding preview/warning), `gather`, `loadFormData`, `clearForm`, startup default, `acAttachCompany` (skipped), `openAgencyManager` (opens Contacts > Organizations). Call sheet prints the agency's country only when it differs from the user's default.
+   - `contacts-v2.js`: `open(tab)`, `slater:v2-changed` event, shared `sync`, `fetchOne`, `createOrganization`.
+   - Tests: new `scripts/e2e-project-orgs-v2.js` (20 steps, incl. downloading the call sheet + expense report and checking the agency block). Run it alongside the other two after any change (it takes a few minutes).
+   - Bug the tests caught: a project linked to an ARCHIVED org couldn't find it, so docs silently fell back to the default agency. Fixed (fetch on demand).
+8. **NEXT: Session 5** -- Crew/Talent/KP role_id + contact_id wiring.
+
+(Original Session 4 notes, for reference:)
+   - Project tab organization pickers on v2, behind the same `?contacts=v2` flag (old pickers stay the default until cutover).
    - Agency picker: organizations WHERE is_agency (active). Client/company picker: ALL active orgs (replaces free-text `client_company` + companies autocomplete). New projects default the agency to `users.default_organization_id`.
    - Store links in `projects.agency_org_id` / `client_org_id` (real columns, already in schema) AND keep writing the old `data.agency_id` / `data.client_company` text for rollback until cutover. Decide with John how the projects route saves the new columns (projects are saved as a whole JSON blob today, `routes/projects.js`).
    - Doc branding (Agency / Client logo) + call sheet / expense report agency info (billing contact name/email/phone, invoicing email/text) read from the org. Docs print an address's country ONLY when it differs from `users.default_country`.
    - Replace the old Agency Manager modal (`openAgencyManager`, app.js ~5392) with the Organizations tab, or point it there.
    - Watch-outs: permanent delete already refuses orgs referenced by `agency_org_id`/`client_org_id`; keep that working. Run both test suites and extend the browser test for the pickers.
+
+## Decided 2026-10-04
+
+- Contacts v2 (Session 3): John tested, "working great", no new issues found.
+- PROJECT ORG LINKS SAVE PATH (John, option 1): projects keep saving as one whole JSON bundle via `POST /api/projects/:key`. On every save the SERVER copies the two org ids from the bundle into the real columns `projects.agency_org_id` / `client_org_id`. The columns are the source of truth for the links (the bundle copy is a mirror until cutover; if they disagree the column wins). Old `data.agency_id` / `data.client_company` keep being written for rollback. Every link must be checkable against its owner (server only accepts orgs owned by the saving user), so sharing can be designed later.
+- Rejected: links in the bundle only (DB can't enforce delete protection; would need adding later anyway); a separate save call just for links (two writers that can disagree, wrong shape for sharing).
+- DEFERRED, SEPARATE BRANCH LATER (John): split project items (crew, talent, KP, schedule days, workback items, etc.) into their own tables with per-record sync, like contacts. Needed before V2.0 project sharing (whole-bundle save = last save wins, which loses collaborator edits). Trigger: before sharing work starts, after this branch's cutover. Estimated several weeks. Open sharing question to settle then: how a collaborator sees orgs/contacts that belong to the project owner (grant access vs. snapshot on the project).
+- Model: John runs Opus for Sessions 4, 6, 7.
 
 ## Draft v2 changes beyond the 12 answers (for John's review)
 
