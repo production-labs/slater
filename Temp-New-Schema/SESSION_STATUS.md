@@ -4,7 +4,7 @@ Last updated: 2026-10-07
 
 ## Where we are
 
-**PICK UP HERE (2026-10-07):** Session 5 BUILT, all automated tests pass, committed + pushed to the branch. WAITING ON John's hands-on test (`http://localhost:3000/?contacts=v2`). Fix whatever he finds, then Session 6 (use Opus). Details: item 8 under "Next step"; decisions in "Decided 2026-10-07". If tests say `relation "roles" does not exist`, Postgres@18 took the port after a reboot (see Decided 2026-10-07).
+**PICK UP HERE (2026-10-07):** Session 5 BUILT, all automated tests pass, committed + pushed to the branch. WAITING ON John's hands-on test (`http://localhost:3000/?contacts=v2`) using `Temp-New-Schema/SESSION5_TEST_CHECKLIST.md`. Start by asking John for his results. Fix whatever he finds, then Session 6 (use Opus). Details: item 8 under "Next step"; decisions in "Decided 2026-10-07". If tests say `relation "roles" does not exist`, Postgres@18 took the port after a reboot (see Decided 2026-10-07).
 
 **Earlier (2026-10-04):** Session 4 done, tested by John and committed. Next: Session 5 (item 8 under "Next step"; use Opus). Earlier note: Sessions 1-3 done and committed (last commit `714b824`, pushed to `origin/data-model-rewrite`; nothing on `main`, nothing deployed). Session 3 (new Contacts screen) is feature-complete per John's testing feedback today. **Next: Session 4** (Project tab agency/client pickers on v2, see item 7 under "Next step"). Before starting: ask John if he found anything else in Contacts while testing.
 
