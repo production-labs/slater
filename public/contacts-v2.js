@@ -964,15 +964,22 @@
   // findNearestHospital). Automatic only while the hospital box is empty, so
   // a typed or corrected hospital is never replaced; "Look up" replaces it on
   // request. The result is a normal form edit: Save / Create keeps it.
-  var hosp = { key: null, busy: false };
+  // hosp.auto = the text this lookup put in the box (for this record). If
+  // the box still holds exactly that and the address changes, the hospital
+  // is looked up again; anything typed by hand is left alone.
+  var hosp = { key: null, busy: false, auto: null, sel: null };
   function hospLookup(force) {
     if (ui.tab !== 'locations' || ui.sel == null || typeof findNearestHospital !== 'function') return;
     if (ui.baseline && ui.baseline.archived_at) return;
     var box = document.getElementById('cv2f_hospital');
-    if (!box || (!force && box.value.trim())) return;
+    if (!box) return;
+    if (hosp.sel !== ui.sel) { hosp.sel = ui.sel; hosp.auto = null; hosp.key = null; }
+    var replaceable = !box.value.trim() || (hosp.auto != null && box.value === hosp.auto);
+    if (!force && !replaceable) return;
     var f = readForm();
-    if (!f.address && !(f.city && (f.state || f.zip)) && !f.zip) {
-      if (force) hospStatus('Enter an address first.', true);
+    // Wait for enough address to pin down the place: a zip, or city + state.
+    if (!f.zip && !(f.city && f.state)) {
+      if (force) hospStatus('Add a city and state, or a zip, first.', true);
       return;
     }
     var key = [f.address, f.city, f.state, f.zip, f.country].join('|');
@@ -984,14 +991,23 @@
       hosp.busy = false;
       var b = document.getElementById('cv2f_hospital');
       if (!b || ui.sel !== sel) return;
-      if (!force && b.value.trim()) { hospStatus(''); return; } // typed meanwhile
+      if (!force && b.value.trim() && b.value !== hosp.auto) { hospStatus(''); return; } // typed meanwhile
       b.value = text;
+      hosp.auto = text;
       hospStatus('Found. Check it, then ' + (sel === 'new' ? 'Create.' : 'Save.'));
       updateDirty();
+      recheck();
     }, function (e) {
       hosp.busy = false;
       if (ui.sel === sel) hospStatus((e && e.message ? e.message : 'Lookup failed.') + ' You can type it in.', true);
+      recheck();
     });
+    // The address changed while this lookup ran: look up the new one.
+    function recheck() {
+      if (ui.sel !== sel || ui.tab !== 'locations') return;
+      var g = readForm();
+      if ([g.address, g.city, g.state, g.zip, g.country].join('|') !== key) setTimeout(function () { hospLookup(false); }, 0);
+    }
   }
   function hospStatus(msg, isErr) {
     var el = document.getElementById('cv2-hosp-status');

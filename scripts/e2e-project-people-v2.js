@@ -72,7 +72,7 @@ async function main() {
   await page.evaluateOnNewDocument(() => {
     window.__hospCalls = [];
     window.addEventListener('DOMContentLoaded', () => {
-      window.findNearestHospital = async loc => { window.__hospCalls.push(loc.address || loc.zip || loc.city); return 'Stub General Hospital\n1 Test Way\nSeattle, WA 98101'; };
+      window.findNearestHospital = async loc => { window.__hospCalls.push(loc.address || loc.zip || loc.city); return 'Stub General Hospital\n1 Test Way\n' + [loc.city, loc.state].filter(Boolean).join(', ') + ' ' + (loc.zip || ''); };
     });
   });
   const storeLoaded = () => page.waitForFunction(() => window.ContactsV2 && ContactsV2.store.loaded, { timeout: 8000 });
@@ -438,6 +438,8 @@ async function main() {
     await page.type('#cv2f_address', '2130 Alaskan Way');
     await page.type('#cv2f_city', 'Seattle');
     await page.click('#cv2f_zip');
+    await page.type('#cv2f_zip', '98121');
+    await page.click('#cv2f_notes');
     await page.waitForFunction(() => /Stub General/.test(document.getElementById('cv2f_hospital').value), { timeout: 5000 });
     assert(/Found/.test(await page.$eval('#cv2-hosp-status', e => e.textContent)), 'status');
     await shot('06-new-location-prefilled');
@@ -459,6 +461,8 @@ async function main() {
     await page.type('#cv2f_name', 'Typed First');
     await page.type('#cv2f_hospital', 'My Own Hospital');
     await page.type('#cv2f_address', '1 Somewhere Ave');
+    await page.click('#cv2f_zip');
+    await page.type('#cv2f_zip', '98101');
     await page.click('#cv2f_city');
     await sleep(500);
     assert(await val('cv2f_hospital') === 'My Own Hospital', 'kept');
@@ -493,6 +497,51 @@ async function main() {
     await blur(did + '_loc_id');
     await sleep(200);
     assert(await val(did + '_loc_id') === '' && await val(did + '_location_id') === '', 'cleared');
+  });
+
+  await step('Contacts location: no lookup on a street alone; looks up once city/state/zip are in; redoes it when the address changes', async () => {
+    await page.evaluate(() => ContactsV2.open('locations'));
+    await T('[data-act="new"]');
+    await sleep(800);
+    await page.click('[data-act="new"]');
+    await T('#cv2f_name');
+    await page.type('#cv2f_name', 'Street First');
+    const calls0 = await page.evaluate(() => window.__hospCalls.length);
+    await page.type('#cv2f_address', '1116 N Cedar Street');
+    await page.click('#cv2f_city');
+    await sleep(500);
+    assert(await page.evaluate(() => window.__hospCalls.length) === calls0, 'no lookup on a street alone');
+    assert(await val('cv2f_hospital') === '', 'box still empty');
+    await page.type('#cv2f_city', 'Tacoma');
+    await page.click('#cv2f_state');
+    await page.type('#cv2f_state', 'WA');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Tab');   // the state list covers the zip field; Tab like a person would
+    await sleep(200);
+    assert(await val('cv2f_state') === 'WA', 'state ' + await val('cv2f_state'));
+    await page.click('#cv2f_zip');
+    await page.type('#cv2f_zip', '98406');
+    await page.click('#cv2f_notes');
+    await page.waitForFunction(() => /Tacoma, WA 98406/.test(document.getElementById('cv2f_hospital').value), { timeout: 5000 })
+      .catch(async () => { throw new Error('box=' + JSON.stringify(await val('cv2f_hospital')) + ' calls=' + JSON.stringify(await page.evaluate(() => window.__hospCalls)) + ' status=' + await page.$eval('#cv2-hosp-status', e => e.textContent) + ' state=' + await val('cv2f_state') + ' zip=' + await val('cv2f_zip')); });
+    // fix the zip: the automatic hospital follows
+    await page.$eval('#cv2f_zip', e => { e.focus(); e.select(); });
+    await page.type('#cv2f_zip', '98403');
+    await page.click('#cv2f_notes');
+    await page.waitForFunction(() => /98403/.test(document.getElementById('cv2f_hospital').value), { timeout: 5000 });
+    // a hand-typed hospital is never replaced by an address change
+    await page.$eval('#cv2f_hospital', e => { e.focus(); e.select(); });
+    await page.type('#cv2f_hospital', 'Hand Typed ER');
+    await page.$eval('#cv2f_zip', e => { e.focus(); e.select(); });
+    await page.type('#cv2f_zip', '98402');
+    await page.click('#cv2f_notes');
+    await sleep(500);
+    assert(await val('cv2f_hospital') === 'Hand Typed ER', 'kept: ' + await val('cv2f_hospital'));
+    await page.click('[data-act="cancel-new"]');
+    await sleep(200);
+    if (await page.$('#modal-overlay.open')) await page.click('#modal-ok');
+    await page.evaluate(() => { const b = document.querySelector('#contacts-v2-modal [data-act="close"]'); if (b) b.click(); });
+    await sleep(200);
   });
 
   console.log('\nBefore the migration');

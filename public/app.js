@@ -414,12 +414,23 @@ async function locateAddress(loc) {
   var cc = (loc.country || "").toLowerCase() || undefined;
   var ck = [street, city, state, zip, cc].join("|").toLowerCase();
   if (_locateCache[ck]) return _locateCache[ck];
+  // A street alone matches streets in every state ("1116 N Cedar Street"
+  // landed in Colorado Springs), so a city or zip is required, and every
+  // result must agree with the state (and the zip or city) that was entered.
+  if (!zip && !city) throw new Error("Add a city and state, or a zip, first.");
+  function stateOk(r) {
+    if (!state) return true;
+    var a = r.address || {}, st = state.toLowerCase();
+    var iso = String(a["ISO3166-2-lvl4"] || "").toLowerCase();       // "us-wa"
+    if (iso && iso.split("-").pop() === st) return true;
+    return !!a.state && a.state.toLowerCase() === st;                // non-US: full name
+  }
   function matches(r) {
-    if (!r) return false;
+    if (!r || !stateOk(r)) return false;
     var a = r.address || {};
     if (zip && a.postcode) return a.postcode.slice(0, 5).toLowerCase() === zip.slice(0, 5).toLowerCase();
     var c = (a.city || a.town || a.village || a.hamlet || "").toLowerCase();
-    return !city || c === city.toLowerCase();
+    return !!city && c === city.toLowerCase();
   }
   var r = null, approx = false;
   if (street) {
@@ -427,8 +438,8 @@ async function locateAddress(loc) {
     if (!matches(r)) r = await _nominatim({q:[street, city, state, zip].filter(Boolean).join(", "), countrycodes:cc});
     if (!matches(r)) r = null;
   }
-  if (!r && zip) { r = await _nominatim({postalcode:zip, countrycodes:cc}); approx = !!street; }
-  if (!r && city) { r = await _nominatim({city:city, state:state, countrycodes:cc}); approx = true; }
+  if (!r && zip) { r = await _nominatim({postalcode:zip, countrycodes:cc}); if (r && !stateOk(r)) r = null; approx = !!street; }
+  if (!r && city) { r = await _nominatim({city:city, state:state, countrycodes:cc}); if (r && !stateOk(r)) r = null; approx = true; }
   if (!r) throw new Error("Couldn't find that address on the map.");
   var out = {lat: parseFloat(r.lat), lng: parseFloat(r.lon), approx: approx};
   _locateCache[ck] = out;
