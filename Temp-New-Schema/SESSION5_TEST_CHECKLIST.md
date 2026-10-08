@@ -74,3 +74,36 @@ Tip: try it on a copy of a real project (Duplicate) so your real dev projects st
 
 - Is the yellow edge on linked names a clear enough cue?
 - Anything that felt slow, confusing, or got in the way.
+
+---
+
+# Round 2: re-test of your 5 notes (2026-10-07)
+
+Open http://localhost:3000/?contacts=v2 (if it asks you to log in, open the link again afterwards).
+
+## 1. Name list filtered by role
+- [ ] On a crew card with a role picked (e.g. DP), click the empty Name field. Only people with that role are listed, under "People with the role ...".
+- [ ] Click **Show all contacts** at the bottom. Everyone shows up. Click away and back: it's filtered again.
+- [ ] On a card with a role nobody has yet, the list says so and still offers Show all contacts.
+- [ ] Key personnel cards work the same way (e.g. EP lists people with Executive Producer).
+
+## 2. Notes
+- [ ] Pick a person who has Notes in Contacts on a card with empty Notes. Their notes fill in (several lines become one, separated by ";").
+- [ ] Type something in a card's Notes first, then pick a person. Your text is kept.
+
+## 3. Hospital (now lives on the location)
+- [ ] Contacts > Locations > + New. Enter an address and click into another field. "Looking up..." then the hospital fills in. Create.
+- [ ] Type your own hospital first, then enter the address: your text is kept. Click **Look up** to replace it on purpose.
+- [ ] Try the addresses that failed before. Smith Tower should now find Harborview; Microsoft 5th Ave should find Lenox Health Greenwich Village.
+- [ ] On a schedule day, pick a location that has a hospital. The day shows it and nothing overwrites it.
+- [ ] Pick a location with no hospital. After a few seconds a message says the hospital was saved to that location, and the day shows it.
+- [ ] Edit a location's hospital in Contacts. The schedule day follows.
+- Note: the free map services can be slow at times (up to a minute). If it says the service is busy, click Look up again later or type it in.
+
+## 4. "+" next to Location
+- [ ] On a schedule day, type a new location name, then click **+**. Contacts opens a new location with that name filled in.
+- [ ] Add the address and click **Create**. Contacts closes and the day is set to the new location (with its hospital).
+
+## 5. Linked tag
+- [ ] A linked name shows a yellow **LINKED** tag next to "Name". Hover it for the explanation.
+- [ ] Type over the name: the tag goes away.

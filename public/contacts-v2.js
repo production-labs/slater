@@ -304,6 +304,7 @@
     // focus: after a pick, focus returns to the input, and an auto-opened
     // list would cover the fields below and swallow the next click.
     root.addEventListener('focusout', function (e) {
+      if (ui.tab === 'locations' && /^cv2f_(address|city|state|zip|country)$/.test(e.target.id)) setTimeout(function () { hospLookup(false); }, 200);
       // Timers re-check focus: a stale timer (field left, then re-entered or
       // re-rendered within 150ms) must not close the list now in use.
       function stillIn(id) { return document.activeElement && document.activeElement.id === id; }
@@ -317,12 +318,29 @@
     document.getElementById('cv2-logo-file').addEventListener('change', onLogoFile);
   }
 
-  function open(tab) {
+  // opts (Session 5 follow-up, schedule day "+" button):
+  //   newLocation: { name }  start a new location with this name filled in
+  //   onCreated(row)         called once when that new record is created;
+  //                          Contacts then closes and returns to the project
+  function open(tab, opts) {
     build();
+    opts = opts || {};
     if (tab && TAB_TABLE[tab] && tab !== ui.tab && !ui.dirty) {
       ui.tab = tab; ui.sel = null; ui.baseline = null; ui.q = ''; ui.cat = 'all'; ui.state = '';
     }
+    ui.onCreated = null;
     root.classList.add('open');
+    if (opts.newLocation && ui.tab === 'locations' && !ui.dirty) {
+      var prefill = function () {
+        select('new');
+        var n = document.getElementById('cv2f_name');
+        if (n) { n.value = opts.newLocation.name || ''; updateDirty(); }
+        var a = document.getElementById('cv2f_address'); if (a) a.focus();
+        ui.onCreated = opts.onCreated || null;
+      };
+      if (store.loaded) { renderAll(); prefill(); return syncShared().then(function () { renderTabs(); renderList(); }); }
+      return syncShared().then(function () { renderAll(); prefill(); }, function (e) { toast('Could not load contacts: ' + e.message, 'err'); });
+    }
     if (!store.loaded) {
       document.getElementById('cv2-list').innerHTML = '<div class="cv2-loading">Loading contacts...</div>';
       document.getElementById('cv2-detail').innerHTML = '';
@@ -336,7 +354,7 @@
   function close() {
     guard(function () {
       root.classList.remove('open');
-      ui.sel = null; ui.baseline = null; ui.dirty = false;
+      ui.sel = null; ui.baseline = null; ui.dirty = false; ui.onCreated = null;
     });
   }
   function guard(fn) {
@@ -785,7 +803,10 @@
     return '' +
       fieldHtml('Name', 'name', l.name, { required: true, placeholder: 'e.g. Building 92, Studio B' }) +
       addressHtml(l) +
-      fieldHtml('Nearest hospital', 'hospital', l.hospital, { type: 'textarea', placeholder: 'Name and address of the nearest emergency room' }) +
+      '<div class="fl"><label for="cv2f_hospital">Nearest hospital' +
+        (l.archived_at ? '' : ' <button type="button" class="cv2-inline-btn" data-act="hosp-lookup" title="Find the nearest emergency room for this address">Look up</button>') +
+        ' <span class="cv2-hosp-status" id="cv2-hosp-status"></span></label>' +
+        '<textarea id="cv2f_hospital" data-field="hospital" rows="3" placeholder="Looked up from the address when you enter one. You can type or correct it.">' + esc(l.hospital) + '</textarea></div>' +
       fieldHtml('Notes', 'notes', l.notes, { type: 'textarea', placeholder: 'Parking, load-in, access, contacts on site...' });
   }
 
@@ -938,9 +959,51 @@
     });
   }
 
+  // ------------------------------------------------------ nearest hospital
+  // Locations look up their nearest ER from the address (app.js
+  // findNearestHospital). Automatic only while the hospital box is empty, so
+  // a typed or corrected hospital is never replaced; "Look up" replaces it on
+  // request. The result is a normal form edit: Save / Create keeps it.
+  var hosp = { key: null, busy: false };
+  function hospLookup(force) {
+    if (ui.tab !== 'locations' || ui.sel == null || typeof findNearestHospital !== 'function') return;
+    if (ui.baseline && ui.baseline.archived_at) return;
+    var box = document.getElementById('cv2f_hospital');
+    if (!box || (!force && box.value.trim())) return;
+    var f = readForm();
+    if (!f.address && !(f.city && (f.state || f.zip)) && !f.zip) {
+      if (force) hospStatus('Enter an address first.', true);
+      return;
+    }
+    var key = [f.address, f.city, f.state, f.zip, f.country].join('|');
+    if (hosp.busy || (!force && key === hosp.key)) return; // auto: once per address
+    hosp.key = key; hosp.busy = true;
+    var sel = ui.sel;
+    hospStatus('Looking up...');
+    findNearestHospital(f).then(function (text) {
+      hosp.busy = false;
+      var b = document.getElementById('cv2f_hospital');
+      if (!b || ui.sel !== sel) return;
+      if (!force && b.value.trim()) { hospStatus(''); return; } // typed meanwhile
+      b.value = text;
+      hospStatus('Found. Check it, then ' + (sel === 'new' ? 'Create.' : 'Save.'));
+      updateDirty();
+    }, function (e) {
+      hosp.busy = false;
+      if (ui.sel === sel) hospStatus((e && e.message ? e.message : 'Lookup failed.') + ' You can type it in.', true);
+    });
+  }
+  function hospStatus(msg, isErr) {
+    var el = document.getElementById('cv2-hosp-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle('err', !!isErr);
+  }
+
   // ------------------------------------------------------------- actions
   function select(id) {
     guard(function () {
+      ui.onCreated = null; // leaving the prefilled new location
       var table = TAB_TABLE[ui.tab];
       ui.sel = id;
       ui.baseline = id === 'new' ? null : store[table][id] || null;
@@ -971,8 +1034,17 @@
     }
     var table = TAB_TABLE[ui.tab];
     ui.saving = true; updateDirty();
+    var wasNew = ui.sel === 'new';
     saveRecord(table, ui.sel === 'new' ? null : ui.baseline, form).then(function (res) {
       ui.saving = false; ui.dirty = false;
+      if (wasNew && ui.onCreated) {
+        var cb = ui.onCreated; ui.onCreated = null;
+        root.classList.remove('open');
+        ui.sel = null; ui.baseline = null;
+        cb(res.row);
+        toast('Location "' + res.row.name + '" created and added to the day.');
+        return;
+      }
       ui.sel = res.row.id; ui.baseline = res.row;
       ui.formRoles = ui.tab === 'people' ? (res.row.role_ids || []).slice() : [];
       ui.formLogo = ui.tab === 'organizations' ? res.row.logo : null;
@@ -1126,7 +1198,7 @@
       case 'new': return select('new');
       case 'select': return select(Number(id));
       case 'back': return guard(function () { ui.sel = null; ui.baseline = null; renderList(); renderDetail(); });
-      case 'cancel-new': return guard(function () { ui.sel = null; ui.baseline = null; renderList(); renderDetail(); });
+      case 'cancel-new': return guard(function () { ui.sel = null; ui.baseline = null; ui.onCreated = null; renderList(); renderDetail(); });
       case 'save': return save();
       case 'archive': return archive();
       case 'restore': return restore();
@@ -1146,6 +1218,7 @@
       case 'create-role': return showNewRoleForm(document.getElementById('cv2-role-input').value.trim());
       case 'newrole-cancel': document.getElementById('cv2-newrole').innerHTML = ''; return;
       case 'newrole-save': return saveNewRole();
+      case 'hosp-lookup': return hospLookup(true);
       case 'pill-remove':
         e.stopPropagation();
         ui.formRoles = ui.formRoles.filter(function (x) { return x !== Number(id); });
@@ -1305,6 +1378,13 @@
         .then(function (res) { return res.row; });
     },
     roleGroups: roleGroups,
+    // Change some fields of one record (merge rules as in the screen).
+    // Resolves to the saved row.
+    update: function (table, id, fields) {
+      var base = store[table][id];
+      if (!base) return Promise.reject(new Error('Not loaded'));
+      return saveRecord(table, base, Object.assign({}, base, fields)).then(function (res) { return res.row; });
+    },
     _store: store, // for debugging in the console during the rewrite
   };
 })();

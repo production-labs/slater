@@ -376,6 +376,102 @@ function lookupHospForDay(dayId, addr) {
   }).catch(function() {});
 }
 
+// ── Nearest hospital for a location record (Session 5 follow-up) ─────────────
+// {address, city, state, zip, country} -> "Name\nStreet\nCity, ST zip".
+// Rejects with an Error whose message can be shown to the user.
+// Why not geocode(): a free-text search silently returns the wrong place for
+// spelled-out streets ("122 Fifth Avenue, New York" landed in New Rochelle,
+// "506 Second Avenue, Seattle" in Ballard). This uses a structured search,
+// "Fifth" -> "5th", and only accepts a result whose zip (or city) matches;
+// otherwise it falls back to the zip code's center, which is close enough to
+// find the nearest ER. Overpass is often busy, so it tries mirrors.
+var _ORDINALS = ["first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth","eleventh","twelfth","thirteenth","fourteenth","fifteenth","sixteenth","seventeenth","eighteenth","nineteenth","twentieth"];
+function _ordinalDigits(s) {
+  return s.replace(new RegExp("\\b(" + _ORDINALS.join("|") + ")\\b", "gi"), function(m) {
+    var n = _ORDINALS.indexOf(m.toLowerCase()) + 1;
+    return n + ((n % 100 >= 11 && n % 100 <= 13) ? "th" : (["th","st","nd","rd"][n % 10] || "th"));
+  });
+}
+var _locateCache = {};
+var _nominatimQueue = Promise.resolve();
+function _nominatim(params) {
+  // Nominatim allows about one request per second.
+  var run = _nominatimQueue.then(function() {
+    var u = new URL("https://nominatim.openstreetmap.org/search");
+    Object.keys(params).forEach(function(k) { if (params[k]) u.searchParams.set(k, params[k]); });
+    u.searchParams.set("format", "json"); u.searchParams.set("limit", "1"); u.searchParams.set("addressdetails", "1");
+    return fetch(u.toString(), {headers:{"Accept-Language":"en"}}).then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { return d[0] || null; });
+  });
+  _nominatimQueue = run.catch(function() {}).then(function() { return new Promise(function(r) { setTimeout(r, 1100); }); });
+  return run;
+}
+async function locateAddress(loc) {
+  var street = String(loc.address || "")
+    .replace(/,?\s*(suite|ste\.?|floor|fl\.?|apt\.?|apartment|unit|#)\s*[\w-]*/gi, "")
+    .split(",")[0].trim();   // "506 Second Ave, Seattle, WA 98104" typed all in one line
+  street = _ordinalDigits(street);
+  var city = (loc.city || "").trim(), state = (loc.state || "").trim(), zip = (loc.zip || "").trim();
+  var cc = (loc.country || "").toLowerCase() || undefined;
+  var ck = [street, city, state, zip, cc].join("|").toLowerCase();
+  if (_locateCache[ck]) return _locateCache[ck];
+  function matches(r) {
+    if (!r) return false;
+    var a = r.address || {};
+    if (zip && a.postcode) return a.postcode.slice(0, 5).toLowerCase() === zip.slice(0, 5).toLowerCase();
+    var c = (a.city || a.town || a.village || a.hamlet || "").toLowerCase();
+    return !city || c === city.toLowerCase();
+  }
+  var r = null, approx = false;
+  if (street) {
+    r = await _nominatim({street:street, city:city, state:state, postalcode:zip, countrycodes:cc});
+    if (!matches(r)) r = await _nominatim({q:[street, city, state, zip].filter(Boolean).join(", "), countrycodes:cc});
+    if (!matches(r)) r = null;
+  }
+  if (!r && zip) { r = await _nominatim({postalcode:zip, countrycodes:cc}); approx = !!street; }
+  if (!r && city) { r = await _nominatim({city:city, state:state, countrycodes:cc}); approx = true; }
+  if (!r) throw new Error("Couldn't find that address on the map.");
+  var out = {lat: parseFloat(r.lat), lng: parseFloat(r.lon), approx: approx};
+  _locateCache[ck] = out;
+  return out;
+}
+var _OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
+async function nearestHospitalAt(lat, lng) {
+  var radii = [15000, 40000], reached = false;
+  for (var i = 0; i < radii.length; i++) {
+    var q = "[out:json][timeout:20];nwr[\"amenity\"=\"hospital\"](around:" + radii[i] + "," + lat + "," + lng + ");out center tags;";
+    var data = null;
+    // Every server busy: wait a few seconds and go round once more.
+    for (var j = 0; j < _OVERPASS.length * 2 && !data; j++) {
+      if (j === _OVERPASS.length) await new Promise(function(r) { setTimeout(r, 4000); });
+      try {
+        var ctl = new AbortController(); var tm = setTimeout(function() { ctl.abort(); }, 20000);
+        var res = await fetch(_OVERPASS[j % _OVERPASS.length], {method:"POST", body:"data=" + encodeURIComponent(q), headers:{"Content-Type":"application/x-www-form-urlencoded"}, signal:ctl.signal});
+        clearTimeout(tm);
+        if (res.ok) data = await res.json();
+      } catch (e) {}
+    }
+    if (!data) continue;
+    reached = true;
+    var kmLng = 111 * Math.cos(lat * Math.PI / 180);
+    var list = (data.elements || []).filter(function(el) { return el.tags && el.tags.name && el.tags.emergency !== "no"; })
+      .map(function(el) {
+        var la = el.lat != null ? el.lat : el.center && el.center.lat, ln = el.lon != null ? el.lon : el.center && el.center.lon;
+        return {tags: el.tags, er: el.tags.emergency === "yes", km: Math.sqrt(Math.pow((la - lat) * 111, 2) + Math.pow((ln - lng) * kmLng, 2))};
+      }).sort(function(a, b) { return a.km - b.km; });
+    if (!list.length) continue;
+    // Nearest hospital with an emergency room; else the nearest hospital.
+    var tg = (list.filter(function(h) { return h.er; })[0] || list[0]).tags;
+    var st2 = [tg["addr:housenumber"], tg["addr:street"]].filter(Boolean).join(" ");
+    var ci = tg["addr:city"] || "", st3 = tg["addr:state"] || tg["addr:province"] || "", po = tg["addr:postcode"] || "";
+    return [tg.name, st2, ([ci, st3].filter(Boolean).join(", ") + (po ? " " + po : "")).trim()].filter(Boolean).join("\n");
+  }
+  throw new Error(reached ? "No hospital found within 40 km." : "The hospital lookup service is busy. Try again in a minute.");
+}
+async function findNearestHospital(loc) {
+  var at = await locateAddress(loc);
+  return nearestHospitalAt(at.lat, at.lng);
+}
+
 function getLocByName(name) {
   if (!name) return null;
   if (window.ProjectPeopleV2) return ProjectPeopleV2.locationByName(name);
@@ -414,6 +510,12 @@ function refreshDayLocDisplay(dayId) {
   if (infoDiv) { infoDiv.textContent = addr; infoDiv.style.display = addr ? "block" : "none"; }
   var hospWrapEl = document.getElementById(dayId+"_hospital_wrap");
   if (hospWrapEl && loc) hospWrapEl.style.display = [loc.address, loc.city, loc.state].filter(Boolean).length ? "" : "none";
+  // v2: the day shows (and saves) the linked location's hospital.
+  var hospEl = document.getElementById(dayId+"_hospital");
+  if (hospEl && loc && loc.hospital && window.ProjectPeopleV2) {
+    var h = parseHospitalText(loc.hospital);
+    if (hospEl.textContent !== h) { hospEl.textContent = h; hospEl.style.display = "block"; }
+  }
 }
 
 function doLookup() {
@@ -1248,8 +1350,14 @@ function addScheduleDay(data, insertAfterDayId) {
       hospEl.textContent = parsedHosp;
       hospEl.style.display = parsedHosp ? "block" : "none";
     }
-    var locAddr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
-    if (locAddr) lookupHospForDay(dayId, locAddr);
+    // The location's own hospital wins; never overwrite it with a lookup.
+    // v2: a location with no hospital is looked up once and saved back to
+    // the location in Contacts (project-people-v2.js).
+    if (!loc.hospital) {
+      var locAddr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
+      if (window.ProjectPeopleV2 && loc.id) ProjectPeopleV2.fillLocationHospital(loc);
+      else if (locAddr) lookupHospForDay(dayId, locAddr);
+    }
     var notesEl = document.getElementById(dayId+"_loc_notes");
     if (notesEl && !notesEl.value && loc.notes) notesEl.value = loc.notes;
     checkShowBlacks(dayId);
@@ -1313,7 +1421,26 @@ function addScheduleDay(data, insertAfterDayId) {
   addLocBtn.title = "Manage locations";
   addLocBtn.textContent = "+";
   addLocBtn.style.cssText = "padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:16px;font-family:inherit;cursor:pointer;color:var(--film-can);line-height:1;flex-shrink:0";
-  addLocBtn.onclick = function() { contactsTab = "locations"; openContacts(); };
+  // Keep focus in the field so its blur doesn't clear a typed new name.
+  addLocBtn.addEventListener("mousedown", function(e) { e.preventDefault(); });
+  addLocBtn.onclick = function() {
+    var typed = locInp.value.trim();
+    if (window.ProjectPeopleV2 && window.ContactsV2) {
+      locList.classList.remove("open");
+      // v2: a typed name that isn't a location yet opens a new location with
+      // that name; once it's created, this day links to it.
+      var known = typed ? getLocByName(typed) : null;
+      ContactsV2.open("locations", typed && !known ? { newLocation: { name: typed }, onCreated: function(row) {
+        if (!document.getElementById(dayId+"_loc_id")) return; // day was removed meanwhile
+        locInp.value = row.name;
+        locIdInp.value = String(row.id);
+        _applyLocSelection(row);
+        if (typeof autosaveTrigger === "function") autosaveTrigger();
+      } } : undefined);
+      return;
+    }
+    contactsTab = "locations"; openContacts();
+  };
 
   const locSelRow = document.createElement("div"); locSelRow.className = "sday-loc-sel-row";
   locSelRow.appendChild(addLocBtn); locSelRow.appendChild(locWrap);

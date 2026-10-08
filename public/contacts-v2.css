@@ -128,3 +128,10 @@
 .fl input.pv2-linked:not([type="date"]){border-left:3px solid var(--accent-yellow)}
 .pv2-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;padding:7px 10px;border-radius:6px;background:var(--surface-3);border:1px solid var(--accent-yellow);font-size:12px;color:var(--text-primary)}
 .pv2-bar-btns{display:flex;gap:6px;flex-shrink:0}
+.pv2-tag{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:8px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:var(--accent-yellow);color:#181818;cursor:help;vertical-align:1px}
+.pv2-empty{padding:8px 11px;font-size:12px;color:var(--text-muted);font-style:italic;border-bottom:1px solid var(--border)}
+.ac-item.pv2-more{font-size:12px;color:var(--text-muted);text-align:center}
+.cv2-inline-btn{margin-left:8px;padding:1px 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text-primary);font-size:10px;font-family:inherit;text-transform:none;letter-spacing:0;cursor:pointer}
+.cv2-inline-btn:hover{border-color:var(--border-strong)}
+.cv2-hosp-status{margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)}
+.cv2-hosp-status.err{color:var(--accent)}

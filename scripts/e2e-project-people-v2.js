@@ -68,6 +68,13 @@ async function main() {
     return { status: r.status, body: await r.json().catch(() => null) };
   }, method, url, body);
   const proj = async key => (await db.query('SELECT * FROM projects WHERE key=$1', [key])).rows[0];
+  // Hospital lookups go to public map servers; tests use a stub that counts calls.
+  await page.evaluateOnNewDocument(() => {
+    window.__hospCalls = [];
+    window.addEventListener('DOMContentLoaded', () => {
+      window.findNearestHospital = async loc => { window.__hospCalls.push(loc.address || loc.zip || loc.city); return 'Stub General Hospital\n1 Test Way\nSeattle, WA 98101'; };
+    });
+  });
   const storeLoaded = () => page.waitForFunction(() => window.ContactsV2 && ContactsV2.store.loaded, { timeout: 8000 });
   const openProject = async key => {
     await page.evaluate(k => localStorage.setItem('slater_last_project', k), key);
@@ -108,13 +115,13 @@ async function main() {
       R[n] = roles.find(r => r.name === n && r.is_global); assert(R[n], 'global role ' + n);
     }
     custom = (await api('POST', '/api/v2/roles', { name: 'Drone Wrangler', category: 'crew', department: 'Camera' })).body;
-    dana = (await api('POST', '/api/v2/contacts', { name: 'Dana Pham', phone: '206.555.0101', email: 'dana@example.com', role_ids: [R['Director of Photography'].id] })).body;
+    dana = (await api('POST', '/api/v2/contacts', { name: 'Dana Pham', phone: '206.555.0101', email: 'dana@example.com', notes: 'Prefers text\nOwns FX6 kit', role_ids: [R['Director of Photography'].id] })).body;
     gary = (await api('POST', '/api/v2/contacts', { name: 'Gary Lamp', phone: '206.555.0102', email: 'gary@example.com', role_ids: [R['Gaffer'].id] })).body;
     erin = (await api('POST', '/api/v2/contacts', { name: 'Erin Exec', phone: '206.555.0103', email: 'erin@example.com', role_ids: [R['Executive Producer'].id] })).body;
     hannah = (await api('POST', '/api/v2/contacts', { name: 'Hannah Host', phone: '206.555.0104', title: 'Chief Executive Officer', role_ids: [R['Host'].id] })).body;
     await api('POST', '/api/v2/contacts', { name: 'Sam Same', phone: '1' });
     await api('POST', '/api/v2/contacts', { name: 'Sam Same', phone: '2' });
-    loc1 = (await api('POST', '/api/v2/locations', { name: 'Studio A', address: '100 Main St', city: 'Seattle', state: 'WA', zip: '98101', notes: 'Load in at back door' })).body;
+    loc1 = (await api('POST', '/api/v2/locations', { name: 'Studio A', address: '100 Main St', city: 'Seattle', state: 'WA', zip: '98101', notes: 'Load in at back door', hospital: 'Typed Hospital\n5 Real Rd' })).body;
     loc2 = (await api('POST', '/api/v2/locations', { name: 'Warehouse', address: '9 Dock Rd', city: 'Tacoma', state: 'WA' })).body;
     assert(dana.id && gary.id && erin.id && hannah.id && loc1.id && loc2.id && custom.id, 'created');
   });
@@ -153,8 +160,19 @@ async function main() {
     assert(await val(c1 + '_role_id') === String(R['Director of Photography'].id), 'role linked');
   });
 
-  await step('name search: everyone, crew-role people first, roles shown', async () => {
+  await step('role on the card: clicking the empty name lists only people with that role', async () => {
     await page.click('#' + c1 + '_name');
+    await T('.ac-list.open .ac-item');
+    const items = await listTexts();
+    const head = await page.$eval('.ac-list.open .pv2-group', e => e.textContent);
+    assert(/Director of Photography/.test(head), head);
+    assert(items[0].startsWith('Dana Pham') && !items.some(t => /Gary|Hannah|Erin/.test(t)), JSON.stringify(items));
+    assert(items[items.length - 1] === 'Show all contacts', 'escape hatch: ' + items[items.length - 1]);
+    await shot('02a-role-filtered');
+  });
+
+  await step('"Show all contacts": everyone, crew-role people first, roles shown', async () => {
+    await pickItem('Show all contacts');
     await page.type('#' + c1 + '_name', 'a');
     await T('.ac-list.open .ac-item');
     const items = await listTexts();
@@ -166,21 +184,26 @@ async function main() {
     await shot('02-name-search');
   });
 
-  await step('picking a contact fills name/phone/email and links; role slot kept', async () => {
+  await step('picking a contact fills name/phone/email/notes and links; role slot kept; Linked tag', async () => {
     await typeInto(c1 + '_name', 'dan');
     await pickItem('Dana Pham');
+    assert(await val(c1 + '_notes') === 'Prefers text; Owns FX6 kit', 'notes: ' + await val(c1 + '_notes'));
+    const tag = await page.$eval('#' + c1 + ' .pv2-tag', e => ({ t: e.textContent, tip: e.title }));
+    assert(tag.t === 'Linked' && /Contacts/.test(tag.tip), JSON.stringify(tag));
     assert(await val(c1 + '_name') === 'Dana Pham' && await val(c1 + '_phone') === '206.555.0101' && await val(c1 + '_email') === 'dana@example.com', 'filled');
     assert(await val(c1 + '_contact_id') === String(dana.id), 'linked');
     assert(await val(c1 + '_contact_ack') === dana.updated_at, 'ack = contact updated_at');
     assert(await val(c1 + '_position') === 'DP', 'role kept');
   });
 
-  await step("empty role slot takes the person's crew role", async () => {
+  await step("empty role slot takes the person's crew role; typed card notes are kept", async () => {
     c2 = await newCard('crew');
+    await page.type('#' + c2 + '_notes', 'Bring ladder');
     await page.click('#' + c2 + '_name');
     await page.type('#' + c2 + '_name', 'gary');
     await pickItem('Gary Lamp');
     assert(await val(c2 + '_position') === 'Gaffer' && await val(c2 + '_role_id') === String(R['Gaffer'].id), 'role from contact');
+    assert(await val(c2 + '_notes') === 'Bring ladder', 'card notes kept');
   });
 
   await step('talent: title from the contact, talent role linked', async () => {
@@ -219,6 +242,7 @@ async function main() {
     await page.click('#' + c2 + '_name');
     await page.keyboard.type('s');
     assert(await val(c2 + '_contact_id') === '', 'unlinked');
+    assert(!(await page.$('#' + c2 + ' .pv2-tag')), 'Linked tag removed');
     await typeInto(c2 + '_name', 'Gary Lamp');
     await blur(c2 + '_name');
     await sleep(100);
@@ -330,6 +354,77 @@ async function main() {
     assert(/9 Dock Rd, Tacoma, WA/.test(await page.$eval('#' + dayId + '_loc_info', e => e.textContent)), 'address shown');
     const d = await saveUntil(key, d => (d.schedule_days || []).some(s => s.location_id === loc2.id), 'location saved');
     assert(d.schedule_days.find(s => s.location_id === loc2.id).loc_name === 'Warehouse', 'name snapshot kept');
+  });
+
+  await step('location with no hospital: looked up once, saved to the location, shown on the day', async () => {
+    let row; for (let i = 0; i < 20; i++) { row = (await db.query('SELECT hospital FROM locations WHERE id=$1', [loc2.id])).rows[0]; if (row.hospital) break; await sleep(250); }
+    assert(/Stub General Hospital/.test(row.hospital), 'saved to location: ' + row.hospital);
+    await page.waitForFunction(id => /Stub General/.test(document.getElementById(id + '_hospital').textContent), { timeout: 5000 }, dayId);
+    assert((await page.evaluate(() => window.__hospCalls.length)) === 1, 'one lookup');
+  });
+
+  let d2;
+  await step('location WITH a hospital: the day uses it, no lookup, nothing overwritten', async () => {
+    d2 = await page.evaluate(() => { addScheduleDay({ date_iso: '2026-11-03', label: 'Day 2' }); return scheduleDays[scheduleDays.length - 1]; });
+    const before = await page.evaluate(() => window.__hospCalls.length);
+    await page.click('#' + d2 + '_loc_id');
+    await pickItem('Studio A');
+    await sleep(500);
+    assert(/Typed Hospital/.test(await page.$eval('#' + d2 + '_hospital', e => e.textContent)), 'day shows location hospital');
+    assert((await page.evaluate(() => window.__hospCalls.length)) === before, 'no lookup');
+    assert((await db.query('SELECT hospital FROM locations WHERE id=$1', [loc1.id])).rows[0].hospital === 'Typed Hospital\n5 Real Rd', 'location untouched');
+  });
+
+  await step('location hospital edited in Contacts: the day follows', async () => {
+    const cur = (await api('GET', '/api/v2/locations/' + loc1.id)).body;
+    await api('PATCH', '/api/v2/locations/' + loc1.id, { hospital: 'Edited Hospital\n9 New St', base_updated_at: cur.updated_at });
+    await page.evaluate(() => ContactsV2.sync());
+    await page.waitForFunction(id => /Edited Hospital/.test(document.getElementById(id + '_hospital').textContent), { timeout: 5000 }, d2);
+  });
+
+  await step('"+" with a typed new name: Contacts opens a new location with it; Create links the day', async () => {
+    const d3 = await page.evaluate(() => { addScheduleDay({ date_iso: '2026-11-04', label: 'Day 3' }); return scheduleDays[scheduleDays.length - 1]; });
+    await page.click('#' + d3 + '_loc_id');
+    await page.type('#' + d3 + '_loc_id', 'Pier 66 Stage');
+    const plus = await page.evaluateHandle(id => document.getElementById(id + '_loc_id').closest('.sday-loc-sel-row').querySelector('button'), d3);
+    await plus.asElement().click();
+    await T('#cv2f_name');
+    assert(await val('cv2f_name') === 'Pier 66 Stage', 'name prefilled: ' + await val('cv2f_name'));
+    await page.type('#cv2f_address', '2130 Alaskan Way');
+    await page.type('#cv2f_city', 'Seattle');
+    await page.click('#cv2f_zip');
+    await page.waitForFunction(() => /Stub General/.test(document.getElementById('cv2f_hospital').value), { timeout: 5000 });
+    assert(/Found/.test(await page.$eval('#cv2-hosp-status', e => e.textContent)), 'status');
+    await shot('06-new-location-prefilled');
+    await page.click('[data-act="save"]');
+    await page.waitForFunction(id => document.getElementById(id + '_loc_id').value === 'Pier 66 Stage', { timeout: 5000 }, d3);
+    assert(!(await page.$('#contacts-v2-modal.open')), 'Contacts closed');
+    const row = (await db.query(`SELECT * FROM locations WHERE owner_id=$1 AND name='Pier 66 Stage'`, [userId])).rows[0];
+    assert(row && row.address === '2130 Alaskan Way' && /Stub General/.test(row.hospital), 'created with hospital');
+    assert(await val(d3 + '_location_id') === String(row.id), 'day linked');
+    assert(/Stub General/.test(await page.$eval('#' + d3 + '_hospital', e => e.textContent)), 'day shows its hospital');
+  });
+
+  await step('Contacts location: auto lookup never replaces a typed hospital; "Look up" does', async () => {
+    await page.evaluate(() => ContactsV2.open('locations'));
+    await T('[data-act="new"]');
+    await sleep(800); // let the open's background refresh finish redrawing
+    await page.click('[data-act="new"]');
+    await T('#cv2f_name');
+    await page.type('#cv2f_name', 'Typed First');
+    await page.type('#cv2f_hospital', 'My Own Hospital');
+    await page.type('#cv2f_address', '1 Somewhere Ave');
+    await page.click('#cv2f_city');
+    await sleep(500);
+    assert(await val('cv2f_hospital') === 'My Own Hospital', 'kept');
+    await page.click('[data-act="hosp-lookup"]');
+    await page.waitForFunction(() => /Stub General/.test(document.getElementById('cv2f_hospital').value), { timeout: 5000 });
+    await page.click('[data-act="cancel-new"]');
+    await sleep(200);
+    const m = await page.$('#modal-overlay.open'); if (m) await page.click('#modal-ok');
+    await page.evaluate(() => { const b = document.querySelector('#contacts-v2-modal [data-act="close"]'); if (b) b.click(); });
+    await sleep(200);
+    assert(!(await page.$('#contacts-v2-modal.open')), 'Contacts closed');
   });
 
   await step('location rename follows the link; call sheet prints the new name + address', async () => {

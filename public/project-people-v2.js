@@ -183,10 +183,19 @@
     var list = makeList(nameEl), st = { idx: -1 };
     var cat = KINDS[kind].cat;
 
+    // Card has a linked role (crew / key personnel): only people with that
+    // role, listed even before typing. "Show all contacts" lifts the filter
+    // until the list closes.
+    function roleFilter() {
+      var r = kind === 'talent' ? null : role(link(id).roleId);
+      return r && !st.showAll ? r : null;
+    }
     function matches(q) {
-      var k = key(q);
-      if (!k) return [];
-      var hits = active('contacts').filter(function (c) {
+      var k = key(q), rf = roleFilter();
+      var pool = active('contacts');
+      if (rf) pool = pool.filter(function (c) { return (c.role_ids || []).indexOf(rf.id) !== -1; });
+      else if (!k) return [];
+      var hits = !k ? pool : pool.filter(function (c) {
         return key(c.name).indexOf(k) !== -1 || key(c.sort_last_name).indexOf(k) === 0;
       });
       hits.sort(function (a, b) {
@@ -196,18 +205,31 @@
         if (sa !== sb) return sa - sb;
         return key(a.name) < key(b.name) ? -1 : key(a.name) > key(b.name) ? 1 : 0;
       });
-      return hits.slice(0, 8);
+      return hits.slice(0, roleFilter() && !k ? 50 : 8);
     }
     function render() {
       list.innerHTML = '';
-      var q = nameEl.value;
-      if (!store.loaded || !key(q)) { close(list, st); return; }
-      matches(q).forEach(function (c) {
+      var q = nameEl.value, k = key(q), rf = roleFilter();
+      var cardRole = kind === 'talent' ? null : role(link(id).roleId);
+      if (!store.loaded || (!k && !rf)) { close(list, st); return; }
+      if (rf) {
+        var h = document.createElement('div'); h.className = 'pv2-group'; h.textContent = 'People with the role ' + rf.name; list.appendChild(h);
+      }
+      var ms = matches(q);
+      ms.forEach(function (c) {
         var roles = contactRoles(c).map(roleText).join(', ');
-        item(list, '<strong>' + esc(c.name) + '</strong><span>' + esc([roles, c.phone, c.email].filter(Boolean).join(' · ')) + '</span>', '', function () { pick(c); });
+        item(list, '<strong>' + esc(c.name) + '</strong><span>' + esc([roles, c.phone, c.email].filter(Boolean).join(' \u00b7 ')) + '</span>', '', function () { pick(c); });
       });
-      if (!contactByName(q) && !active('contacts').some(function (c) { return key(c.name) === key(q); })) {
+      if (rf && !ms.length) {
+        var none = document.createElement('div'); none.className = 'pv2-empty';
+        none.textContent = k ? 'No one with this role matches "' + q.trim() + '".' : 'No one in Contacts has this role yet.';
+        list.appendChild(none);
+      }
+      if (k && !active('contacts').some(function (c) { return key(c.name) === k; })) {
         item(list, '<strong>+ Add "' + esc(q.trim()) + '" to contacts</strong>', 'po2-add', function () { addTyped(); });
+      }
+      if (cardRole) {
+        item(list, st.showAll ? 'Only people with the role ' + esc(cardRole.name) : 'Show all contacts', 'pv2-more', function () { st.showAll = !st.showAll; render(); });
       }
       show(list, st);
     }
@@ -249,9 +271,12 @@
       }
       render();
     });
-    nameEl.addEventListener('focus', function () { if (key(nameEl.value) && !link(id).contactId) render(); });
+    function openOnEntry() { if (!link(id).contactId && (key(nameEl.value) || roleFilter())) render(); }
+    nameEl.addEventListener('focus', openOnEntry);
+    nameEl.addEventListener('click', function () { if (!list.classList.contains('open')) openOnEntry(); });
     nameEl.addEventListener('blur', function () {
       close(list, st);
+      st.showAll = false;
       // Exact name of one contact: link it, keep what's typed in the card.
       if (!link(id).contactId && store.loaded) {
         var c = contactByName(nameEl.value);
@@ -280,7 +305,15 @@
         if (r) { setVal(id + rf, roleText(r)); setVal(id + '_role_id', r.id); }
       }
     }
+    if (fromPick) fillNotes(id, c);
     renderCard(id);
+  }
+  // Contact notes go into an EMPTY card Notes field (one line; project notes
+  // typed on the card are never replaced). Key personnel cards have no notes.
+  function fillNotes(id, c) {
+    var n = el(id + '_notes');
+    if (!n || n.value.trim() || !c.notes) return;
+    n.value = String(c.notes).split(/\s*\n+\s*/).filter(Boolean).join('; ');
   }
   // Linked by typed name: only fill fields the card doesn't have yet.
   function fillEmpty(id, c) {
@@ -288,6 +321,7 @@
       var want = expected(id, c)[f];
       if (want && !val(id + '_' + f).trim()) setVal(id + '_' + f, want);
     });
+    fillNotes(id, c);
   }
   function linkQuietly(id, c) {
     setLink(id, c);
@@ -372,11 +406,19 @@
       '<span class="pv2-bar-btns"><button type="button" class="lb primary cv2-small" data-pv2="update">Update</button><button type="button" class="lb cv2-small" data-pv2="dismiss">Dismiss</button></span>';
     markLinked(id, true);
   }
+  var LINKED_TIP = 'Linked to this person in Contacts. If their phone, email or other details change there, this card offers to update. Typing a different name removes the link.';
   function markLinked(id, on) {
     var nameEl = el(id + '_name');
     if (!nameEl) return;
     nameEl.classList.toggle('pv2-linked', on);
-    nameEl.title = on ? 'Linked to Contacts' : '';
+    nameEl.title = on ? LINKED_TIP : '';
+    var fl = nameEl.closest('.fl'), label = fl && fl.querySelector('label');
+    if (!label) return;
+    var tag = label.querySelector('.pv2-tag');
+    if (on && !tag) {
+      tag = document.createElement('span'); tag.className = 'pv2-tag'; tag.textContent = 'Linked'; tag.title = LINKED_TIP;
+      label.appendChild(tag);
+    } else if (!on && tag) tag.remove();
   }
 
   // --------------------------------------------------- legacy links on load
@@ -419,6 +461,24 @@
     if (id) { ensure('locations', id); var row = store.locations[id]; if (row) return row; }
     return locationByName(name);
   }
+  // A location picked on a schedule day with no hospital on file: look it up
+  // once and save it to the location in Contacts. The day then shows it via
+  // refreshDayLocDisplay. Never replaces a hospital that's already there.
+  var hospBusy = {};
+  function fillLocationHospital(loc) {
+    if (!loc || !loc.id || loc.hospital || hospBusy[loc.id] || typeof findNearestHospital !== 'function') return;
+    if (!(loc.address || loc.zip || (loc.city && loc.state))) return;
+    hospBusy[loc.id] = true;
+    findNearestHospital(loc).then(function (text) {
+      var cur = store.locations[loc.id];
+      if (!cur || cur.hospital) return;
+      return CV2.update('locations', loc.id, { hospital: text }).then(function (row) {
+        status('Nearest hospital saved to "' + row.name + '" in Contacts.');
+      });
+    }).catch(function (e) {
+      status('Nearest hospital for "' + loc.name + '": ' + (e && e.message ? e.message : 'lookup failed.') + ' Add it in Contacts.', 'err');
+    }).then(function () { delete hospBusy[loc.id]; });
+  }
   function locations() {
     return active('locations').filter(function (l) { return !!l.name; })
       .sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -437,6 +497,7 @@
     locations: locations,
     location: location,
     locationByName: locationByName,
+    fillLocationHospital: fillLocationHospital,
     onProjectLoaded: function () { linkLegacy(); render(); },
   };
 
