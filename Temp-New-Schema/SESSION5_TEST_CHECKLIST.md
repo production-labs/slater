@@ -1,5 +1,18 @@
 # Session 5: Hands-on Test Checklist
 
+## NEXT TIME: START HERE
+
+Round 1 (the first list below) is done. Your notes from it are all fixed. Next time, test **Round 2 only** (at the bottom of this file, sections 1 to 6), on commit `b2d8f15` or later.
+
+1. Open Terminal: `cd ~/Sites/slater && node server.js` (leave the window open)
+2. Go to http://localhost:3000/?contacts=v2
+3. If it asks you to log in: log in, then open that link **again** (logging in drops the `?contacts=v2` part, and you'd see the old Contacts).
+4. Hard refresh once (Cmd+Shift+R) so the browser picks up the newest code.
+5. Work through **Round 2**: role-filtered names, notes, hospital, "+" next to Location, Linked tag, typing over a linked person.
+6. Tell Claude what you find. After that comes Session 6 (the migration).
+
+---
+
 Branch `data-model-rewrite`, commit `98f735b`. Everything tested here is local only; nothing is on main.
 
 ## Before you start
