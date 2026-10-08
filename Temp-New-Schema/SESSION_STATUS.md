@@ -4,7 +4,7 @@ Last updated: 2026-10-07
 
 ## Where we are
 
-**PICK UP HERE (2026-10-07):** Session 5 BUILT, all automated tests pass, committed + pushed to the branch. John tested round 1 (5 notes, all fixed, see item 8 "JOHN'S TEST ROUND 1"). Then he reported item 6 (fixed, plus item 7). Round 2 (2026-10-08): everything working except the hospital-in-wrong-state bug (item 8, fixed). Last check: John re-tests item 8, then SESSION 6. Then Session 6. Note: logging in drops `?contacts=v2` from the URL; open the link again after logging in. Fix whatever he finds, then Session 6 (use Opus). Details: item 8 under "Next step"; decisions in "Decided 2026-10-07". If tests say `relation "roles" does not exist`, Postgres@18 took the port after a reboot (see Decided 2026-10-07).
+**PICK UP HERE (2026-10-08):** SESSION 5 DONE. John tested two rounds; everything works (last fix `d712c45`, hospital lookup). **Next: Session 6** (use Opus): row-count verification FIRST, then the migration script, rehearsed on a restored production backup (item 9 under "Next step"; hard rules + John's answers #10 apply). Before starting, ask John to download the most recent nightly backup (Admin dashboard > Backups > Download, link valid 5 min; procedure `docs/RESTORE.md`, Postgres 18 tools, scratch server on port 5433). Optional quick check for John: click "Look up" on the "John's House" and "Smith Tower" locations (they still hold wrong hospitals saved before the fix).
 
 **Earlier (2026-10-04):** Session 4 done, tested by John and committed. Next: Session 5 (item 8 under "Next step"; use Opus). Earlier note: Sessions 1-3 done and committed (last commit `714b824`, pushed to `origin/data-model-rewrite`; nothing on `main`, nothing deployed). Session 3 (new Contacts screen) is feature-complete per John's testing feedback today. **Next: Session 4** (Project tab agency/client pickers on v2, see item 7 under "Next step"). Before starting: ask John if he found anything else in Contacts while testing.
 
@@ -139,7 +139,7 @@ Earlier estimate: original was 12-16 working days; add ~3-5 days for the offline
    - `contacts-v2.js`: `open(tab)`, `slater:v2-changed` event, shared `sync`, `fetchOne`, `createOrganization`.
    - Tests: new `scripts/e2e-project-orgs-v2.js` (20 steps, incl. downloading the call sheet + expense report and checking the agency block). Run it alongside the other two after any change (it takes a few minutes).
    - Bug the tests caught: a project linked to an ARCHIVED org couldn't find it, so docs silently fell back to the default agency. Fixed (fetch on demand).
-8. ~~Session 5: Crew/Talent/KP role_id + contact_id wiring, schedule locations~~ -- BUILT 2026-10-07, all tests pass; awaiting John's hands-on test. Same `?contacts=v2` flag.
+8. ~~Session 5: Crew/Talent/KP role_id + contact_id wiring, schedule locations~~ -- DONE 2026-10-08 (built 10-07, John tested 2 rounds, all fixes in). Same `?contacts=v2` flag.
    - New `public/project-people-v2.js` (header comment has the full behavior). Name fields search ALL v2 contacts (card's category first) and link `contact_id`; role fields (crew Position, KP Role) pick roles and link `role_id`, writing abbreviation-else-name; talent Title stays free text, filled from `contacts.title` (else the talent role name), talent `role_id` = the contact's first talent role. "+ Add ... to contacts" (`ContactsV2.createContact`). Typing over a linked name unlinks; exact unique name / exact role name-or-abbreviation links on blur. "Details changed in Contacts" bar with Update / Dismiss (`contact_ack`).
    - Saved shape (projects.data): crew / talent / kp_cards entries gain optional `contact_id`, `role_id` (numbers), `contact_ack` (contact updated_at string). Schedule days gain optional `location_id`; `loc_id` / `loc_name` still hold the name. Link ids live in hidden inputs on the cards, so they survive drag-reorder and a save with the flag OFF.
    - Legacy projects link on load (and new projects' default EP/Producer link to roles): contact/location by unique exact name, role by name/abbreviation (category, then built-in, breaks ties). Text unchanged; `contact_ack` set at link time. **Session 6 migration must apply the same rules + set contact_ack**, plus the alias map. Preview on John's dev data: 48/55 people, 58/77 roles, 19/21 days link; unmatched roles: Virtual Event Prod., Stream Tech, Graphic Designer, Motion Designer, Mng. Producer, V-Cam Op, V Cam Op; unmatched location: Teams Town Hall.
@@ -160,7 +160,11 @@ Earlier estimate: original was 12-16 working days; add ~3-5 days for the offline
      Round 2 otherwise: John reports everything working.
      Doc check vs pre-Session-5 code on today's data: flag off identical; flag on only adds Jen's House address + notes to one call sheet (now read from v2 Locations).
    - Not done / later: alias map (Session 6); crew configs are still per-browser localStorage; Rundown crew tab unchanged (reads card text); the old name-keyed backfill into the contacts blob still runs (removed at cutover, Session 8).
-9. **NEXT: Session 6** -- row-count verification + migration script, rehearse on a restored prod dump.
+9. **NEXT: Session 6** -- row-count verification + migration script, rehearse on a restored prod dump. Must carry over from Session 5:
+   - Link project people/locations with the SAME rules as project-people-v2.js linkLegacy (unique exact name; role by name/abbreviation, category then built-in breaks ties) plus the alias map, and set `contact_ack` = the contact's updated_at at link time; card text never changes.
+   - Schedule days: `location_id` from the unique exact location name.
+   - Locations: copy the old blob's hospital; leave empty where there is none (the app looks those up once on first use).
+   - Unmatched from John's dev data (expect similar in prod): roles Virtual Event Prod., Stream Tech, Graphic Designer, Motion Designer, Mng. Producer, V-Cam Op, V Cam Op; location Teams Town Hall.
 
 (Original Session 4 notes, for reference:)
    - Project tab organization pickers on v2, behind the same `?contacts=v2` flag (old pickers stay the default until cutover).
