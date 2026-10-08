@@ -7,8 +7,8 @@
 //   ?contacts=v1   turn off
 // Project tab agency/client pickers read organizations from this store
 // (project-orgs-v2.js, Session 4; listens for 'slater:v2-changed').
-// Schedule location dropdowns and crew/talent autocomplete still use the old
-// contacts blob until Session 5 and the Session 6 migration.
+// Crew / talent / key personnel cards and schedule day locations read the
+// store too (project-people-v2.js, Session 5).
 //
 // Saving: per record. Only the fields the user changed are sent, with the
 // baseline updated_at. If the record changed elsewhere (409 conflict), the
@@ -1298,6 +1298,13 @@
       return saveRecord('organizations', null, { name: name, country: defaultCountry() })
         .then(function (res) { return res.row; });
     },
+    // Quick-add from project crew / talent / key personnel cards (Session 5).
+    // fields: name, phone, email, title, role_ids. Resolves to the new row.
+    createContact: function (fields) {
+      return saveRecord('contacts', null, Object.assign({ country: defaultCountry() }, fields))
+        .then(function (res) { return res.row; });
+    },
+    roleGroups: roleGroups,
     _store: store, // for debugging in the console during the rewrite
   };
 })();

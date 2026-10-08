@@ -1,10 +1,12 @@
 # Data Model Rewrite: Session Status
 
-Last updated: 2026-10-04
+Last updated: 2026-10-07
 
 ## Where we are
 
-**PICK UP HERE (2026-10-04):** Session 4 done, tested by John and committed. Next: Session 5 (item 8 under "Next step"; use Opus). Earlier note: Sessions 1-3 done and committed (last commit `714b824`, pushed to `origin/data-model-rewrite`; nothing on `main`, nothing deployed). Session 3 (new Contacts screen) is feature-complete per John's testing feedback today. **Next: Session 4** (Project tab agency/client pickers on v2, see item 7 under "Next step"). Before starting: ask John if he found anything else in Contacts while testing.
+**PICK UP HERE (2026-10-07):** Session 5 BUILT, all automated tests pass, committed + pushed to the branch. WAITING ON John's hands-on test (`http://localhost:3000/?contacts=v2`). Fix whatever he finds, then Session 6 (use Opus). Details: item 8 under "Next step"; decisions in "Decided 2026-10-07". If tests say `relation "roles" does not exist`, Postgres@18 took the port after a reboot (see Decided 2026-10-07).
+
+**Earlier (2026-10-04):** Session 4 done, tested by John and committed. Next: Session 5 (item 8 under "Next step"; use Opus). Earlier note: Sessions 1-3 done and committed (last commit `714b824`, pushed to `origin/data-model-rewrite`; nothing on `main`, nothing deployed). Session 3 (new Contacts screen) is feature-complete per John's testing feedback today. **Next: Session 4** (Project tab agency/client pickers on v2, see item 7 under "Next step"). Before starting: ask John if he found anything else in Contacts while testing.
 
 - Branch: `data-model-rewrite`. Confirm you are on it before any change. Level with `main` as of 2026-10-03 (main has had no new commits; re-check with `git rev-list --left-right --count main...data-model-rewrite` and merge main in if it moved).
 - Schema lives in `scripts/data-model/schema.sql` (the `slater_schema_draft.sql` in this folder is SUPERSEDED, history only). Built-in roles: `scripts/data-model/global-roles.js` (80 roles). Apply/re-apply to the LOCAL dev DB with `node scripts/migrate-data-model.js` (one transaction, refuses non-local DB, idempotent).
@@ -137,7 +139,16 @@ Earlier estimate: original was 12-16 working days; add ~3-5 days for the offline
    - `contacts-v2.js`: `open(tab)`, `slater:v2-changed` event, shared `sync`, `fetchOne`, `createOrganization`.
    - Tests: new `scripts/e2e-project-orgs-v2.js` (20 steps, incl. downloading the call sheet + expense report and checking the agency block). Run it alongside the other two after any change (it takes a few minutes).
    - Bug the tests caught: a project linked to an ARCHIVED org couldn't find it, so docs silently fell back to the default agency. Fixed (fetch on demand).
-8. **NEXT: Session 5** -- Crew/Talent/KP role_id + contact_id wiring.
+8. ~~Session 5: Crew/Talent/KP role_id + contact_id wiring, schedule locations~~ -- BUILT 2026-10-07, all tests pass; awaiting John's hands-on test. Same `?contacts=v2` flag.
+   - New `public/project-people-v2.js` (header comment has the full behavior). Name fields search ALL v2 contacts (card's category first) and link `contact_id`; role fields (crew Position, KP Role) pick roles and link `role_id`, writing abbreviation-else-name; talent Title stays free text, filled from `contacts.title` (else the talent role name), talent `role_id` = the contact's first talent role. "+ Add ... to contacts" (`ContactsV2.createContact`). Typing over a linked name unlinks; exact unique name / exact role name-or-abbreviation links on blur. "Details changed in Contacts" bar with Update / Dismiss (`contact_ack`).
+   - Saved shape (projects.data): crew / talent / kp_cards entries gain optional `contact_id`, `role_id` (numbers), `contact_ack` (contact updated_at string). Schedule days gain optional `location_id`; `loc_id` / `loc_name` still hold the name. Link ids live in hidden inputs on the cards, so they survive drag-reorder and a save with the flag OFF.
+   - Legacy projects link on load (and new projects' default EP/Producer link to roles): contact/location by unique exact name, role by name/abbreviation (category, then built-in, breaks ties). Text unchanged; `contact_ack` set at link time. **Session 6 migration must apply the same rules + set contact_ack**, plus the alias map. Preview on John's dev data: 48/55 people, 58/77 roles, 19/21 days link; unmatched roles: Virtual Event Prod., Stream Tech, Graphic Designer, Motion Designer, Mng. Producer, V-Cam Op, V Cam Op; unmatched location: Teams Town Hall.
+   - Schedule: location picker reads v2 Locations (`scheduleLocations()`, `getDayLoc()`, `refreshDayLocDisplay()` in app.js); a renamed location follows the link; call sheet `getDayLocInfo` reads by `location_id`. Day 1/2 call sheet objects now carry `location_id`.
+   - Crew configs (both flags): Save asks Roles only / Roles and assigned crew; new `items` list (position, role_id, name/phone/email, contact_id, contact_ack), old `roles` text list still written. Recall: all TBD, no contacted time, keeps saved order (old code loaded configs upside down; fixed).
+   - Bug fixed (both flags): .ics export had no location since the Location tab was removed (read DOM ids that no longer exist); now uses the day's location + hospital.
+   - Tests: new `scripts/e2e-project-people-v2.js` (25 steps). New `scripts/doc-snapshot.js <label> [v1|v2]`: read-only (blocks all writes), logs in as John via a temp session row, writes call sheet / workback / expense text for all his projects to /tmp/slater-doc-snapshots/<label>. Before vs after Session 5: identical, flag on and off (16 projects).
+   - Not done / later: alias map (Session 6); crew configs are still per-browser localStorage; Rundown crew tab unchanged (reads card text); the old name-keyed backfill into the contacts blob still runs (removed at cutover, Session 8).
+9. **NEXT: Session 6** -- row-count verification + migration script, rehearse on a restored prod dump.
 
 (Original Session 4 notes, for reference:)
    - Project tab organization pickers on v2, behind the same `?contacts=v2` flag (old pickers stay the default until cutover).
@@ -146,6 +157,14 @@ Earlier estimate: original was 12-16 working days; add ~3-5 days for the offline
    - Doc branding (Agency / Client logo) + call sheet / expense report agency info (billing contact name/email/phone, invoicing email/text) read from the org. Docs print an address's country ONLY when it differs from `users.default_country`.
    - Replace the old Agency Manager modal (`openAgencyManager`, app.js ~5392) with the Organizations tab, or point it there.
    - Watch-outs: permanent delete already refuses orgs referenced by `agency_org_id`/`client_org_id`; keep that working. Run both test suites and extend the browser test for the pickers.
+
+## Decided 2026-10-07 (Session 5)
+
+- Card role text (John, Q1): picking a role writes its ABBREVIATION to the card when it has one, else the full name. That text is what call sheets print. Legacy text that links to a role on load is NOT rewritten (old docs stay the same).
+- Contact changes (John, Q2 option c): cards keep their saved name/phone/email/title. A card linked to a contact whose details have since changed shows "Details changed in Contacts" with Update / Dismiss. Dismiss stores the contact's `updated_at` on the card (`contact_ack`), so it only comes back if the contact changes again. Cards linked by the on-load legacy name match get `contact_ack` set at link time (no prompt for pre-existing differences); the Session 6 migration must do the same.
+- Name search (John, Q3): every card searches ALL contacts; people with a role in the card's category (crew / talent / staff for key personnel) are listed first.
+- Crew configs (John, Q4): Save asks "Roles only" or "Roles and assigned crew". With crew, each entry keeps name/phone/email (+ contact_id/role_id when linked); notes and status are not saved. Recalling sets every status to TBD (contacted time cleared). Still localStorage, per browser.
+- Dev DB: Postgres@16 holds the dev data; @18 has an older Sept 16 copy. @18 stopped on 2026-10-07 after a reboot let it take port 5432.
 
 ## Decided 2026-10-04
 

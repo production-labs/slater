@@ -378,7 +378,42 @@ function lookupHospForDay(dayId, addr) {
 
 function getLocByName(name) {
   if (!name) return null;
+  if (window.ProjectPeopleV2) return ProjectPeopleV2.locationByName(name);
   return (loadContacts().locations || []).find(function(l) { return l.name === name; }) || null;
+}
+
+// Data model rewrite (Session 5): with the v2 flag, schedule days pick from
+// the v2 Locations and save location_id plus the name (loc_id / loc_name, as
+// before). Flag off: the old contacts blob, matched by name.
+function scheduleLocations() {
+  if (window.ProjectPeopleV2) return ProjectPeopleV2.locations();
+  var list = (loadContacts().locations || []).filter(function(l) { return !!l.name; });
+  list.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  return list;
+}
+function getDayLoc(dayId) {
+  var inp = document.getElementById(dayId+"_loc_id");
+  if (window.ProjectPeopleV2) {
+    var idEl = document.getElementById(dayId+"_location_id");
+    return ProjectPeopleV2.location(idEl ? idEl.value : "", inp ? inp.value : "");
+  }
+  return inp && inp.value ? getLocByName(inp.value) : null;
+}
+function dayLocAddress(loc) {
+  return loc ? [loc.address, loc.city, [loc.state, loc.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") : "";
+}
+// Redraw a day's location name + address after the v2 store loads or a
+// location changes in Contacts (no lookups, no autosave).
+function refreshDayLocDisplay(dayId) {
+  var inp = document.getElementById(dayId+"_loc_id");
+  if (!inp) return;
+  var loc = getDayLoc(dayId);
+  if (loc && document.activeElement !== inp && inp.value !== loc.name) inp.value = loc.name;
+  var infoDiv = document.getElementById(dayId+"_loc_info");
+  var addr = dayLocAddress(loc);
+  if (infoDiv) { infoDiv.textContent = addr; infoDiv.style.display = addr ? "block" : "none"; }
+  var hospWrapEl = document.getElementById(dayId+"_hospital_wrap");
+  if (hospWrapEl && loc) hospWrapEl.style.display = [loc.address, loc.city, loc.state].filter(Boolean).length ? "" : "none";
 }
 
 function doLookup() {
@@ -386,9 +421,7 @@ function doLookup() {
   scheduleDays.forEach(function(dayId) {
     var iso = (document.getElementById(dayId+"_date_iso")||{}).value||"";
     if (!iso) return;
-    var inp = document.getElementById(dayId+"_loc_id");
-    if (!inp || !inp.value) return;
-    var loc = getLocByName(inp.value);
+    var loc = getDayLoc(dayId);
     if (!loc || !loc.address) return;
     var addr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
     if (!addr) return;
@@ -663,7 +696,7 @@ function addCrew(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, crew));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at"><input type="hidden" id="${id}_contact_id"><input type="hidden" id="${id}_role_id"><input type="hidden" id="${id}_contact_ack">`;
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -679,7 +712,7 @@ function addTalent(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at"><input type="hidden" id="${id}_contact_id"><input type="hidden" id="${id}_role_id"><input type="hidden" id="${id}_contact_ack">`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -712,7 +745,8 @@ function addKP(cardData) {
   cardData = cardData || {};
   var id = "kp_"+(++_uid);
   var d = document.createElement("div"); d.className="card"; d.id=id;
-  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role">'+icon('pencil','pencil-icon')+'</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" onchange="updateCrewStatusPill(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>';
+  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role">'+icon('pencil','pencil-icon')+'</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" onchange="updateCrewStatusPill(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>'+
+    '<input type="hidden" id="'+id+'_contact_id"><input type="hidden" id="'+id+'_role_id"><input type="hidden" id="'+id+'_contact_ack">';
   kp.push(id);
   document.getElementById("kp-list").appendChild(d);
   var sv = function(eid, val) { var e=document.getElementById(eid); if(e && val!==undefined) e.value=val||""; };
@@ -721,6 +755,7 @@ function addKP(cardData) {
   sv(id+"_phone", cardData.phone||"");
   sv(id+"_email", cardData.email||"");
   sv(id+"_status", cardData.status||"tbd");
+  setCardLinkFields(id, cardData);
   updateCrewStatusPill(id, cardData.status||"tbd");
   (function(cardId) {
     document.getElementById(cardId+"_del").onclick = function() {
@@ -1185,11 +1220,11 @@ function addScheduleDay(data, insertAfterDayId) {
   const locRow = document.createElement("div"); locRow.className = "sday-loc-row";
   const locLbl = document.createElement("label"); locLbl.textContent = "Location";
 
-  // Sort locations alphabetically
-  var _contactLocs = (loadContacts().locations || []).filter(function(l) { return !!l.name; });
-  _contactLocs.sort(function(a, b) { return a.name.localeCompare(b.name); });
-  var _locByName = {};
-  _contactLocs.forEach(function(l) { _locByName[l.name] = l; });
+  // Locations are read fresh each time (the v2 store can load after the card).
+  // locIdInp holds the v2 location id (empty with the flag off).
+  const locIdInp = document.createElement("input"); locIdInp.type = "hidden";
+  locIdInp.id = dayId+"_location_id";
+  locIdInp.value = data.location_id ? String(data.location_id) : "";
 
   // Helper: update address display + hospital visibility when a location is selected/cleared
   function _applyLocSelection(loc) {
@@ -1236,7 +1271,7 @@ function addScheduleDay(data, insertAfterDayId) {
 
   function _buildLocList(query) {
     locList.innerHTML = "";
-    var filtered = _contactLocs.filter(function(l) {
+    var filtered = scheduleLocations().filter(function(l) {
       return !query || l.name.toLowerCase().indexOf(query.toLowerCase()) !== -1;
     });
     if (!filtered.length) { locList.classList.remove("open"); return; }
@@ -1246,6 +1281,7 @@ function addScheduleDay(data, insertAfterDayId) {
       item.addEventListener("mousedown", function(e) {
         e.preventDefault();
         locInp.value = loc.name;
+        locIdInp.value = loc.id != null && window.ProjectPeopleV2 ? String(loc.id) : "";
         locList.classList.remove("open");
         _applyLocSelection(loc);
       });
@@ -1255,16 +1291,21 @@ function addScheduleDay(data, insertAfterDayId) {
   }
 
   locInp.addEventListener("focus", function() { _buildLocList(""); });
-  locInp.addEventListener("input", function() { _buildLocList(locInp.value); });
+  locInp.addEventListener("input", function() { locIdInp.value = ""; _buildLocList(locInp.value); });
   locInp.addEventListener("blur", function() {
     setTimeout(function() { locList.classList.remove("open"); }, 150);
-    if (locInp.value && !_locByName[locInp.value]) {
+    var typed = locInp.value ? getLocByName(locInp.value) : null;
+    if (locInp.value && !typed) {
       locInp.value = "";
+      locIdInp.value = "";
       _applyLocSelection(null);
+    } else if (typed && !locIdInp.value && window.ProjectPeopleV2) {
+      locIdInp.value = String(typed.id);
     }
   });
 
   locWrap.appendChild(locInp);
+  locWrap.appendChild(locIdInp);
   locWrap.appendChild(locList);
 
   const addLocBtn = document.createElement("button");
@@ -1285,17 +1326,18 @@ function addScheduleDay(data, insertAfterDayId) {
   body.appendChild(locInfoDiv);
 
   // Show address if a location is already selected on load
+  function _initLoc() {
+    if (window.ProjectPeopleV2) return ProjectPeopleV2.location(locIdInp.value, locInp.value);
+    return locInp.value ? getLocByName(locInp.value) : null;
+  }
   (function() {
-    var initLoc = _locByName[locInp.value];
-    if (initLoc) {
-      var addrParts = [initLoc.address, initLoc.city, [initLoc.state, initLoc.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-      if (addrParts) { locInfoDiv.textContent = addrParts; locInfoDiv.style.display = "block"; }
-    }
+    var addrParts = dayLocAddress(_initLoc());
+    if (addrParts) { locInfoDiv.textContent = addrParts; locInfoDiv.style.display = "block"; }
   })();
 
   // Hospital field — hidden when selected location has no address
   var _initLocHasAddr = (function() {
-    var l = _locByName[locInp.value];
+    var l = _initLoc();
     return l ? !![l.address, l.city, l.state].filter(Boolean).length : true;
   })();
   const hospWrap = document.createElement("div"); hospWrap.className = "fl"; hospWrap.id = dayId+"_hospital_wrap";
@@ -1790,6 +1832,7 @@ function getScheduleDays() {
       sunset:       v(dayId+"_sunset"),
       loc_id:       (document.getElementById(dayId+"_loc_id")||{}).value||"",
       loc_name:     (document.getElementById(dayId+"_loc_id")||{}).value||"",
+      location_id:  Number((document.getElementById(dayId+"_location_id")||{}).value) || undefined,
       hospital:     (document.getElementById(dayId+"_hospital")||{}).textContent||"",
       loc_notes:    v(dayId+"_loc_notes"),
       show_blacks:       (document.getElementById(dayId+"_show_blacks")||{}).checked||false,
@@ -3304,6 +3347,7 @@ function acAttach(nameEl, getPhoneEl, getEmailEl, bucket) {
 
 // Attach autocomplete to all relevant fields
 function acAttachKP(id) {
+  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
   const nameEl = document.getElementById(id+"_name");
   acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "staff");
 }
@@ -3319,12 +3363,34 @@ function acAttachAll() {
 }
 
 function acAttachCrew(id) {
+  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
   const nameEl = document.getElementById(id+"_name");
   acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "crew");
 }
 function acAttachTalent(id) {
+  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
   const nameEl = document.getElementById(id+"_name");
   acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "talent");
+}
+
+// Data model rewrite (Session 5): crew / talent / key personnel cards can be
+// linked to a v2 contact and role. The ids live in hidden fields on the card
+// so they survive drag-reorder and save with the project, flag on or off.
+// contact_ack = the contact's updated_at the card last agreed with (picked,
+// updated, or dismissed); see project-people-v2.js.
+function cardLinkFields(id) {
+  var out = {};
+  var c = v(id+"_contact_id"), r = v(id+"_role_id"), a = v(id+"_contact_ack");
+  if (c) out.contact_id = Number(c);
+  if (r) out.role_id = Number(r);
+  if (c && a) out.contact_ack = a;
+  return out;
+}
+function setCardLinkFields(id, d) {
+  d = d || {};
+  [["_contact_id", d.contact_id], ["_role_id", d.role_id], ["_contact_ack", d.contact_ack]].forEach(function(p) {
+    var e = document.getElementById(id+p[0]); if (e) e.value = p[1] == null ? "" : String(p[1]);
+  });
 }
 
 // Contacts modal
@@ -4550,18 +4616,63 @@ function crewConfigSave(configs) {
   localStorage.setItem(CREW_CFG_KEY, JSON.stringify(configs));
 }
 
+// A config is a list of crew slots in on-screen order. "roles" (position
+// text) is the original format and is always written, so older copies of the
+// app can still load it. "items" adds the linked role id and, when saved with
+// crew, the assigned person (name/phone/email + contact link). Status, notes
+// and contacted time are never saved: recalled crew always start at TBD.
 function saveCrewConfig() {
-  var roles = crew.map(function(id) {
-    var pos = document.getElementById(id + '_position');
-    return pos ? pos.value.trim() : '';
-  }).filter(function(r) { return r; });
-  if (!roles.length) { setStatus("No roles to save. Add some crew members with positions first.", "err"); return; }
-  var name = prompt("Config name:");
-  if (!name || !name.trim()) return;
-  var configs = crewConfigLoad();
-  configs.push({ id: "cc_" + Date.now(), name: name.trim(), roles: roles });
-  crewConfigSave(configs);
-  setStatus("Crew config saved.", "ok");
+  var slots = crew.map(function(id) {
+    var link = cardLinkFields(id);
+    return {
+      position: v(id+"_position"), role_id: link.role_id || null,
+      name: v(id+"_name"), phone: v(id+"_phone"), email: v(id+"_email"),
+      contact_id: link.contact_id || null, contact_ack: link.contact_ack || null,
+      declined: v(id+"_status") === "declined",
+    };
+  });
+  var roleSlots = slots.filter(function(c) { return c.position; });
+  var crewSlots = slots.filter(function(c) { return c.position || (c.name && !c.declined); });
+  if (!crewSlots.length) { setStatus("No crew to save. Add some crew members first.", "err"); return; }
+  var people = crewSlots.filter(function(c) { return c.name && !c.declined; }).length;
+
+  var msg = document.getElementById("modal-msg");
+  document.getElementById("modal-title").textContent = "Save crew config";
+  msg.innerHTML = '<div class="fl" style="margin:4px 0 12px"><label>Config name</label><input type="text" id="cc-save-name" autocomplete="off"></div>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;cursor:pointer"><input type="radio" name="cc-save-mode" value="roles" checked style="margin-top:3px"><span><strong style="color:var(--text-primary)">Roles only</strong><br><span style="font-size:12px;color:var(--text-muted)">' + roleSlots.length + ' role' + (roleSlots.length === 1 ? '' : 's') + ', no names</span></span></label>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer' + (people ? '' : ';opacity:.5') + '"><input type="radio" name="cc-save-mode" value="crew"' + (people ? '' : ' disabled') + ' style="margin-top:3px"><span><strong style="color:var(--text-primary)">Roles and assigned crew</strong><br><span style="font-size:12px;color:var(--text-muted)">' + (people ? people + ' ' + (people === 1 ? 'person' : 'people') + '. Status is not saved; everyone comes back as TBD.' : 'No one is assigned yet.') + (slots.some(function(c) { return c.declined && c.name; }) ? ' Declined crew are saved as open roles.' : '') + '</span></span></label>';
+  var okBtn = document.getElementById("modal-ok");
+  var cancelBtn = document.querySelector(".modal-btns .lb:first-child");
+  okBtn.textContent = "Save";
+  if (cancelBtn) { cancelBtn.textContent = "Cancel"; cancelBtn.onclick = function() { modalCancel(); }; }
+  modalCallback = null;
+  okBtn.onclick = function() {
+    var name = (document.getElementById("cc-save-name").value || "").trim();
+    if (!name) { document.getElementById("cc-save-name").focus(); return; }
+    var withCrew = (document.querySelector('input[name="cc-save-mode"]:checked') || {}).value === "crew";
+    var list = withCrew ? crewSlots : roleSlots;
+    if (!list.length) { setStatus("No roles to save. Add some crew members with positions first.", "err"); return; }
+    var items = list.map(function(c) {
+      var it = { position: c.position };
+      if (c.role_id) it.role_id = c.role_id;
+      if (withCrew && c.name && !c.declined) {
+        it.name = c.name; it.phone = c.phone; it.email = c.email;
+        if (c.contact_id) { it.contact_id = c.contact_id; if (c.contact_ack) it.contact_ack = c.contact_ack; }
+      }
+      return it;
+    });
+    modalCancel();
+    var configs = crewConfigLoad();
+    configs.push({ id: "cc_" + Date.now(), name: name, with_crew: withCrew, items: items,
+      roles: items.map(function(it) { return it.position; }).filter(Boolean) });
+    crewConfigSave(configs);
+    setStatus("Crew config saved" + (withCrew ? " with crew." : "."), "ok");
+  };
+  document.getElementById("modal-overlay").classList.add("open");
+  setTimeout(function() { var n = document.getElementById("cc-save-name"); if (n) n.focus(); }, 0);
+}
+function crewConfigItems(cfg) {
+  return cfg.items || (cfg.roles || []).map(function(r) { return { position: r }; });
 }
 
 function openCrewConfigManager() {
@@ -4600,7 +4711,8 @@ function renderCrewConfigManager() {
         if (found) { found.name = newName.trim(); crewConfigSave(cfgs); renderCrewConfigManager(); }
       }; })(cfg);
       var meta = document.createElement("div"); meta.className = "tmpl-row-meta";
-      meta.textContent = cfg.roles.length + " roles";
+      var _n = crewConfigItems(cfg).length;
+      meta.textContent = _n + (_n === 1 ? " role" : " roles") + (cfg.with_crew ? ", with crew" : "");
       var loadBtn = document.createElement("button"); loadBtn.className = "lb"; loadBtn.style.fontSize = "11px"; loadBtn.textContent = "Load";
       loadBtn.onclick = (function(c) { return function() { loadCrewConfig(c); }; })(cfg);
       var delBtn = document.createElement("button"); delBtn.className = "lb danger"; delBtn.style.fontSize = "11px"; delBtn.textContent = "Delete";
@@ -4621,14 +4733,22 @@ function renderCrewConfigManager() {
 }
 
 function loadCrewConfig(config) {
-  config.roles.forEach(function(role) {
+  var items = crewConfigItems(config);
+  // addCrew() puts each new card on top, so add in reverse to keep the
+  // saved order (older versions loaded configs upside down).
+  items.slice().reverse().forEach(function(it) {
     addCrew();
     var newId = crew[0];
-    var posField = document.getElementById(newId + '_position');
-    if (posField) posField.value = role;
+    var set = function(f, val) { var e = document.getElementById(newId + f); if (e && val) e.value = val; };
+    set('_position', it.position);
+    set('_name', it.name); set('_phone', it.phone); set('_email', it.email);
+    setCardLinkFields(newId, { role_id: it.role_id, contact_id: it.contact_id, contact_ack: it.contact_ack });
+    // Status: addCrew() starts every card at TBD with no contacted time.
   });
   closeCrewConfigModal();
-  setStatus("Crew config loaded - " + config.roles.length + " roles added.", "ok");
+  if (window.ProjectPeopleV2) ProjectPeopleV2.render();
+  if (typeof autosaveTrigger === "function") autosaveTrigger();
+  setStatus("Crew config loaded - " + items.length + (items.length === 1 ? " role" : " roles") + " added" + (config.with_crew ? " with crew, all TBD." : "."), "ok");
 }
 
 // ── Template manager modal ────────────────────────────────────────────────────
@@ -6072,9 +6192,7 @@ function checkShowBlacks(dayId) {
 }
 
 function triggerSunLookup(dayId) {
-  var inp = document.getElementById(dayId+"_loc_id");
-  if (!inp || !inp.value) return;
-  var loc = getLocByName(inp.value);
+  var loc = getDayLoc(dayId);
   if (!loc || !loc.address) return;
   var iso = (document.getElementById(dayId+"_date_iso")||{}).value||"";
   var addr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
@@ -7106,11 +7224,11 @@ function gather() {
     agency_id: _v2Links ? _orgLinks.legacy_agency_id : (function(){ var el=document.getElementById("project_agency_id"); return el?el.value||null:null; })(),
     doc_branding:(function(){ var el=document.querySelector('input[name="doc_branding"]:checked'); return el?el.value:"agency"; })(),
     project_title:v("project_title"), client:v("client_company"), client_company:v("client_company"), client_name:v("client_name"), billing_code:v("billing_code"),
-    kp_cards: kp.map(function(id) { return {_id:id, role:v(id+"_role")||"", name:v(id+"_name")||"", phone:v(id+"_phone")||"", email:v(id+"_email")||"", status:v(id+"_status")||"tbd"}; }),
+    kp_cards: kp.map(function(id) { return Object.assign({_id:id, role:v(id+"_role")||"", name:v(id+"_name")||"", phone:v(id+"_phone")||"", email:v(id+"_email")||"", status:v(id+"_status")||"tbd"}, cardLinkFields(id)); }),
     hospital:v("hospital"), breakfast:v("breakfast")||"8:00 am", lunch:v("lunch")||"12:00 pm",
     sunrise:v("sunrise"), sunset:v("sunset"),
 
-    crew: crew.map(id => ({id:id,position:v(id+"_position"),name:v(id+"_name"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined})).filter(c => c.position||c.name||c.email||c.phone||c.notes),
+    crew: crew.map(id => Object.assign({id:id,position:v(id+"_position"),name:v(id+"_name"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined}, cardLinkFields(id))).filter(c => c.position||c.name||c.email||c.phone||c.notes),
     crew_summary: (function() {
       var counts = {tbd:0, contacted:0, pencil:0, hold:0, confirmed:0, declined:0, total:0};
       crew.forEach(function(id) {
@@ -7120,7 +7238,7 @@ function gather() {
       });
       return counts;
     })(),
-    talent: talent.map(id => ({id:id,name:v(id+"_name"),title:v(id+"_title"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined})),
+    talent: talent.map(id => Object.assign({id:id,name:v(id+"_name"),title:v(id+"_title"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined}, cardLinkFields(id))),
     timezone: v("timezone")||"PT",
     kickoff_date_iso: v("kickoff_date_iso"),
     kickoff_time: v("kickoff_time"),
@@ -7195,6 +7313,7 @@ function loadFormData(data) {
     var sel = document.getElementById(id+"_status");
     if (sel) sel.setAttribute("data-prev", statusVal);
     if (c.contacted_at) s(id+"_contacted_at", c.contacted_at);
+    setCardLinkFields(id, c);
     updateCrewStatusPill(id, statusVal);
     updateContactedAgo(id);
   });
@@ -7214,6 +7333,7 @@ function loadFormData(data) {
     var sel = document.getElementById(id+"_status");
     if (sel) sel.setAttribute("data-prev", talentStatus);
     if (t.contacted_at) s(id+"_contacted_at", t.contacted_at);
+    setCardLinkFields(id, t);
     updateCrewStatusPill(id, talentStatus);
     updateContactedAgo(id);
   });
@@ -7244,6 +7364,8 @@ function loadFormData(data) {
   var ne = document.getElementById("note-editor");
   if (ne) ne.innerHTML = data._note_draft || "";
   updateNoteDraftIndicator(data._note_draft || "");
+  // v2: link people + locations saved before Session 5, check for contact changes.
+  if (window.ProjectPeopleV2) ProjectPeopleV2.onProjectLoaded();
 }
 
 // ── Clear form ────────────────────────────────────────────────────────────
@@ -7266,6 +7388,7 @@ function clearForm() {
   document.getElementById("kp-list").innerHTML = ""; kp = [];
   getDefaultKP().forEach(function(c) { addKP(c); });
   updateAddKPButton();
+  if (window.ProjectPeopleV2) ProjectPeopleV2.onProjectLoaded(); // link the default EP / Producer roles
   document.getElementById("crew-list").innerHTML = ""; crew = []; updateCrewStatusBar(); updateDeclinedSection("crew");
   document.getElementById("talent-list").innerHTML = ""; talent = []; updateTalentStatusBar(); updateDeclinedSection("talent");
   loadScheduleDays([]);
@@ -7590,21 +7713,13 @@ function generateDayICS(dayId) {
   var wrapT = parseT(wrapRaw);
   if (!wrapT && callT) wrapT = {h: Math.min(callT.h + 12, 23), m: callT.m};
 
-  var locId = (document.getElementById(dayId+"_loc_id")||{}).value||"";
-  var loc = null;
-  if (locId) {
-    var _lnEl = document.getElementById(locId+"_name");
-    if (_lnEl) {
-      loc = {
-        name:     _lnEl.value||"",
-        address:  (document.getElementById(locId+"_address")||{}).value||"",
-        city:     (document.getElementById(locId+"_city")||{}).value||"",
-        state:    (document.getElementById(locId+"_state")||{}).value||"",
-        zip:      (document.getElementById(locId+"_zip")||{}).value||"",
-        hospital: (document.getElementById(locId+"_hospital")||{}).value||"",
-      };
-    }
-  }
+  // The day's location (was read from the removed Location tab, so .ics
+  // files had no location at all). Hospital = what the day card shows.
+  var _dl = getDayLoc(dayId);
+  var loc = _dl ? {
+    name: _dl.name||"", address: _dl.address||"", city: _dl.city||"", state: _dl.state||"", zip: _dl.zip||"",
+    hospital: (document.getElementById(dayId+"_hospital")||{}).textContent || _dl.hospital || "",
+  } : null;
 
   var entries = (daySchedItems[dayId]||[]).map(function(eid) {
     return {time: v(eid+"_time"), desc: v(eid+"_desc")};
@@ -7999,9 +8114,9 @@ async function generateDoc() {
     const pr_rows = (data.kp_cards||[]).map(function(p){return {role:p.role||"",name:p.name||"",phone:p.phone||""};});
     function getDayLocInfo(dayData) {
       var locName = dayData.loc_name || dayData.loc_id || "";
-      if (!locName) return {name:"", address:"", notes:""};
-      var locs = loadContacts().locations || [];
-      var found = locs.find(function(l) { return l.name === locName; });
+      var found = window.ProjectPeopleV2 ? ProjectPeopleV2.location(dayData.location_id, locName) : null;
+      if (!locName && !found) return {name:"", address:"", notes:""};
+      if (!window.ProjectPeopleV2) found = (loadContacts().locations || []).find(function(l) { return l.name === locName; });
       if (found) return {
         name: found.name||"",
         address: [found.address, found.city, [found.state, found.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
@@ -8242,8 +8357,8 @@ async function generateDoc() {
       return sd.hospital || data.hospital || "";
     }
 
-    const day1 = {call_time:sd0.call_time,date:sd0.date,end_date:sd0.end_date||"",label:sd0.label,breakfast:sd0.breakfast,lunch:sd0.lunch,sunrise:sd0.sunrise,sunset:sd0.sunset,hospital:getDayHospital(sd0),loc_name:sd0.loc_name,loc_id:sd0.loc_id,tzAbbr,excluded_crew:sd0.excluded_crew||[],excluded_talent:sd0.excluded_talent||[],category:sd0.category||"shoot_day",f1_label:sd0.f1_label||"",f3_label:sd0.f3_label||""};
-    const day2 = {call_time:sd1.call_time,date:sd1.date,end_date:sd1.end_date||"",label:sd1.label,breakfast:sd1.breakfast,lunch:sd1.lunch,sunrise:sd1.sunrise,sunset:sd1.sunset,golive:sd1.golive,hospital:getDayHospital(sd1),loc_name:sd1.loc_name,loc_id:sd1.loc_id,tzAbbr,excluded_crew:sd1.excluded_crew||[],excluded_talent:sd1.excluded_talent||[],category:sd1.category||"shoot_day",f1_label:sd1.f1_label||"",f3_label:sd1.f3_label||""};
+    const day1 = {call_time:sd0.call_time,date:sd0.date,end_date:sd0.end_date||"",label:sd0.label,breakfast:sd0.breakfast,lunch:sd0.lunch,sunrise:sd0.sunrise,sunset:sd0.sunset,hospital:getDayHospital(sd0),loc_name:sd0.loc_name,loc_id:sd0.loc_id,location_id:sd0.location_id,tzAbbr,excluded_crew:sd0.excluded_crew||[],excluded_talent:sd0.excluded_talent||[],category:sd0.category||"shoot_day",f1_label:sd0.f1_label||"",f3_label:sd0.f3_label||""};
+    const day2 = {call_time:sd1.call_time,date:sd1.date,end_date:sd1.end_date||"",label:sd1.label,breakfast:sd1.breakfast,lunch:sd1.lunch,sunrise:sd1.sunrise,sunset:sd1.sunset,golive:sd1.golive,hospital:getDayHospital(sd1),loc_name:sd1.loc_name,loc_id:sd1.loc_id,location_id:sd1.location_id,tzAbbr,excluded_crew:sd1.excluded_crew||[],excluded_talent:sd1.excluded_talent||[],category:sd1.category||"shoot_day",f1_label:sd1.f1_label||"",f3_label:sd1.f3_label||""};
     const doc = new Document({sections:[
       {properties:pp, headers:{default:makeHeader("Worktank Call Sheet", sd0.label||"Day 1 of 2")}, children:buildCallSheet(day1)},
       {properties:pp, headers:{default:makeHeader("Worktank Call Sheet", sd0.label||"Day 1 of 2")}, children:buildSchedulePage(day1, sd0.sched_entries||[])},

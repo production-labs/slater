@@ -118,3 +118,13 @@
 .po2-hint{font-size:12px;color:var(--text-muted);margin-top:4px}
 .po2-hint a{color:var(--accent);text-decoration:underline;cursor:pointer}
 .ac-item.po2-add strong{color:var(--accent)}
+
+/* Session 5: project crew / talent / key personnel + roles (project-people-v2.js) */
+.pv2-group{padding:6px 11px 3px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);background:var(--surface-2);border-bottom:1px solid var(--border);position:sticky;top:0}
+.pv2-role-wrap{display:inline-block}
+.pv2-role-wrap .ac-list{right:auto;min-width:260px;max-height:280px}
+.pv2-role-wrap .ac-list .ac-item{text-transform:none;letter-spacing:0;font-weight:400}
+.pv2-list .ac-item.po2-add strong{color:var(--accent)}
+.fl input.pv2-linked:not([type="date"]){border-left:3px solid var(--accent-yellow)}
+.pv2-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;padding:7px 10px;border-radius:6px;background:var(--surface-3);border:1px solid var(--accent-yellow);font-size:12px;color:var(--text-primary)}
+.pv2-bar-btns{display:flex;gap:6px;flex-shrink:0}
