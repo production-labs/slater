@@ -807,7 +807,8 @@ function addCrew(afterId=null) {
   updateCrewStatusBar();
   updateDeclinedSection("crew");
   scheduleDays.forEach(function(d) { updateDayCrewBadge(d); });
-  setTimeout(() => acAttachCrew(id), 0);
+  // v2 picker attaches now: a late attach would move the field while typing.
+  if (window.ProjectPeopleV2) acAttachCrew(id); else setTimeout(() => acAttachCrew(id), 0);
 }
 function addTalent(afterId=null) {
   const id = "talent_"+(++_uid);
@@ -823,7 +824,8 @@ function addTalent(afterId=null) {
   updateTalentStatusBar();
   updateDeclinedSection("talent");
   scheduleDays.forEach(function(d) { updateDayTalentBadge(d); });
-  setTimeout(() => acAttachTalent(id), 0);
+  // v2 picker attaches now: a late attach would move the field while typing.
+  if (window.ProjectPeopleV2) acAttachTalent(id); else setTimeout(() => acAttachTalent(id), 0);
 }
 function ri(id, arr) { const i = arr.indexOf(id); if (i > -1) arr.splice(i,1); document.getElementById(id).remove(); }
 function confirmRemoveCrew(id) {
@@ -872,7 +874,8 @@ function addKP(cardData) {
     };
   })(id);
   updateAddKPButton();
-  setTimeout(() => acAttachKP(id), 0);
+  // v2 picker attaches now: a late attach would move the field while typing.
+  if (window.ProjectPeopleV2) acAttachKP(id); else setTimeout(() => acAttachKP(id), 0);
 }
 
 function getDefaultKP() {

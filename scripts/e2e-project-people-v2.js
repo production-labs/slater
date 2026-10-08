@@ -249,13 +249,58 @@ async function main() {
     assert(await val(c2 + '_contact_id') === String(gary.id), 'exact name relinks on blur');
   });
 
+  await step("typing over a linked person clears their details; + Add doesn't carry them to the new contact", async () => {
+    const c = await newCard('crew');
+    await page.click('#' + c + '_position');
+    await page.type('#' + c + '_position', 'photo');
+    await pickItem('Director of Photography');
+    await page.click('#' + c + '_name');
+    await pickItem('Dana Pham');
+    assert(await val(c + '_email') && await val(c + '_notes'), 'filled from Dana');
+    await typeInto(c + '_name', 'Zed Newperson');
+    assert(await val(c + '_phone') === '' && await val(c + '_email') === '' && await val(c + '_notes') === '', 'cleared: ' + [await val(c + '_phone'), await val(c + '_email'), await val(c + '_notes')].join('|'));
+    assert(await val(c + '_position') === 'DP', 'role slot kept');
+    await pickItem('+ Add "Zed Newperson" to contacts');
+    await page.waitForFunction(id => !!document.getElementById(id + '_contact_id').value, { timeout: 5000 }, c);
+    const row = (await db.query(`SELECT * FROM contacts WHERE owner_id=$1 AND name='Zed Newperson'`, [userId])).rows[0];
+    assert(row && !row.phone && !row.email && !row.notes, "new contact has none of Dana's details: " + JSON.stringify({ p: row && row.phone, e: row && row.email }));
+    await page.evaluate(id => { ri(id, crew); }, c);
+  });
+
+  await step('typing over a linked person keeps details edited on the card', async () => {
+    const c = await newCard('crew');
+    await page.click('#' + c + '_name');
+    await page.type('#' + c + '_name', 'gary');
+    await pickItem('Gary Lamp');
+    await typeInto(c + '_phone', '4255550000');
+    const edited = await val(c + '_phone');
+    await typeInto(c + '_name', 'Someone Else');
+    assert(await val(c + '_phone') === edited, 'edited phone kept: ' + await val(c + '_phone'));
+    assert(await val(c + '_email') === '', "Gary's email cleared");
+    await page.evaluate(id => { ri(id, crew); }, c);
+  });
+
+  await step('picker is attached the moment a card is created (no timer)', async () => {
+    const r = await page.evaluate(() => {
+      addCrew(); const c = crew[0]; const a = !!document.getElementById(c + '_name')._pv2 && !!document.getElementById(c + '_position')._pv2; ri(c, crew);
+      addTalent(); const t = talent[0]; const b = !!document.getElementById(t + '_name')._pv2; ri(t, talent);
+      return a && b;
+    });
+    assert(r, 'attached synchronously');
+  });
+
   await step('exact name typed links on blur and fills only empty fields', async () => {
     const c = await newCard('crew');
     await page.type('#' + c + '_phone', '999');
     await page.type('#' + c + '_name', '  dana   PHAM ');
     await blur(c + '_name');
     await sleep(100);
-    assert(await val(c + '_contact_id') === String(dana.id), 'linked');
+    // (was intermittent until 2026-10-07: the picker attached late, mid-typing)
+    assert(await val(c + '_contact_id') === String(dana.id), 'linked: ' + JSON.stringify(await page.evaluate(id => ({
+      name: document.getElementById(id + '_name').value, focus: document.activeElement && document.activeElement.id,
+      picker: !!document.getElementById(id + '_name')._pv2,
+      danas: Object.values(ContactsV2.store.contacts).filter(x => /dana/i.test(x.name)).map(x => x.name + '#' + x.id + (x.archived_at ? ' archived' : '')),
+    }), c)));
     // (the app's phone formatter reformats as you type; any typed value must survive)
     assert(/999/.test(await val(c + '_phone')) && !/555/.test(await val(c + '_phone')) && await val(c + '_email') === 'dana@example.com', 'typed phone kept, empty email filled: ' + await val(c + '_phone') + ' / ' + await val(c + '_email'));
     await page.evaluate(id => { ri(id, crew); }, c);

@@ -107,3 +107,8 @@ Open http://localhost:3000/?contacts=v2 (if it asks you to log in, open the link
 ## 5. Linked tag
 - [ ] A linked name shows a yellow **LINKED** tag next to "Name". Hover it for the explanation.
 - [ ] Type over the name: the tag goes away.
+
+## 6. Typing over a linked person (your bug report)
+- [ ] Pick a person on a crew card, then type a different name over theirs. Phone, email and notes from the old person clear; the role stays.
+- [ ] Choose **+ Add "..." to contacts**. The new contact has none of the old person's details.
+- [ ] Pick a person, change the phone on the card yourself, then type a different name. Your phone edit stays.

@@ -136,6 +136,16 @@
   function attach(id) {
     var kind = kindOf(id);
     if (!kind) return;
+    // Attaching wraps the inputs (moves them in the page), which would drop
+    // the cursor of someone typing. If a field of this card has focus, wait.
+    var act = document.activeElement, rf0 = KINDS[kind].roleField;
+    if (act && !act._pv2 && (act.id === id + '_name' || (rf0 && act.id === id + rf0))) {
+      if (!act._pv2wait) {
+        act._pv2wait = true;
+        act.addEventListener('blur', function () { act._pv2wait = false; setTimeout(function () { attach(id); }, 0); }, { once: true });
+      }
+      return;
+    }
     var nameEl = el(id + '_name');
     if (nameEl && !nameEl._pv2) attachName(id, kind, nameEl);
     var rf = KINDS[kind].roleField;
@@ -265,6 +275,10 @@
     nameEl.addEventListener('input', function () {
       // Editing the name breaks the link until a contact is picked again.
       if (link(id).contactId) {
+        // A different person is being typed in: clear what came from the
+        // old contact so it can't stick to the new name (or be saved with
+        // it by "+ Add to contacts"). Edits made on the card are kept.
+        clearFromContact(id, contact(link(id).contactId));
         setLink(id, null);
         if (kind === 'talent') setVal(id + '_role_id', '');
         renderCard(id);
@@ -308,12 +322,22 @@
     if (fromPick) fillNotes(id, c);
     renderCard(id);
   }
+  function notesLine(c) { return String(c.notes || '').split(/\s*\n+\s*/).filter(Boolean).join('; '); }
+  function clearFromContact(id, c) {
+    if (!c) return;
+    var e = expected(id, c);
+    ['phone', 'email', 'title'].forEach(function (f) {
+      if (f in e && val(id + '_' + f).trim() && key(val(id + '_' + f)) === key(e[f])) setVal(id + '_' + f, '');
+    });
+    var n = el(id + '_notes');
+    if (n && c.notes && n.value.trim() === notesLine(c)) n.value = '';
+  }
   // Contact notes go into an EMPTY card Notes field (one line; project notes
   // typed on the card are never replaced). Key personnel cards have no notes.
   function fillNotes(id, c) {
     var n = el(id + '_notes');
     if (!n || n.value.trim() || !c.notes) return;
-    n.value = String(c.notes).split(/\s*\n+\s*/).filter(Boolean).join('; ');
+    n.value = notesLine(c);
   }
   // Linked by typed name: only fill fields the card doesn't have yet.
   function fillEmpty(id, c) {
