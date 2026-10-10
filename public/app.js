@@ -1,3 +1,9 @@
+// Save-queue state (Session 7; the queue itself is next to autosaveNow).
+var _serverSavedAt = {};   // project key -> data.savedAt of the last server copy seen
+var _flushing = {};        // project key -> in-flight flush promise
+var _pendingReceipts = {}; // "<key>_<index>" -> { key, i, img } (memory only: images are big)
+var _lastSentOk = {};      // project key -> savedAt of the last save THIS tab got onto the server
+
   
  // ── Server API client ─────────────────────────────────────────────────────────
  const API = {
@@ -10,12 +16,27 @@
      } catch(e) { return null; }
    },
    async getProject(key) {
+     // Changes saved on this device while offline go first, so the older
+     // server copy can't replace them (Session 7).
+     try { await flushProjectSave(key); } catch(e) {}
      try {
        const r = await fetch(this.base+'/api/projects/'+key);
        if (r.status === 401) return { _unauthenticated: true };
        if (!r.ok) return null;
-       return await r.json();
+       const j = await r.json();
+       if (j && j.data) noteServerCopy(key, j.data);
+       return j;
      } catch(e) { return null; }
+   },
+   // Raw read for the save queue: the project JSON, null if the server has no
+   // such project, undefined if the server couldn't be reached or refused.
+   async _fetchProject(key) {
+     try {
+       const r = await fetch(this.base+'/api/projects/'+key, { cache: 'no-store' });
+       if (r.status === 404) return null;
+       if (!r.ok) return undefined;
+       return await r.json();
+     } catch(e) { return undefined; }
    },
    async saveProject(key, label, data) {
      try {
@@ -6290,25 +6311,184 @@ function autosaveNow() {
   libSaveAll(db);
   _allProjectsCache[currentSheetKey] = { label: data.label, data: data };
   mergeContactsFromSheet(data);
-  showAutosaveIndicator();
-  // Also save to server
-  API.saveProject(currentSheetKey, data.label, data).then(function(result) {
-    if (result) console.log("Autosaved to server:", currentSheetKey);
-    else console.warn("Server autosave failed, localStorage only");
+  // Save to the server. "Autosaved" only shows once the server has it; a save
+  // that doesn't get there is kept in the save queue below and sent later.
+  var key = currentSheetKey;
+  var offline = window.SlaterConn && !SlaterConn.online;
+  if (offline || pendingSavesLoad()[key]) {
+    // Offline, or earlier changes are still waiting: queue it (synchronously,
+    // so it survives the tab closing) and let the queue send it in order.
+    queueProjectSave(key, data.label, data);
+    if (!offline) flushProjectSave(key);
+    showAutosaveIndicator(false);
+    return;
+  }
+  API.saveProject(key, data.label, data).then(function(result) {
+    if (result) {
+      _serverSavedAt[key] = data.savedAt;
+      if (!(_lastSentOk[key] >= data.savedAt)) _lastSentOk[key] = data.savedAt;
+      if (currentSheetKey === key) showAutosaveIndicator();
+    } else {
+      console.warn("Server autosave failed; kept on this device and queued:", key);
+      queueProjectSave(key, data.label, data);
+      if (currentSheetKey === key) showAutosaveIndicator(false);
+    }
   });
 }
 
-function showAutosaveIndicator() {
+// ok === false: the change is kept on this device but isn't on the server yet.
+function showAutosaveIndicator(ok) {
   var ind = document.getElementById("autosave-indicator");
   if (!ind) return;
   var now = new Date();
   var t = now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}).toLowerCase();
-  ind.innerHTML = "Autosaved at:<br>" + t;
+  ind.innerHTML = ok === false ? "Not saved yet:<br>kept on this device" : "Autosaved at:<br>" + t;
   ind.classList.add("show");
   clearTimeout(ind._hideTimer);
   ind._hideTimer = setTimeout(function() { ind.classList.remove("show"); }, 4000);
 }
 
+
+// ── Saves that didn't reach the server (Session 7) ──────────────────────────
+// A project save that fails (offline, server error, logged out) is kept in
+// localStorage under PENDING_SAVES_KEY, so it survives closing the tab, and
+// is sent when the connection is back or before that project next loads.
+//   { <project key>: { label, data, base, conflict, at } }
+// base = the server copy's data.savedAt this device last saw. Before sending,
+// the queue re-reads the server copy: if it changed since (another device
+// saved while this one was offline), nothing is overwritten silently; the
+// bar asks "Use my version" / "Keep the other version". Projects are still
+// whole-bundle saves; real merging comes with the project-items branch.
+var PENDING_SAVES_KEY = "slater_pending_saves";
+// _serverSavedAt / _flushing / _pendingReceipts are declared at the top of
+// this file: API.getProject (above) can reach this queue during startup.
+
+function pendingSavesLoad() {
+  try { return JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || "{}") || {}; } catch (e) { return {}; }
+}
+function pendingSavesStore(p) {
+  try {
+    if (Object.keys(p).length) localStorage.setItem(PENDING_SAVES_KEY, JSON.stringify(p));
+    else localStorage.removeItem(PENDING_SAVES_KEY);
+  } catch (e) {
+    console.warn("Could not keep an offline copy:", e);
+    setStatus("This device is out of storage, so offline changes can't be kept. Reconnect before closing Slater.", "err");
+  }
+  if (window.SlaterConn) SlaterConn.changed();
+}
+function noteServerCopy(key, data) {
+  if (data && data.savedAt != null) _serverSavedAt[key] = data.savedAt;
+}
+function queueProjectSave(key, label, data) {
+  // This tab already got a newer copy onto the server (saves can finish out
+  // of order). Only this tab's own timestamps are compared: another device's
+  // clock may be ahead, and comparing against it would drop real changes.
+  if (_lastSentOk[key] != null && data.savedAt <= _lastSentOk[key]) return;
+  var p = pendingSavesLoad();
+  var prev = p[key];
+  p[key] = {
+    label: label, data: data, at: Date.now(),
+    base: prev ? prev.base : (_serverSavedAt[key] != null ? _serverSavedAt[key] : null),
+    conflict: prev ? prev.conflict : null,
+  };
+  pendingSavesStore(p);
+}
+function _escText(t) {
+  return String(t == null ? "" : t).replace(/[&<>"']/g, function(c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; });
+}
+// After a conflict is settled, the open project is reloaded so the screen
+// shows what the server now holds. currentSheetKey is cleared first so the
+// unload autosave doesn't push the screen's copy back over it.
+function _reloadIfOpen(key) {
+  if (currentSheetKey !== key) return;
+  clearTimeout(_autosaveTimer);
+  currentSheetKey = null;
+  location.reload();
+}
+function _showProjectConflict(key) {
+  var e = pendingSavesLoad()[key];
+  if (!e || !e.conflict || !window.SlaterConn) return;
+  var when = new Date(e.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
+  SlaterConn.notice("conflict-" + key,
+    "<strong>“" + _escText(e.label || key) + "” was changed on another device</strong> while this one was offline. " +
+    "Your changes from " + _escText(when) + " are kept on this device and weren't saved over it.",
+    [{ label: "Use my version", fn: function() { flushProjectSave(key, true).then(function(ok) { if (ok) _reloadIfOpen(key); }); } },
+     { label: "Keep the other version", fn: function() { discardProjectSave(key); } }],
+    true);
+}
+function discardProjectSave(key) {
+  var p = pendingSavesLoad();
+  delete p[key];
+  pendingSavesStore(p);
+  if (window.SlaterConn) SlaterConn.clearNotice("conflict-" + key);
+  _reloadIfOpen(key);
+}
+// Send the queued copy of one project. Resolves true when nothing is left
+// waiting for it. force = "Use my version" (skip the other-device check).
+function flushProjectSave(key, force) {
+  if (_flushing[key]) return _flushing[key];
+  var entry = pendingSavesLoad()[key];
+  if (!entry) return Promise.resolve(true);
+  if (entry.conflict && !force) { _showProjectConflict(key); return Promise.resolve(false); }
+  var sent = entry.data.savedAt;
+  _flushing[key] = API._fetchProject(key).then(function(server) {
+    if (server === undefined) return false; // still can't reach the server
+    var sSaved = server && server.data ? server.data.savedAt : undefined;
+    var changedElsewhere = sSaved !== undefined && sSaved !== sent &&
+      (entry.base != null ? sSaved !== entry.base : sSaved > sent);
+    if (changedElsewhere && !force) {
+      var p = pendingSavesLoad();
+      if (p[key]) { p[key].conflict = { serverSavedAt: sSaved }; pendingSavesStore(p); }
+      _showProjectConflict(key);
+      return false;
+    }
+    return API.saveProject(key, entry.label, entry.data).then(function(result) {
+      if (!result) return false;
+      _serverSavedAt[key] = sent;
+      if (!(_lastSentOk[key] >= sent)) _lastSentOk[key] = sent;
+      var p = pendingSavesLoad();
+      if (p[key] && p[key].data.savedAt === sent) delete p[key];
+      else if (p[key]) { p[key].base = sent; p[key].conflict = null; } // edited again meanwhile: send that next
+      pendingSavesStore(p);
+      if (window.SlaterConn) SlaterConn.clearNotice("conflict-" + key);
+      if (currentSheetKey === key) showAutosaveIndicator();
+      return true;
+    });
+  }).then(function(ok) {
+    delete _flushing[key];
+    if (ok && pendingSavesLoad()[key]) return flushProjectSave(key);
+    return ok;
+  }, function(e) {
+    delete _flushing[key];
+    console.warn("Queued save failed for " + key, e);
+    return false;
+  });
+  return _flushing[key];
+}
+function flushAllPendingSaves() {
+  var keys = Object.keys(pendingSavesLoad());
+  var chain = keys.reduce(function(c, k) { return c.then(function() { return flushProjectSave(k); }); }, Promise.resolve());
+  return chain.then(function() {
+    var ids = Object.keys(_pendingReceipts);
+    return Promise.all(ids.map(function(id) {
+      var r = _pendingReceipts[id];
+      return API.saveReceipt(r.key, r.i, r.img).then(function(ok) {
+        if (ok && _pendingReceipts[id] === r) delete _pendingReceipts[id];
+      });
+    }));
+  }).then(function() { if (window.SlaterConn) SlaterConn.changed(); });
+}
+if (window.SlaterConn) {
+  SlaterConn.addSource("projects", {
+    pending: function() {
+      var p = pendingSavesLoad();
+      return Object.keys(p).filter(function(k) { return !p[k].conflict; }).length + Object.keys(_pendingReceipts).length;
+    },
+    retry: flushAllPendingSaves,
+  });
+  // Left over from an earlier visit: send them (or show the conflict again).
+  setTimeout(function() { if (SlaterConn.online) flushAllPendingSaves(); else Object.keys(pendingSavesLoad()).forEach(_showProjectConflict); }, 0);
+}
 
 function updateNoteDraftIndicator(content) {
   var ind = document.getElementById("note-draft-indicator");
@@ -7557,8 +7737,11 @@ function saveReceipts(projectKey, expenses) {
   // Save each receipt to server
   expenses.forEach(function(e, i) {
     if (e.receipt) {
-      API.saveReceipt(projectKey, i, e.receipt).then(function(result) {
-        if (!result) console.warn("Server receipt save failed for index", i);
+      var id = projectKey + "_" + i, img = e.receipt;
+      API.saveReceipt(projectKey, i, img).then(function(result) {
+        if (result) { if (_pendingReceipts[id] && _pendingReceipts[id].img === img) delete _pendingReceipts[id]; }
+        else { console.warn("Server receipt save failed for index", i, "(kept, will retry)"); _pendingReceipts[id] = { key: projectKey, i: i, img: img }; }
+        if (window.SlaterConn) SlaterConn.changed();
       });
     }
   });

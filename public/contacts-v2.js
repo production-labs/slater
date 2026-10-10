@@ -55,6 +55,7 @@
       opts.body = JSON.stringify(body);
     }
     return fetch('/api/v2' + path, opts).then(function (r) {
+      if (r.status >= 502 && r.status <= 504) throw offlineError();
       return r.json().catch(function () { return null; }).then(function (data) {
         if (!r.ok) {
           var e = new Error((data && data.error) || ('Request failed (' + r.status + ')'));
@@ -63,7 +64,13 @@
         }
         return data;
       });
-    });
+    }, function () { throw offlineError(); });
+  }
+  // Couldn't reach Slater's server (connection.js shows the offline bar).
+  function offlineError() {
+    var e = new Error("You're offline, so this wasn't saved yet.");
+    e.offline = true;
+    return e;
   }
 
   // ---------------------------------------------------------------- store
@@ -1053,7 +1060,7 @@
   }
 
   function save() {
-    if (ui.saving) return;
+    if (ui.saving) return Promise.resolve();
     var form = readForm();
     if (!norm('name', form.name)) {
       toast('Name is required.', 'err');
@@ -1063,8 +1070,9 @@
     var table = TAB_TABLE[ui.tab];
     ui.saving = true; updateDirty();
     var wasNew = ui.sel === 'new';
-    saveRecord(table, ui.sel === 'new' ? null : ui.baseline, form).then(function (res) {
-      ui.saving = false; ui.dirty = false;
+    return saveRecord(table, ui.sel === 'new' ? null : ui.baseline, form).then(function (res) {
+      ui.saving = false; ui.dirty = false; ui.retrySave = null;
+      if (window.SlaterConn) SlaterConn.changed();
       if (wasNew && ui.onCreated) {
         var cb = ui.onCreated; ui.onCreated = null;
         root.classList.remove('open');
@@ -1080,7 +1088,39 @@
       toast(res.merged ? 'Saved. Also kept changes made on another device.' : 'Saved.');
     }, function (e) {
       ui.saving = false; updateDirty();
+      if (e.offline) {
+        // Edits stay in the form; saved automatically when the connection is back.
+        ui.retrySave = { tab: ui.tab, sel: ui.sel };
+        if (window.SlaterConn) SlaterConn.changed();
+        toast("You're offline. Not saved yet: your changes stay here and save as soon as the connection is back.", 'err');
+        return;
+      }
       toast(e.message, 'err');
+    });
+  }
+  // Connection back: finish a Save that couldn't go through (if that record is
+  // still open with its edits), then pull what changed elsewhere. Lists and
+  // pickers redraw; the open form is left alone so nothing typed is lost.
+  function retryAfterReconnect() {
+    var r = ui.retrySave;
+    var first = Promise.resolve();
+    if (r) {
+      if (ui.dirty && ui.tab === r.tab && ui.sel === r.sel && root && root.classList.contains('open')) first = save();
+      else { ui.retrySave = null; }
+    }
+    return first.then(function () {
+      if (!store.loaded) return;
+      // A fresh pull, not syncShared(): one already in flight may have started
+      // before the changes made while this device was offline.
+      return (syncing || Promise.resolve()).catch(function () {}).then(sync).then(function (ch) {
+        if (ch && root && root.classList.contains('open')) { renderTabs(); renderList(); }
+      });
+    });
+  }
+  if (window.SlaterConn) {
+    SlaterConn.addSource('contacts', {
+      pending: function () { return ui.retrySave && ui.dirty ? 1 : 0; },
+      retry: retryAfterReconnect,
     });
   }
 
