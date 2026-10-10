@@ -244,7 +244,7 @@
   function queuePut(ch, qid) {
     var q = queueLoad();
     var i = qid ? q.findIndex(function (x) { return x.qid === qid; }) : -1;
-    ch.qid = qid || uuid(); ch.at = Date.now(); ch.owner = myTab();
+    ch.qid = qid || uuid(); ch.at = Date.now(); ch.owner = myTab(); ch.user = window._slaterUserId || null;
     if (i >= 0) q[i] = ch; else q.push(ch);
     queueStore(q);
     return ch.qid;

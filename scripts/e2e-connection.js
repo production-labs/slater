@@ -305,9 +305,19 @@ async function main() {
     await setTitle(page, 'After logout elsewhere');
     await until(async () => /logged out/.test(await barText(page)), 'logged-out panel in tab A (John: no message at all)');
     assert((await pending(page))[KEY], 'change kept in the queue');
-    const st = await page.evaluate(async (e, pw) => (await fetch('/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e, password: pw }) })).status, EMAIL, PASS);
-    assert(st === 200, 'relogin ' + st);
-    await until(async () => await title() === 'After logout elsewhere', 'sent after logging back in', 20000);
+    assert((await pending(page))[KEY].user === userId, 'queued change records whose it is');
+    // Someone else's unsent change in this browser: must NOT survive a login.
+    await page.evaluate(() => { const raw = JSON.parse(localStorage.getItem('slater_pending_saves') || '{}'); raw['cs_other::tX'] = { key: 'cs_other', owner: 'tX', user: 999999, label: 'x', data: { savedAt: 1 } }; localStorage.setItem('slater_pending_saves', JSON.stringify(raw)); });
+    // Log back in through the REAL login page in the other tab (John: the login
+    // page cleared the browser's Slater data, queued change included).
+    await b.waitForSelector('#login-email', { visible: true });
+    await b.type('#login-email', EMAIL);
+    await b.type('#login-password', PASS);
+    await Promise.all([b.waitForNavigation({ waitUntil: 'networkidle2' }), b.click('button[onclick="login()"]')]);
+    await until(async () => await title() === 'After logout elsewhere', 'sent after logging back in (tab A notices within ~5s)', 25000);
+    await until(async () => !/logged out/.test(await barText(page)), 'logged-out panel gone');
+    const left = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('slater_pending_saves') || '{}')));
+    assert(!left.some(k => k.startsWith('cs_other')), 'another person\'s unsent change was kept at login: ' + left.join(','));
     await b.close({ runBeforeUnload: false });
   });
 
@@ -325,7 +335,12 @@ async function main() {
     assert(/localhost:\d+\/\?/.test(page.url()) || !/login/.test(page.url()), 'still in the app');
     assert((await pending(page))[KEY], 'change still kept');
     await page.setOfflineMode(false);
-    await until(async () => await title() === 'Unsent at logout', 'sent once back online');
+    try { await until(async () => await title() === 'Unsent at logout', 'sent once back online'); }
+    catch (e) {
+      const srv = (await db.query('SELECT data->>\'savedAt\' s FROM projects WHERE key=$1', [KEY])).rows[0].s;
+      const st = await page.evaluate(k => { const q = JSON.parse(localStorage.getItem('slater_pending_saves') || '{}'); const e = Object.values(q).find(x => x.key === k) || {}; return { base: e.base, ours: e.ours, sent: e.data && e.data.savedAt, conflict: e.conflict, serverSeen: _serverSavedAt[k], lastOk: _lastSentOk[k] }; }, KEY);
+      throw new Error(e.message + ' | server savedAt=' + srv + ' | ' + JSON.stringify(st));
+    }
   });
 
   console.log('\nContacts');

@@ -5,6 +5,11 @@ var _pendingReceipts = {}; // "<key>_<index>" -> { key, i, img } (memory only: i
 var _lastSentOk = {};      // project key -> savedAt of the last save THIS tab got onto the server
 var _unloading = false;    // set in beforeunload: the page is going away
 var _formSnap = {};        // project key -> gather() JSON at the last load/save in this tab
+var _mySavedAts = {};      // project key -> every savedAt THIS tab produced (newest last, max 50)
+function _noteMine(key, t) {
+  var a = _mySavedAts[key] || (_mySavedAts[key] = []);
+  if (t != null && a.indexOf(t) < 0) { a.push(t); if (a.length > 50) a.shift(); }
+}
 
   
  // ── Server API client ─────────────────────────────────────────────────────────
@@ -6340,6 +6345,7 @@ function autosaveNow(onlyIfChanged) {
   // (found by John, Session 7 test 5). The save goes out and the server decides.
   data.label = (db[currentSheetKey] && db[currentSheetKey].label) || libLabel(data);
   data.savedAt = Date.now();
+  _noteMine(currentSheetKey, data.savedAt);
   var ne = document.getElementById("note-editor");
   data._note_draft = ne ? ne.innerHTML : "";
   var expenses = data.expenses || [];
@@ -6482,11 +6488,14 @@ function queueProjectSave(key, label, data) {
   // ours = every savedAt this device produced for the project while it was
   // queued. A server copy carrying one of them is OUR earlier save that got
   // through (e.g. a request cancelled as the page closed), not another device.
-  var ours = (prev && prev.ours ? prev.ours : []).concat(prev ? [prev.data.savedAt] : [], [data.savedAt]);
+  var ours = (prev && prev.ours ? prev.ours : []).concat(prev ? [prev.data.savedAt] : [], _mySavedAts[key] || [], [data.savedAt]);
   p[key] = {
     label: label, data: data, at: Date.now(),
     base: prev ? prev.base : (_serverSavedAt[key] != null ? _serverSavedAt[key] : null),
     conflict: prev ? prev.conflict : null,
+    // Whose change this is: the login page keeps queued saves only for the
+    // person logging in (it clears everything else for privacy).
+    user: (prev && prev.user) || window._slaterUserId || null,
     ours: ours.filter(function(v, i, a) { return v != null && a.indexOf(v) === i; }).slice(-50),
   };
   pendingSavesStore(p);
@@ -6541,7 +6550,7 @@ function flushProjectSave(key, force) {
       if (window.SlaterConn) SlaterConn.clearNotice("conflict-" + key);
       return true;
     }
-    var ours = entry.ours || [];
+    var ours = (entry.ours || []).concat(_mySavedAts[key] || [], [_lastSentOk[key]]);
     var changedElsewhere = sSaved !== undefined && ours.indexOf(sSaved) < 0 &&
       (entry.base != null ? sSaved !== entry.base : sSaved > sent);
     if (changedElsewhere && !force) {
@@ -8843,6 +8852,7 @@ function updateSidebarUser(data) {
 }
 
 API.getMe().then(function(data) {
+  if (data && data.id) window._slaterUserId = data.id; // queued saves record whose they are
   updateSidebarUser(data);
 }).catch(function() {});
 

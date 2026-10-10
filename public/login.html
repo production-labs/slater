@@ -115,17 +115,41 @@
           errEl.style.display = 'block';
           return;
         }
-        var keysToRemove = [];
-        for (var i = 0; i < localStorage.length; i++) {
-          var k = localStorage.key(i);
-          if (k && (k.startsWith('slater_') || k.startsWith('sday_'))) keysToRemove.push(k);
-        }
-        keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+        clearLocalData(data.user && data.user.id);
         window.location.href = '/';
       } catch(e) {
         errEl.textContent = 'Connection error';
         errEl.style.display = 'block';
       }
+    }
+
+    // Clear Slater's cached data from this browser (a different person may be
+    // logging in), EXCEPT changes that never reached the server and belong to
+    // the person logging in now: an open Slater tab sends those as soon as it
+    // sees the login (Session 7; found by John). keepUser = null clears all.
+    function clearLocalData(keepUser) {
+      var kept = {};
+      if (keepUser) {
+        try {
+          var p = JSON.parse(localStorage.getItem('slater_pending_saves') || '{}') || {}, mine = {};
+          Object.keys(p).forEach(function(id) { if (p[id] && p[id].user === keepUser) mine[id] = p[id]; });
+          if (Object.keys(mine).length) kept.slater_pending_saves = JSON.stringify(mine);
+        } catch (e) {}
+        try {
+          var q = (JSON.parse(localStorage.getItem('slater_pending_contacts') || '[]') || []).filter(function(x) { return x && x.user === keepUser; });
+          if (q.length) kept.slater_pending_contacts = JSON.stringify(q);
+        } catch (e) {}
+        // Which tabs are still open: so a new tab doesn't take over an open tab's saves.
+        var beats = localStorage.getItem('slater_tab_beats');
+        if (beats) kept.slater_tab_beats = beats;
+      }
+      var keysToRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && (k.startsWith('slater_') || k.startsWith('sday_'))) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+      Object.keys(kept).forEach(function(k) { localStorage.setItem(k, kept[k]); });
     }
 
     async function register() {
@@ -151,12 +175,7 @@
           errEl.style.display = 'block';
           return;
         }
-        var keysToRemove = [];
-        for (var i = 0; i < localStorage.length; i++) {
-          var k = localStorage.key(i);
-          if (k && (k.startsWith('slater_') || k.startsWith('sday_'))) keysToRemove.push(k);
-        }
-        keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+        clearLocalData(null); // a brand-new account: nothing to keep
         window.location.href = '/';
       } catch(e) {
         errEl.textContent = 'Connection error';
