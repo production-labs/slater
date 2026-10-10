@@ -526,7 +526,7 @@
   };
 
   window.addEventListener('slater:v2-changed', render);
-  CV2.sync().catch(function (e) { status('Could not load contacts: ' + e.message, 'err'); });
+  CV2.sync().catch(function (e) { if (!e.offline) status('Could not load contacts: ' + e.message, 'err'); });
   // Cards created before this file loaded (startup) got the old autocomplete
   // only if acAttach ran first; attach() skips inputs that already have it.
   render();

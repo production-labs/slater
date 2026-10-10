@@ -145,6 +145,42 @@ async function main() {
     assert(Object.keys(await pending(page)).length === 0, 'queue empty');
   });
 
+  await step('reload right after an edit (online): saved, no conflict question, nothing left queued', async () => {
+    // Edit without the 10s autosave, then reload: only the unload save carries it.
+    await page.evaluate(() => { const e = document.getElementById('project_title'); e.value = 'Reload edit'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    await openProject(page);
+    await until(async () => await title() === 'Reload edit', 'unload save reached the server');
+    await until(async () => Object.keys(await pending(page)).length === 0, 'queue empty');
+    await sleep(500);
+    assert(!/changed on another device/.test(await barText(page)), 'false conflict: ' + await barText(page));
+  });
+
+  await step('server holds this device\'s EARLIER save while a later one is queued: sent, no conflict', async () => {
+    // Close the current tab first, with its autosave off: otherwise its own
+    // last-second save is a genuine "other tab" change and the question is right.
+    await page.evaluate(() => { clearTimeout(_autosaveTimer); currentSheetKey = null; });
+    await page.close({ runBeforeUnload: false });
+    const t1 = Date.now() - 5000, t2 = Date.now() - 1000;
+    await db.query(`UPDATE projects SET data = data || jsonb_build_object('project_title','Earlier mine','savedAt',$2::bigint) WHERE key=$1`, [KEY, t1]);
+    const cur = (await db.query('SELECT data FROM projects WHERE key=$1', [KEY])).rows[0].data;
+    // Plant the queue from the login page (the app isn't running there, so
+    // nothing reacts to it until the app loads).
+    const setup = await browser.newPage();
+    await setup.goto(BASE + '/login');
+    await setup.evaluate((k, d, t1, t2) => {
+      const data = Object.assign({}, d, { project_title: 'Later mine', savedAt: t2 });
+      localStorage.setItem('slater_pending_saves', JSON.stringify({ [k]: { label: 'Conn Test', data, at: t2, base: 1000, conflict: null, ours: [t1, t2] } }));
+      localStorage.setItem('slater_last_project', k);
+    }, KEY, cur, t1, t2);
+    await setup.close();
+    page = await newPage(false);
+    await page.waitForFunction(k => typeof _formKey !== 'undefined' && _formKey === k, { timeout: 10000 }, KEY);
+    try { await until(async () => await title() === 'Later mine', 'later copy sent'); }
+    catch (e) { throw new Error(e.message + ' | ' + JSON.stringify(await page.evaluate(() => ({ q: localStorage.getItem('slater_pending_saves'), bar: (document.getElementById('conn-bar') || {}).textContent, online: SlaterConn.online, form: document.getElementById('project_title').value })))); }
+    assert(!/changed on another device/.test(await barText(page)), 'false conflict: ' + await barText(page));
+    assert(Object.keys(await pending(page)).length === 0, 'queue empty');
+  });
+
   await step('changed on another device while offline: nothing overwritten, choice offered; "Use my version" wins', async () => {
     await page.setOfflineMode(true);
     await until(async () => /You're offline/.test(await barText(page)), 'offline bar');
@@ -219,7 +255,10 @@ async function main() {
   });
 
   console.log('\nContacts');
-  await step('Save while offline: edits stay, clear message, saved automatically when back', async () => {
+  const nContacts = async name => (await db.query(`SELECT COUNT(*)::int n FROM contacts WHERE owner_id=$1 AND name=$2`, [userId, name])).rows[0].n;
+  const queue = () => page.evaluate(() => JSON.parse(localStorage.getItem('slater_pending_contacts') || '[]'));
+  const contactsOpen = () => page.evaluate(() => { const r = document.querySelector('.cv2-head-actions'); return !!(r && r.offsetParent); });
+  await step('Save while offline: kept on this device, Contacts can be closed with no discard prompt, saved once when back', async () => {
     await page.close({ runBeforeUnload: false });
     page = await newPage(true);
     await page.waitForFunction(() => window.ContactsV2 && ContactsV2.store.loaded, { timeout: 10000 });
@@ -230,22 +269,63 @@ async function main() {
     await page.setOfflineMode(true);
     await until(async () => /You're offline/.test(await barText(page)), 'offline bar');
     await page.click('#cv2-save');
-    await until(() => page.evaluate(() => document.body.textContent.includes("You're offline. Not saved yet")), 'offline save message');
-    assert(await page.$eval('#cv2f_name', e => e.value) === 'Offline Olive', 'typed name still in the form');
-    assert((await db.query(`SELECT COUNT(*)::int n FROM contacts WHERE owner_id=$1`, [userId])).rows[0].n === 0, 'nothing saved yet');
-    assert(await page.evaluate(() => SlaterConn.pendingCount()) >= 1, 'counted as unsaved');
+    await until(() => page.evaluate(() => document.body.textContent.includes('Saved on this device')), 'offline save message');
+    let q = await queue();
+    assert(q.length === 1 && q[0].op === 'create' && q[0].body.name === 'Offline Olive', 'queued: ' + JSON.stringify(q));
+    assert(await nContacts('Offline Olive') === 0, 'nothing on the server yet');
+    // Close Contacts: no "Discard your changes?" prompt.
+    await page.click('[data-act="close"]');
+    await sleep(300);
+    assert(!(await page.$('#modal-overlay.open')), 'no discard prompt');
+    assert(!(await contactsOpen()), 'Contacts closed');
+    // Reopen: the list says it's waiting.
+    await page.evaluate(() => openContacts());
+    await until(() => page.evaluate(() => /1 waiting to save \(offline\): Offline Olive/.test(document.getElementById('cv2-list').textContent)), 'waiting line in the list');
+    await page.click('[data-act="close"]');
     await page.setOfflineMode(false);
-    await until(async () => (await db.query(`SELECT COUNT(*)::int n FROM contacts WHERE owner_id=$1 AND name='Offline Olive'`, [userId])).rows[0].n === 1, 'contact saved on reconnect');
-    await until(async () => await page.evaluate(() => SlaterConn.pendingCount()) === 0, 'nothing pending');
+    await until(async () => await nContacts('Offline Olive') === 1, 'contact saved on reconnect');
+    await until(async () => (await queue()).length === 0, 'queue empty');
+    await page.evaluate(() => SlaterConn._retryAll()); await sleep(800);
+    assert(await nContacts('Offline Olive') === 1, 'saved exactly once (no duplicate on a second send)');
+  });
+
+  await step('offline edit to an existing contact is queued and applied; tab closed meanwhile is fine', async () => {
+    const id = (await db.query(`SELECT id FROM contacts WHERE owner_id=$1 AND name='Offline Olive'`, [userId])).rows[0].id;
+    await page.evaluate(() => openContacts());
+    await page.waitForSelector(`[data-act="select"][data-id="${id}"]`, { visible: true });
+    await page.click(`[data-act="select"][data-id="${id}"]`);
+    await page.waitForSelector('#cv2f_phone', { visible: true });
+    await page.setOfflineMode(true);
+    await until(async () => /You're offline/.test(await barText(page)), 'offline bar');
+    await page.type('#cv2f_phone', '206.555.0199');
+    await page.click('#cv2-save');
+    await until(async () => (await queue()).length === 1, 'queued');
+    assert((await queue())[0].op === 'update', 'queued as an update');
+    // Close the whole tab while still offline; come back online in a new one.
+    await page.close({ runBeforeUnload: false });
+    page = await newPage(true);
+    await until(async () => (await db.query(`SELECT phone FROM contacts WHERE id=$1`, [id])).rows[0].phone.replace(/\D/g, '') === '2065550199', 'edit applied on the next visit (phone field formats the number)');
+    await until(async () => (await queue()).length === 0, 'queue empty');
+    await page.waitForFunction(() => window.ContactsV2 && ContactsV2.store.loaded, { timeout: 10000 });
+    await page.evaluate(() => openContacts());
+    await page.waitForSelector('[data-act="new"]', { visible: true });
   });
 
   await step('reconnect pulls changes made elsewhere into the open Contacts list', async () => {
     await page.setOfflineMode(true);
     await until(async () => /You're offline/.test(await barText(page)), 'offline bar');
+    // Reopening Contacts while offline: no error message (the panel covers it).
+    await page.click('[data-act="close"]').catch(() => {});
+    await page.evaluate(() => openContacts());
+    await sleep(500);
+    const sb = await page.evaluate(() => { const b = document.getElementById('status-bar'); return b && b.style.display !== 'none' ? b.textContent : ''; });
+    assert(!/Could not/.test(sb), 'no error in the status bar while offline: ' + sb);
     await db.query(`INSERT INTO contacts (owner_id, name) VALUES ($1, 'Elsewhere Ed')`, [userId]);
     await page.setOfflineMode(false);
     try {
       await until(() => page.evaluate(() => /Elsewhere Ed/.test(document.getElementById('cv2-list').textContent)), 'new contact listed');
+    const sb2 = await page.evaluate(() => { const b = document.getElementById('status-bar'); return b && b.style.display !== 'none' ? b.textContent : ''; });
+    assert(!/offline/i.test(sb2), 'stale offline message left in the status bar: ' + sb2);
     } catch (e) {
       const dbg = await page.evaluate(() => ({ online: SlaterConn.online, inStore: Object.values(ContactsV2.store.contacts).map(c => c.name), cursor: ContactsV2.store.cursor, open: !!document.querySelector('#cv2-list') }));
       const row = (await db.query(`SELECT updated_at FROM contacts WHERE owner_id=$1 AND name='Elsewhere Ed'`, [userId])).rows[0];

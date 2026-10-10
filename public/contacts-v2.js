@@ -55,7 +55,7 @@
       opts.body = JSON.stringify(body);
     }
     return fetch('/api/v2' + path, opts).then(function (r) {
-      if (r.status >= 502 && r.status <= 504) throw offlineError();
+      if (r.status >= 502 && r.status <= 504) throw offlineError(method);
       return r.json().catch(function () { return null; }).then(function (data) {
         if (!r.ok) {
           var e = new Error((data && data.error) || ('Request failed (' + r.status + ')'));
@@ -64,11 +64,13 @@
         }
         return data;
       });
-    }, function () { throw offlineError(); });
+    }, function () { throw offlineError(method); });
   }
-  // Couldn't reach Slater's server (connection.js shows the offline bar).
-  function offlineError() {
-    var e = new Error("You're offline, so this wasn't saved yet.");
+  // Couldn't reach Slater's server. The offline panel (connection.js) already
+  // says so: reads fail quietly (what's on this device stays on screen); only
+  // a write that didn't happen gets a message.
+  function offlineError(method) {
+    var e = new Error(method === 'GET' ? "You're offline." : "You're offline, so this wasn't saved.");
     e.offline = true;
     return e;
   }
@@ -169,24 +171,36 @@
     return out;
   }
 
-  function saveRecord(table, baseline, edited) {
+  // A save is described as a "change" first, then sent. The same description
+  // is what the offline queue keeps, so a queued save goes out exactly as it
+  // would have: a create carries its client_uid (a retried POST can't make a
+  // duplicate); an update carries only the changed fields + the base
+  // updated_at, so the agreed merge rule (409 -> retry on top of the newer
+  // row) applies when it's finally sent.
+  function describeChange(table, baseline, edited, clientUid) {
     if (!baseline) {
       var body = {};
       Object.keys(edited).forEach(function (k) { body[k] = norm(k, edited[k]); });
-      body.client_uid = uuid();
-      return req('POST', '/' + table, body).then(function (row) {
+      body.client_uid = clientUid || uuid();
+      return { table: table, op: 'create', body: body, label: body.name || '' };
+    }
+    return { table: table, op: 'update', id: baseline.id, changes: changedFields(baseline, edited), base: baseline.updated_at, label: edited.name || baseline.name || '' };
+  }
+  function sendChange(ch) {
+    var table = ch.table;
+    if (ch.op === 'create') {
+      return req('POST', '/' + table, ch.body).then(function (row) {
         absorb(table, [row]);
         return { row: row, merged: false };
       });
     }
-    var changes = changedFields(baseline, edited);
-    if (!Object.keys(changes).length) return Promise.resolve({ row: baseline, merged: false, unchanged: true });
-
-    var base = baseline.updated_at, merged = false, attempts = 0;
+    var changes = ch.changes;
+    if (!Object.keys(changes).length) return Promise.resolve({ row: store[table][ch.id], merged: false, unchanged: true });
+    var base = ch.base, merged = false, attempts = 0;
     function attempt() {
       attempts++;
       var body = Object.assign({}, changes, { base_updated_at: base });
-      return req('PATCH', '/' + table + '/' + baseline.id, body).then(function (row) {
+      return req('PATCH', '/' + table + '/' + ch.id, body).then(function (row) {
         absorb(table, [row]);
         return { row: row, merged: merged };
       }, function (e) {
@@ -203,6 +217,72 @@
       });
     }
     return attempt();
+  }
+  function saveRecord(table, baseline, edited) {
+    var ch = describeChange(table, baseline, edited);
+    if (ch.op === 'update' && !Object.keys(ch.changes).length) return Promise.resolve({ row: baseline, merged: false, unchanged: true });
+    return sendChange(ch);
+  }
+
+  // ------------------------------------------------- offline save queue
+  // A Save that can't reach the server (Session 7) is kept in localStorage
+  // under QUEUE_KEY and sent when the connection is back (or on the next
+  // visit). The form then counts as saved, so Contacts can be closed and work
+  // goes on. [{ qid, table, op, body | id+changes+base, label, at }]
+  var QUEUE_KEY = 'slater_pending_contacts';
+  function queueLoad() { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') || []; } catch (e) { return []; } }
+  function queueStore(q) {
+    try { if (q.length) localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); else localStorage.removeItem(QUEUE_KEY); }
+    catch (e) { toast('This device is out of storage, so the offline save can\'t be kept. Reconnect before closing Slater.', 'err'); }
+    if (window.SlaterConn) SlaterConn.changed();
+  }
+  // Add a change, or replace the queued one for the same form (qid).
+  function queuePut(ch, qid) {
+    var q = queueLoad();
+    var i = qid ? q.findIndex(function (x) { return x.qid === qid; }) : -1;
+    ch.qid = qid || uuid(); ch.at = Date.now();
+    if (i >= 0) q[i] = ch; else q.push(ch);
+    queueStore(q);
+    return ch.qid;
+  }
+  function queueDrop(qid) { queueStore(queueLoad().filter(function (x) { return x.qid !== qid; })); }
+  var flushingQueue = null;
+  function flushQueue() {
+    if (flushingQueue) return flushingQueue;
+    function next() {
+      var ch = queueLoad()[0];
+      if (!ch) return Promise.resolve(true);
+      return sendChange(ch).then(function (res) {
+        queueDrop(ch.qid);
+        var row = res && res.row;
+        // The form that queued it is still open: point it at the real record.
+        if (row && ui.queuedQid === ch.qid) {
+          ui.queuedQid = null; ui.queuedForm = null;
+          if (TAB_TABLE[ui.tab] === ch.table) {
+            ui.sel = row.id; ui.baseline = row;
+            if (!ui.dirty) { ui.formRoles = ui.tab === 'people' ? (row.role_ids || []).slice() : []; ui.formLogo = ui.tab === 'organizations' ? row.logo : null; }
+          }
+        }
+        return next();
+      }, function (e) {
+        if (e.offline) return false; // still offline: keep the rest for later
+        // Refused for good (archived elsewhere, invalid...): say so, don't drop silently.
+        queueDrop(ch.qid);
+        if (window.SlaterConn) {
+          SlaterConn.notice('cq-' + ch.qid, 'Couldn\'t save your offline changes to <strong>' + esc(ch.label || 'a contact') + '</strong>: ' + esc(e.message),
+            [{ label: 'Dismiss', fn: function () { SlaterConn.clearNotice('cq-' + ch.qid); } }]);
+        }
+        return next();
+      });
+    }
+    flushingQueue = next().then(function (ok) {
+      flushingQueue = null;
+      // Redraw the form only if nobody is typing in it.
+      if (root && root.classList.contains('open')) { if (ui.dirty) { renderTabs(); renderList(); } else renderAll(); }
+      return ok;
+    },
+      function (e) { flushingQueue = null; throw e; });
+    return flushingQueue;
   }
 
   // ---------------------------------------------------------------- roles
@@ -358,7 +438,7 @@
         ui.onCreated = opts.onCreated || null;
       };
       if (store.loaded) { renderAll(); prefill(); return syncShared().then(function (ch) { if (ch) { renderTabs(); renderList(); } }); }
-      return syncShared().then(function () { renderAll(); prefill(); }, function (e) { toast('Could not load contacts: ' + e.message, 'err'); });
+      return syncShared().then(function () { renderAll(); prefill(); }, function (e) { if (!e.offline) toast('Could not load contacts: ' + e.message, 'err'); });
     }
     if (!store.loaded) {
       document.getElementById('cv2-list').innerHTML = '<div class="cv2-loading">Loading contacts...</div>';
@@ -367,13 +447,13 @@
     renderAll();
     syncShared().then(function (ch) { if (ch) renderAll(); }, function (e) {
       if (!store.loaded) document.getElementById('cv2-list').innerHTML = '<div class="cv2-empty">Could not load contacts.<br>' + esc(e.message) + '</div>';
-      else toast('Could not refresh contacts: ' + e.message, 'err');
+      else if (!e.offline) toast('Could not refresh contacts: ' + e.message, 'err');
     });
   }
   function close() {
     guard(function () {
       root.classList.remove('open');
-      ui.sel = null; ui.baseline = null; ui.dirty = false; ui.onCreated = null;
+      ui.sel = null; ui.baseline = null; ui.dirty = false; ui.onCreated = null; ui.queuedQid = null; ui.queuedForm = null;
     });
   }
   function guard(fn) {
@@ -501,14 +581,17 @@
     if (!store.loaded) return;
     var list = filteredRows();
     if (ui.tab === 'roles') return renderRoleList(el, list);
+    var waiting = queueLoad().filter(function (x) { return x.table === TAB_TABLE[ui.tab]; });
+    var waitNote = waiting.length ? '<div class="cv2-waiting">' + waiting.length + ' waiting to save (offline): ' +
+      esc(waiting.map(function (x) { return x.label || 'Untitled'; }).join(', ')) + '</div>' : '';
     if (!list.length) {
       var anyAtAll = rows(TAB_TABLE[ui.tab], true).length;
-      el.innerHTML = '<div class="cv2-empty">' + (anyAtAll || ui.q || ui.cat !== 'all' || ui.state
+      el.innerHTML = waitNote + '<div class="cv2-empty">' + (anyAtAll || ui.q || ui.cat !== 'all' || ui.state
         ? 'Nothing matches these filters.'
         : 'No ' + (ui.tab === 'people' ? 'people' : ui.tab) + ' yet.<br>Use <strong>+ New</strong> to add one.') + '</div>';
       return;
     }
-    el.innerHTML = list.map(function (r) {
+    el.innerHTML = waitNote + list.map(function (r) {
       var cls = 'cv2-row' + (String(ui.sel) === String(r.id) ? ' active' : '') + (r.archived_at ? ' archived' : '');
       var name = esc(r.name) + (r.archived_at ? '<span class="cv2-badge">Archived</span>' : '');
       var sub, lead = '';
@@ -856,7 +939,12 @@
     var label = document.getElementById('cv2-dirty');
     if (!save) { ui.dirty = false; return; }
     var form = readForm();
-    if (ui.sel === 'new') {
+    if (ui.queuedQid && ui.queuedForm) {
+      // Saved offline (queued): unsaved only if changed since that Save.
+      ui.dirty = Object.keys(form).some(function (k) {
+        return JSON.stringify(norm(k, form[k])) !== JSON.stringify(norm(k, ui.queuedForm[k]));
+      });
+    } else if (ui.sel === 'new') {
       ui.dirty = Object.keys(form).some(function (k) {
         var v = norm(k, form[k]);
         if (k === 'country') return v != null && v !== defaultCountry();
@@ -1039,6 +1127,7 @@
   function select(id) {
     guard(function () {
       ui.onCreated = null; // leaving the prefilled new location
+      ui.queuedQid = null; ui.queuedForm = null;
       var table = TAB_TABLE[ui.tab];
       ui.sel = id;
       ui.baseline = id === 'new' ? null : store[table][id] || null;
@@ -1052,7 +1141,7 @@
   function switchTab(tab) {
     if (tab === ui.tab) return;
     guard(function () {
-      ui.tab = tab; ui.sel = null; ui.baseline = null; ui.q = ''; ui.cat = 'all'; ui.state = ''; ui.dirty = false;
+      ui.tab = tab; ui.sel = null; ui.baseline = null; ui.q = ''; ui.cat = 'all'; ui.state = ''; ui.dirty = false; ui.queuedQid = null; ui.queuedForm = null;
       var table = TAB_TABLE[tab];
       if (ui.showArchived && !store.archivedLoaded[table]) loadArchived(table).then(renderAll);
       renderAll();
@@ -1068,10 +1157,23 @@
       return;
     }
     var table = TAB_TABLE[ui.tab];
-    ui.saving = true; updateDirty();
     var wasNew = ui.sel === 'new';
-    return saveRecord(table, ui.sel === 'new' ? null : ui.baseline, form).then(function (res) {
-      ui.saving = false; ui.dirty = false; ui.retrySave = null;
+    var queued = ui.queuedQid && queueLoad().filter(function (x) { return x.qid === ui.queuedQid; })[0];
+    var ch = describeChange(table, wasNew ? null : ui.baseline, form, queued && queued.op === 'create' ? queued.body.client_uid : null);
+    if (ch.op === 'update' && !Object.keys(ch.changes).length && !queued) { ui.dirty = false; updateDirty(); toast('Saved.'); return Promise.resolve(); }
+    // Offline, or this form already has a save waiting: queue it (replacing
+    // the waiting one, so a new record can't be created twice).
+    if (window.SlaterConn && !SlaterConn.online) { queueOffline(ch); return Promise.resolve(); }
+    if (queued) {
+      // Online again, but this form's earlier save is still waiting: update it, then send in order.
+      ui.queuedQid = queuePut(ch, ui.queuedQid);
+      ui.queuedForm = readForm();
+      ui.dirty = false; updateDirty();
+      return flushQueue().then(function (ok) { if (ok) toast('Saved.'); });
+    }
+    ui.saving = true; updateDirty();
+    return sendChange(ch).then(function (res) {
+      ui.saving = false; ui.dirty = false;
       if (window.SlaterConn) SlaterConn.changed();
       if (wasNew && ui.onCreated) {
         var cb = ui.onCreated; ui.onCreated = null;
@@ -1088,26 +1190,28 @@
       toast(res.merged ? 'Saved. Also kept changes made on another device.' : 'Saved.');
     }, function (e) {
       ui.saving = false; updateDirty();
-      if (e.offline) {
-        // Edits stay in the form; saved automatically when the connection is back.
-        ui.retrySave = { tab: ui.tab, sel: ui.sel };
-        if (window.SlaterConn) SlaterConn.changed();
-        toast("You're offline. Not saved yet: your changes stay here and save as soon as the connection is back.", 'err');
-        return;
-      }
+      if (e.offline) { queueOffline(ch); return; }
       toast(e.message, 'err');
     });
   }
-  // Connection back: finish a Save that couldn't go through (if that record is
-  // still open with its edits), then pull what changed elsewhere. Lists and
-  // pickers redraw; the open form is left alone so nothing typed is lost.
-  function retryAfterReconnect() {
-    var r = ui.retrySave;
-    var first = Promise.resolve();
-    if (r) {
-      if (ui.dirty && ui.tab === r.tab && ui.sel === r.sel && root && root.classList.contains('open')) first = save();
-      else { ui.retrySave = null; }
+  function queueOffline(ch) {
+    if (ch.op === 'update') {
+      // Same record queued earlier from another form: fold the changes together.
+      var prev = queueLoad().filter(function (x) { return x.op === 'update' && x.table === ch.table && x.id === ch.id && x.qid !== ui.queuedQid; })[0];
+      if (prev) { ch.changes = Object.assign({}, prev.changes, ch.changes); ch.base = prev.base; ui.queuedQid = prev.qid; }
     }
+    ui.queuedQid = queuePut(ch, ui.queuedQid);
+    ui.queuedForm = readForm();
+    ui.dirty = false; updateDirty();
+    var msg = "You're offline. Saved on this device: it goes to Slater as soon as the connection is back. You can close this and keep working.";
+    if (ch.op === 'create' && ui.onCreated) { ui.onCreated = null; msg = "You're offline. The location is saved on this device and goes to Slater when the connection is back; pick it on the day then."; }
+    toast(msg, 'warn'); // a notice, not an error: errors also stick in the bottom status bar
+    renderList();
+  }
+  // Connection back (or a later visit): send the queue, then pull what changed
+  // elsewhere. Lists and pickers redraw; an open form being edited is left alone.
+  function retryAfterReconnect() {
+    var first = queueLoad().length ? flushQueue() : Promise.resolve();
     return first.then(function () {
       if (!store.loaded) return;
       // A fresh pull, not syncShared(): one already in flight may have started
@@ -1119,9 +1223,11 @@
   }
   if (window.SlaterConn) {
     SlaterConn.addSource('contacts', {
-      pending: function () { return ui.retrySave && ui.dirty ? 1 : 0; },
+      pending: function () { return queueLoad().length; },
       retry: retryAfterReconnect,
     });
+    // Saves left waiting from an earlier visit.
+    if (queueLoad().length && SlaterConn.online) setTimeout(flushQueue, 0);
   }
 
   function archive() {
@@ -1311,7 +1417,7 @@
       ui.showArchived = t.checked;
       var table = TAB_TABLE[ui.tab];
       if (ui.showArchived && !store.archivedLoaded[table]) {
-        loadArchived(table).then(renderList, function (er) { toast(er.message, 'err'); });
+        loadArchived(table).then(renderList, function (er) { if (!er.offline) toast(er.message, 'err'); });
       }
       return renderList();
     }

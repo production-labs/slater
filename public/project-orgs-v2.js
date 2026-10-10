@@ -312,7 +312,7 @@
     render();
     window.addEventListener('slater:v2-changed', render);
     CV2.sync().catch(function (e) {
-      if (typeof setStatus === 'function') setStatus('Could not load organizations: ' + e.message, 'err');
+      if (!e.offline && typeof setStatus === 'function') setStatus('Could not load organizations: ' + e.message, 'err');
     });
   }
 

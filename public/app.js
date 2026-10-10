@@ -3,6 +3,7 @@ var _serverSavedAt = {};   // project key -> data.savedAt of the last server cop
 var _flushing = {};        // project key -> in-flight flush promise
 var _pendingReceipts = {}; // "<key>_<index>" -> { key, i, img } (memory only: images are big)
 var _lastSentOk = {};      // project key -> savedAt of the last save THIS tab got onto the server
+var _unloading = false;    // set in beforeunload: the page is going away
 
   
  // ── Server API client ─────────────────────────────────────────────────────────
@@ -6315,6 +6316,19 @@ function autosaveNow() {
   // that doesn't get there is kept in the save queue below and sent later.
   var key = currentSheetKey;
   var offline = window.SlaterConn && !SlaterConn.online;
+  if (_unloading && !offline && !pendingSavesLoad()[key]) {
+    // Page is closing: the browser may cancel this request, and code after
+    // it may never run. Queue the copy FIRST, then send. Next visit, the queue
+    // sees whether it landed (same savedAt on the server: dropped, not re-sent).
+    queueProjectSave(key, data.label, data);
+    API.saveProject(key, data.label, data).then(function(result) {
+      if (!result) return;
+      _lastSentOk[key] = data.savedAt;
+      var p = pendingSavesLoad();
+      if (p[key] && p[key].data.savedAt === data.savedAt) { delete p[key]; pendingSavesStore(p); }
+    });
+    return;
+  }
   if (offline || pendingSavesLoad()[key]) {
     // Offline, or earlier changes are still waiting: queue it (synchronously,
     // so it survives the tab closing) and let the queue send it in order.
@@ -6386,10 +6400,15 @@ function queueProjectSave(key, label, data) {
   if (_lastSentOk[key] != null && data.savedAt <= _lastSentOk[key]) return;
   var p = pendingSavesLoad();
   var prev = p[key];
+  // ours = every savedAt this device produced for the project while it was
+  // queued. A server copy carrying one of them is OUR earlier save that got
+  // through (e.g. a request cancelled as the page closed), not another device.
+  var ours = (prev && prev.ours ? prev.ours : []).concat(prev ? [prev.data.savedAt] : [], [data.savedAt]);
   p[key] = {
     label: label, data: data, at: Date.now(),
     base: prev ? prev.base : (_serverSavedAt[key] != null ? _serverSavedAt[key] : null),
     conflict: prev ? prev.conflict : null,
+    ours: ours.filter(function(v, i, a) { return v != null && a.indexOf(v) === i; }).slice(-50),
   };
   pendingSavesStore(p);
 }
@@ -6434,7 +6453,17 @@ function flushProjectSave(key, force) {
   _flushing[key] = API._fetchProject(key).then(function(server) {
     if (server === undefined) return false; // still can't reach the server
     var sSaved = server && server.data ? server.data.savedAt : undefined;
-    var changedElsewhere = sSaved !== undefined && sSaved !== sent &&
+    if (sSaved !== undefined && sSaved === sent) {
+      // Already on the server (the send got through before). Nothing to send.
+      _serverSavedAt[key] = sent;
+      if (!(_lastSentOk[key] >= sent)) _lastSentOk[key] = sent;
+      var p0 = pendingSavesLoad();
+      if (p0[key] && p0[key].data.savedAt === sent) { delete p0[key]; pendingSavesStore(p0); }
+      if (window.SlaterConn) SlaterConn.clearNotice("conflict-" + key);
+      return true;
+    }
+    var ours = entry.ours || [];
+    var changedElsewhere = sSaved !== undefined && ours.indexOf(sSaved) < 0 &&
       (entry.base != null ? sSaved !== entry.base : sSaved > sent);
     if (changedElsewhere && !force) {
       var p = pendingSavesLoad();
@@ -8886,8 +8915,11 @@ document.addEventListener("visibilitychange", function() {
   if (document.hidden && currentSheetKey) _safeUnloadAutosave();
 });
 window.addEventListener("beforeunload", function() {
+  _unloading = true;
   if (currentSheetKey) _safeUnloadAutosave();
 });
+// Leaving was cancelled ("Stay on page"): back to normal saving.
+window.addEventListener("focus", function() { _unloading = false; });
 
 // ── SAMPLE DATA (remove before go-live) ───────────────────────────────────
 

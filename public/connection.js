@@ -74,6 +74,7 @@
     if (state.online) return;
     state.online = true;
     clearTimeout(probeTimer); probeTimer = null; probeDelay = 3000;
+    clearOfflineStatus();
     retryAll();
   }
   // Logged out: the bar's "Log in" opens the login page in a NEW tab (leaving
@@ -81,6 +82,15 @@
   // changes). This tab checks every 5s whether the login is back, then sends
   // everything that was waiting.
   var loginTimer = null;
+  // app.js setStatus() also leaves error messages in the bottom status bar
+  // until the next message. Offline ones are stale once we're back: clear them.
+  function clearOfflineStatus() {
+    ['status-bar', 'toast'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el || !/offline/i.test(el.textContent || '')) return;
+      if (id === 'status-bar') el.style.display = 'none'; else el.classList.remove('show');
+    });
+  }
   function setLoggedOut(v) {
     if (state.loggedOut === v) return;
     state.loggedOut = v;

@@ -135,3 +135,6 @@
 .cv2-inline-btn:hover{border-color:var(--border-strong)}
 .cv2-hosp-status{margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)}
 .cv2-hosp-status.err{color:var(--accent)}
+
+/* Offline save queue (Session 7) */
+.cv2-waiting{margin:6px 8px 8px;padding:8px 10px;border-radius:6px;background:#F5F0E8;color:#181818;font-size:12px;line-height:1.4;border-left:3px solid #D94B43}
