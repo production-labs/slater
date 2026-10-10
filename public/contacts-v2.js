@@ -81,35 +81,47 @@
       window.dispatchEvent(new CustomEvent('slater:v2-changed'));
     }, 0);
   }
+  // Returns how many rows were new or changed. Sync pulls overlap their
+  // window by 10s, so recently edited rows come back again unchanged; those
+  // don't count (and don't trigger redraws).
   function absorb(table, rows) {
+    var changed = 0;
     (rows || []).forEach(function (r) {
       var cur = store[table][r.id];
+      if (!cur || r.updated_at > cur.updated_at) changed++;
       if (!cur || r.updated_at >= cur.updated_at) store[table][r.id] = r;
     });
-    if (rows && rows.length) notify();
+    if (changed) notify();
+    return changed;
   }
   // Permanent deletes from any device arrive as tombstones: drop local copies.
   function applyDeleted(list) {
-    (list || []).forEach(function (d) { if (store[d.table]) delete store[d.table][d.id]; });
-    if (list && list.length) notify();
+    var changed = 0;
+    (list || []).forEach(function (d) { if (store[d.table] && store[d.table][d.id]) { delete store[d.table][d.id]; changed++; } });
+    if (changed) notify();
+    return changed;
   }
+  // Resolves true when anything in the store changed, so callers can skip
+  // redrawing (a needless redraw replaces the list under a click in progress).
   function sync() {
     var q = store.cursor ? '?since=' + encodeURIComponent(store.cursor) : '';
     return req('GET', '/sync' + q).then(function (d) {
+      var changed = !store.loaded;
       if (!store.cursor) TABLES.forEach(function (t) { store[t] = {}; });
-      TABLES.forEach(function (t) { absorb(t, d[t]); });
-      applyDeleted(d.deleted);
-      store.defaultOrgId = d.default_organization_id;
-      if (d.settings) store.settings = d.settings;
+      TABLES.forEach(function (t) { if (absorb(t, d[t])) changed = true; });
+      if (applyDeleted(d.deleted)) changed = true;
+      if (store.defaultOrgId !== d.default_organization_id) { store.defaultOrgId = d.default_organization_id; changed = true; }
+      if (d.settings && JSON.stringify(d.settings) !== JSON.stringify(store.settings)) { store.settings = d.settings; changed = true; }
       if (d.cursor) store.cursor = d.cursor;
       store.loaded = true;
-      notify();
+      if (changed) notify();
+      return changed;
     });
   }
   // One sync at a time; callers that arrive mid-sync share it.
   var syncing = null;
   function syncShared() {
-    if (!syncing) syncing = sync().then(function () { syncing = null; }, function (e) { syncing = null; throw e; });
+    if (!syncing) syncing = sync().then(function (ch) { syncing = null; return ch; }, function (e) { syncing = null; throw e; });
     return syncing;
   }
   function loadArchived(table) {
@@ -338,7 +350,7 @@
         var a = document.getElementById('cv2f_address'); if (a) a.focus();
         ui.onCreated = opts.onCreated || null;
       };
-      if (store.loaded) { renderAll(); prefill(); return syncShared().then(function () { renderTabs(); renderList(); }); }
+      if (store.loaded) { renderAll(); prefill(); return syncShared().then(function (ch) { if (ch) { renderTabs(); renderList(); } }); }
       return syncShared().then(function () { renderAll(); prefill(); }, function (e) { toast('Could not load contacts: ' + e.message, 'err'); });
     }
     if (!store.loaded) {
@@ -346,7 +358,7 @@
       document.getElementById('cv2-detail').innerHTML = '';
     }
     renderAll();
-    syncShared().then(renderAll, function (e) {
+    syncShared().then(function (ch) { if (ch) renderAll(); }, function (e) {
       if (!store.loaded) document.getElementById('cv2-list').innerHTML = '<div class="cv2-empty">Could not load contacts.<br>' + esc(e.message) + '</div>';
       else toast('Could not refresh contacts: ' + e.message, 'err');
     });
@@ -1127,7 +1139,7 @@
         ui.sel = null; ui.baseline = null; ui.dirty = false;
         renderAll();
         toast('Deleted permanently.');
-        sync().then(renderAll, function () {}); // pick up side effects (e.g. unlinked people)
+        sync().then(function (ch) { if (ch) renderAll(); }, function () {}); // pick up side effects (e.g. unlinked people)
       }, function (e) {
         var d = e.data || {};
         if (e.status === 409 && d.error === 'in_use') {

@@ -50,8 +50,8 @@ const CREW_DEPARTMENTS = [
     ['Grip', null],
   ]],
   ['Audio', 1200, [
-    ['A1 (Audio Engineer)', 'A1'],
-    ['A2 (Audio Assistant)', 'A2'],
+    ['Lead Audio Engineer', 'A1'],   // was 'A1 (Audio Engineer)' (renamed 2026-10-10)
+    ['Second Audio Engineer', 'A2'], // was 'A2 (Audio Assistant)' (renamed 2026-10-10)
     ['Sound Mixer', null],
     ['Boom Operator', null],
     ['RF Technician', null],
@@ -115,6 +115,16 @@ const TALENT = [
   ['Background / Extra', null],
 ];
 
+// Built-in roles renamed in place: old name -> new name. The seed renames the
+// existing row (same id) BEFORE matching by name, so contacts and projects
+// that already use the role keep it. Without this, a renamed entry would be
+// inserted as a new role and the old one archived ("retired") under everyone
+// who has it. Keep entries here; they're no-ops once applied.
+const RENAMED = {
+  'A1 (Audio Engineer)': 'Lead Audio Engineer',   // John 2026-10-10
+  'A2 (Audio Assistant)': 'Second Audio Engineer', // John 2026-10-10
+};
+
 function build() {
   const out = [];
   STAFF.forEach(([name, abbreviation], i) =>
@@ -127,4 +137,6 @@ function build() {
   return out;
 }
 
-module.exports = build();
+const ROLES = build();
+ROLES.renamed = RENAMED; // read by scripts/migrate-data-model.js
+module.exports = ROLES;

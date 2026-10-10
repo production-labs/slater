@@ -70,7 +70,7 @@ const ALIASES = {
   'motion designer': 'Motion Graphics Artist',
   'asl 1': 'ASL Interpreter',
   'asl 2': 'ASL Interpreter',
-  'a1 - agency contact': 'A1 (Audio Engineer)',
+  'a1 - agency contact': 'Lead Audio Engineer',
 };
 
 if (!process.env.DATABASE_URL) { console.error('DATABASE_URL is not set.'); process.exit(2); }

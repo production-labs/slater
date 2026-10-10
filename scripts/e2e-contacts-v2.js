@@ -344,7 +344,8 @@ async function main() {
     await click('[data-act="archive"]');
     await T('#modal-overlay.open');
     await page.evaluate(() => document.getElementById('modal-ok').click());
-    await page.waitForFunction(() => /Building 92/.test(document.getElementById('cv2-list').textContent), { timeout: 5000 }); // Show archived is still on
+    // Show archived is still on, so the row was listed before too: wait until it shows AS archived.
+    await page.waitForFunction(() => /Building 92/.test((document.querySelector('.cv2-row.archived') || {}).textContent || ''), { timeout: 5000 });
     await click('.cv2-row.archived');
     await click('[data-act="purge"]');
     await T('#modal-overlay.open');

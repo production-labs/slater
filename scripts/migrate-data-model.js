@@ -68,7 +68,17 @@ async function columns(client, table) {
 }
 
 async function seedRoles(client) {
-  const counts = { inserted: 0, updated: 0, unchanged: 0 };
+  const counts = { inserted: 0, updated: 0, unchanged: 0, renamed: [] };
+  // Renames first, in place (same id), so references survive. Skipped if a
+  // global role with the new name already exists.
+  for (const [from, to] of Object.entries(GLOBAL_ROLES.renamed || {})) {
+    const r = await client.query(
+      `UPDATE roles SET name = $2
+        WHERE owner_id IS NULL AND lower(name) = lower($1)
+          AND NOT EXISTS (SELECT 1 FROM roles WHERE owner_id IS NULL AND lower(name) = lower($2))
+        RETURNING id`, [from, to]);
+    if (r.rowCount) counts.renamed.push(`${from} -> ${to}`);
+  }
   for (const r of GLOBAL_ROLES) {
     const res = await client.query(
       `INSERT INTO roles (owner_id, name, abbreviation, category, department, sort_order)
@@ -167,6 +177,7 @@ async function main() {
 
     const seed = await seedRoles(client);
     console.log(`Global roles: ${seed.inserted} inserted, ${seed.updated} updated, ${seed.unchanged} unchanged (${GLOBAL_ROLES.length} in seed list)`);
+    if (seed.renamed.length) console.log(`  Renamed in place: ${seed.renamed.join(', ')}`);
     if (seed.retired.length) console.log(`  Retired (archived) global roles no longer on the list: ${seed.retired.join(', ')}`);
 
     const after = await fingerprint(client);
