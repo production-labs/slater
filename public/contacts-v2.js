@@ -237,10 +237,14 @@
     if (window.SlaterConn) SlaterConn.changed();
   }
   // Add a change, or replace the queued one for the same form (qid).
+  // Each entry records the tab that queued it (tabs share localStorage); a tab
+  // sends its own entries and those of tabs that are gone (SlaterConn.mayTake).
+  function myTab() { return window.SlaterConn ? SlaterConn.tabId : 'local'; }
+  function mayTake(x) { return window.SlaterConn ? SlaterConn.mayTake(x.owner) : true; }
   function queuePut(ch, qid) {
     var q = queueLoad();
     var i = qid ? q.findIndex(function (x) { return x.qid === qid; }) : -1;
-    ch.qid = qid || uuid(); ch.at = Date.now();
+    ch.qid = qid || uuid(); ch.at = Date.now(); ch.owner = myTab();
     if (i >= 0) q[i] = ch; else q.push(ch);
     queueStore(q);
     return ch.qid;
@@ -250,7 +254,7 @@
   function flushQueue() {
     if (flushingQueue) return flushingQueue;
     function next() {
-      var ch = queueLoad()[0];
+      var ch = queueLoad().filter(mayTake)[0];
       if (!ch) return Promise.resolve(true);
       return sendChange(ch).then(function (res) {
         queueDrop(ch.qid);
@@ -1211,7 +1215,7 @@
   // Connection back (or a later visit): send the queue, then pull what changed
   // elsewhere. Lists and pickers redraw; an open form being edited is left alone.
   function retryAfterReconnect() {
-    var first = queueLoad().length ? flushQueue() : Promise.resolve();
+    var first = queueLoad().some(mayTake) ? flushQueue() : Promise.resolve();
     return first.then(function () {
       if (!store.loaded) return;
       // A fresh pull, not syncShared(): one already in flight may have started
@@ -1223,11 +1227,11 @@
   }
   if (window.SlaterConn) {
     SlaterConn.addSource('contacts', {
-      pending: function () { return queueLoad().length; },
+      pending: function () { return queueLoad().filter(function (x) { return x.owner === myTab(); }).length; },
       retry: retryAfterReconnect,
     });
     // Saves left waiting from an earlier visit.
-    if (queueLoad().length && SlaterConn.online) setTimeout(flushQueue, 0);
+    if (queueLoad().some(mayTake) && SlaterConn.online) setTimeout(flushQueue, 0);
   }
 
   function archive() {

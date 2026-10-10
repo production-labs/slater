@@ -4,6 +4,7 @@ var _flushing = {};        // project key -> in-flight flush promise
 var _pendingReceipts = {}; // "<key>_<index>" -> { key, i, img } (memory only: images are big)
 var _lastSentOk = {};      // project key -> savedAt of the last save THIS tab got onto the server
 var _unloading = false;    // set in beforeunload: the page is going away
+var _formSnap = {};        // project key -> gather() JSON at the last load/save in this tab
 
   
  // ── Server API client ─────────────────────────────────────────────────────────
@@ -19,7 +20,7 @@ var _unloading = false;    // set in beforeunload: the page is going away
    async getProject(key) {
      // Changes saved on this device while offline go first, so the older
      // server copy can't replace them (Session 7).
-     try { await flushProjectSave(key); } catch(e) {}
+     try { _adoptOrphans(); await flushProjectSave(key); } catch(e) {}
      try {
        const r = await fetch(this.base+'/api/projects/'+key);
        if (r.status === 401) return { _unauthenticated: true };
@@ -6272,8 +6273,36 @@ function _applyLoadedProject(key, data) {
   if (currentSheetKey !== key) return false;
   loadFormData(data);
   _formKey = key;
+  _formSnap[key] = _snapNow();
   return true;
 }
+// What the form holds right now, for "has this tab changed anything?".
+function _snapNow() {
+  try { return JSON.stringify(gather()); } catch (e) { return null; }
+}
+function _tabHasEdits(key) {
+  return _formSnap[key] == null || _snapNow() !== _formSnap[key];
+}
+// Switching back to a tab: if the project was saved elsewhere meanwhile and
+// this tab has no edits of its own, show the newer copy. Projects are saved
+// whole, so a stale tab would otherwise save its old copy back over newer
+// work on its next save.
+function _refreshIfStale() {
+  var key = currentSheetKey;
+  if (!key || _formKey !== key || _navigating || _autosaveTimer) return;
+  if (pendingSavesLoad()[key] || _tabHasEdits(key)) return;
+  API._fetchProject(key).then(function(server) {
+    if (!server || !server.data || currentSheetKey !== key || _formKey !== key || _navigating) return;
+    var sv = server.data.savedAt;
+    if (sv === _serverSavedAt[key] || sv === _lastSentOk[key]) return; // nothing new
+    if (_tabHasEdits(key) || pendingSavesLoad()[key]) return; // typing started meanwhile
+    noteServerCopy(key, server.data);
+    _navigating = true;
+    try { _applyLoadedProject(key, server.data); } finally { _navigating = false; }
+    setStatus("Updated with the latest changes from another tab or device.", "warn");
+  });
+}
+document.addEventListener("visibilitychange", function() { if (!document.hidden) _refreshIfStale(); });
 
 // localStorage fallback, only if it holds a full copy of the project. The
 // dropdown sync stores label-only stubs, and loading a stub blanks the form.
@@ -6292,13 +6321,19 @@ function autosaveTrigger() {
   }, _autosaveDelay);
 }
 
-function autosaveNow() {
+// onlyIfChanged: background saves (tab hidden, page closing) skip when this
+// tab hasn't changed anything since it loaded or last saved, so a stale tab
+// can't save its old copy over newer work from another tab or device.
+function autosaveNow(onlyIfChanged) {
   if (!currentSheetKey) return;
   if (_formKey !== currentSheetKey) {
     console.warn("Autosave skipped: " + currentSheetKey + " has not finished loading");
     return;
   }
   var data = gather();
+  var snap = JSON.stringify(data);
+  if (onlyIfChanged === true && _formSnap[currentSheetKey] != null && snap === _formSnap[currentSheetKey]) return;
+  _formSnap[currentSheetKey] = snap;
   var db = libLoad();
   if (!db[currentSheetKey]) return;
   data.label = db[currentSheetKey].label || libLabel(data);
@@ -6377,13 +6412,55 @@ var PENDING_SAVES_KEY = "slater_pending_saves";
 // _serverSavedAt / _flushing / _pendingReceipts are declared at the top of
 // this file: API.getProject (above) can reach this queue during startup.
 
+// Every tab of this browser shares localStorage, so each queued save records
+// the tab that owns it ("<project key>::<tab id>" -> entry with key + owner).
+// pendingSavesLoad() shows THIS tab's entries keyed by project key, and
+// pendingSavesStore() writes them back without touching other tabs' entries.
+// Found by John: tab B's save folded into tab A's queued offline copy.
+// A closed tab's entries are taken over by _adoptOrphans() (connection.js
+// decides which tabs are gone).
+function _tabId() { return window.SlaterConn ? SlaterConn.tabId : "local"; }
+function _pendingRaw() {
+  var raw;
+  try { raw = JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || "{}") || {}; } catch (e) { raw = {}; }
+  Object.keys(raw).forEach(function(id) { if (!raw[id].key) { raw[id].key = id; raw[id].owner = null; } }); // older format: anyone's
+  return raw;
+}
+function _pendingWriteRaw(raw) {
+  if (Object.keys(raw).length) localStorage.setItem(PENDING_SAVES_KEY, JSON.stringify(raw));
+  else localStorage.removeItem(PENDING_SAVES_KEY);
+}
 function pendingSavesLoad() {
-  try { return JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || "{}") || {}; } catch (e) { return {}; }
+  var raw = _pendingRaw(), me = _tabId(), view = {};
+  Object.keys(raw).forEach(function(id) { if (raw[id].owner === me) view[raw[id].key] = raw[id]; });
+  return view;
+}
+// Take over queued saves of tabs that are gone. If this tab already has one
+// for the same project, keep the newer copy and remember both as "ours".
+function _adoptOrphans() {
+  var raw = _pendingRaw(), me = _tabId(), changed = false;
+  Object.keys(raw).forEach(function(id) {
+    var e = raw[id];
+    if (e.owner === me || !(window.SlaterConn ? SlaterConn.mayTake(e.owner) : true)) return;
+    var mineId = Object.keys(raw).filter(function(j) { return raw[j].owner === me && raw[j].key === e.key; })[0];
+    if (!mineId) { e.owner = me; delete raw[id]; raw[e.key + "::" + me] = e; }
+    else {
+      var m = raw[mineId], newer = (e.data.savedAt > m.data.savedAt) ? e : m;
+      var ours = (m.ours || []).concat(e.ours || [], [m.data.savedAt, e.data.savedAt]).filter(function(v, i, a) { return v != null && a.indexOf(v) === i; }).slice(-50);
+      raw[mineId] = Object.assign({}, newer, { owner: me, key: e.key, base: m.base, conflict: null, ours: ours });
+      delete raw[id];
+    }
+    changed = true;
+  });
+  if (changed) { try { _pendingWriteRaw(raw); } catch (e) {} if (window.SlaterConn) SlaterConn.changed(); }
+  return changed;
 }
 function pendingSavesStore(p) {
   try {
-    if (Object.keys(p).length) localStorage.setItem(PENDING_SAVES_KEY, JSON.stringify(p));
-    else localStorage.removeItem(PENDING_SAVES_KEY);
+    var raw = _pendingRaw(), me = _tabId();
+    Object.keys(raw).forEach(function(id) { if (raw[id].owner === me) delete raw[id]; });
+    Object.keys(p).forEach(function(key) { raw[key + "::" + me] = Object.assign({}, p[key], { key: key, owner: me }); });
+    _pendingWriteRaw(raw);
   } catch (e) {
     console.warn("Could not keep an offline copy:", e);
     setStatus("This device is out of storage, so offline changes can't be kept. Reconnect before closing Slater.", "err");
@@ -6495,6 +6572,7 @@ function flushProjectSave(key, force) {
   return _flushing[key];
 }
 function flushAllPendingSaves() {
+  _adoptOrphans();
   var keys = Object.keys(pendingSavesLoad());
   var chain = keys.reduce(function(c, k) { return c.then(function() { return flushProjectSave(k); }); }, Promise.resolve());
   return chain.then(function() {
@@ -8909,7 +8987,7 @@ function _safeUnloadAutosave() {
     console.warn("Unload autosave skipped: talent cards present but all empty (possible load corruption)");
     return;
   }
-  autosaveNow();
+  autosaveNow(true);
 }
 document.addEventListener("visibilitychange", function() {
   if (document.hidden && currentSheetKey) _safeUnloadAutosave();

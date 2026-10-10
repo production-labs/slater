@@ -62,7 +62,8 @@ async function openProject(p) {
   await sleep(300);
 }
 const barText = p => p.evaluate(() => { const b = document.getElementById('conn-bar'); return b && b.classList.contains('show') ? b.textContent : ''; });
-const pending = p => p.evaluate(() => JSON.parse(localStorage.getItem('slater_pending_saves') || '{}'));
+// Queued project saves by project key (entries are stored per tab: "<key>::<tab>").
+const pending = p => p.evaluate(() => { const raw = JSON.parse(localStorage.getItem('slater_pending_saves') || '{}'); const o = {}; Object.keys(raw).forEach(id => { o[raw[id].key || id] = raw[id]; }); return o; });
 async function setTitle(p, t) {
   await p.evaluate(t => { const e = document.getElementById('project_title'); e.value = t; e.dispatchEvent(new Event('input', { bubbles: true })); autosaveNow(); }, t);
 }
@@ -212,6 +213,48 @@ async function main() {
     assert(await page.$eval('#project_title', e => e.value) === 'Theirs 2', 'form shows the other version');
     assert(await title() === 'Theirs 2', 'server keeps the other version');
     assert(Object.keys(await pending(page)).length === 0, 'queue empty');
+  });
+
+  await step('two real tabs: "Use my version", then reloading the other tab keeps mine', async () => {
+    const b = await newPage(false);
+    await openProject(b);
+    await page.setOfflineMode(true);
+    await until(async () => /You're offline/.test(await barText(page)), 'offline bar in tab A');
+    await setTitle(page, 'Mine (tab A)');
+    await setTitle(b, 'Theirs (tab B)');
+    await until(async () => await title() === 'Theirs (tab B)', 'tab B saved');
+    await page.setOfflineMode(false);
+    await until(async () => /changed on another device/.test(await barText(page)), 'conflict question in tab A');
+    const reloaded = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
+    await clickBarButton(page, 'Use my version');
+    await until(async () => await title() === 'Mine (tab A)', 'mine saved');
+    await reloaded;
+    await page.waitForFunction(k => typeof _formKey !== 'undefined' && _formKey === k, { timeout: 10000 }, KEY).catch(e => { throw new Error('tab A reload: ' + e.message); });
+    // The bug John found: reloading the stale tab B saved "Theirs" back over it.
+    await b.reload({ waitUntil: 'networkidle2' });
+    await b.waitForFunction(k => typeof _formKey !== 'undefined' && _formKey === k, { timeout: 10000 }, KEY).catch(async e => { throw new Error('tab B reload: ' + e.message + ' ' + JSON.stringify(await b.evaluate(() => ({ fk: _formKey, ck: currentSheetKey, nav: _navigating })))); });
+    await sleep(800);
+    assert(await title() === 'Mine (tab A)', 'stale tab B saved over it: ' + await title());
+    assert(await b.$eval('#project_title', e => e.value) === 'Mine (tab A)', 'tab B shows mine after reload');
+    global.__tabB = b;
+  });
+
+  await step('a stale tab with no edits never saves over newer work when hidden', async () => {
+    const b = global.__tabB;
+    await setTitle(page, 'Newer from A');
+    await until(async () => await title() === 'Newer from A', 'A saved');
+    await b.evaluate(() => _safeUnloadAutosave()); // what hiding/closing tab B does
+    await sleep(1000);
+    assert(await title() === 'Newer from A', 'hidden stale tab saved over it: ' + await title());
+  });
+
+  await step('switching back to a stale tab shows the newer copy', async () => {
+    const b = global.__tabB;
+    assert(await b.$eval('#project_title', e => e.value) !== 'Newer from A', 'tab B should be stale before switching back');
+    await b.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await until(() => b.$eval('#project_title', e => e.value === 'Newer from A'), 'tab B refreshed');
+    assert(await title() === 'Newer from A', 'server unchanged');
+    await b.close({ runBeforeUnload: false });
   });
 
   await step('server error while online: "Some changes aren\'t saved yet" + Try again', async () => {

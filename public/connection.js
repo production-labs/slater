@@ -27,6 +27,54 @@
   'use strict';
 
   var origFetch = window.fetch.bind(window);
+
+  // Tab identity. Queued saves live in localStorage, which every tab of this
+  // browser shares, so each queued save records the tab that owns it; a tab
+  // only touches its own. Each tab checks in every 5s; a queued save whose
+  // tab hasn't checked in for 20s (closed, crashed) is ORPHANED and the next
+  // tab to look adopts and sends it. sessionStorage keeps the id across a
+  // reload of the same tab, so a reloaded tab still owns its saves.
+  var TAB_ID = (function () {
+    try {
+      var id = sessionStorage.getItem('slater_tab_id');
+      if (!id) { id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); sessionStorage.setItem('slater_tab_id', id); }
+      return id;
+    } catch (e) { return 't' + Math.random().toString(36).slice(2); }
+  })();
+  var BEATS_KEY = 'slater_tab_beats', STALE_MS = 20000;
+  function beats() { try { return JSON.parse(localStorage.getItem(BEATS_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  // Chrome's "Duplicate tab" copies sessionStorage, id included. A live tab
+  // already checking in with this id (a reload removes its own check-in on
+  // the way out) means this is a copy: take a new id.
+  (function () {
+    var t = beats()[TAB_ID];
+    if (t && Date.now() - t < STALE_MS) {
+      TAB_ID = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      try { sessionStorage.setItem('slater_tab_id', TAB_ID); } catch (e) { /* ignore */ }
+    }
+  })();
+  function beat() {
+    try {
+      var b = beats(), now = Date.now();
+      b[TAB_ID] = now;
+      Object.keys(b).forEach(function (k) { if (now - b[k] > 24 * 3600 * 1000) delete b[k]; });
+      localStorage.setItem(BEATS_KEY, JSON.stringify(b));
+    } catch (e) { /* storage full: orphan adoption just takes longer */ }
+  }
+  beat();
+  setInterval(beat, 5000);
+  // A tab that really goes away gives up its claim at once (a reload keeps
+  // its id and claims it again on load).
+  window.addEventListener('pagehide', function () {
+    try { var b = beats(); delete b[TAB_ID]; localStorage.setItem(BEATS_KEY, JSON.stringify(b)); } catch (e) { /* ignore */ }
+  });
+  // True when a queued save tagged with `owner` belongs to this tab or to no
+  // live tab (so this tab may send it).
+  function mayTake(owner) {
+    if (!owner || owner === TAB_ID) return true;
+    var t = beats()[owner];
+    return !t || Date.now() - t > STALE_MS;
+  }
   var state = { online: navigator.onLine !== false, loggedOut: false, saving: false };
   var sources = {};
   var notices = {}; // id -> { html, actions: [{ label, fn }] }
@@ -241,6 +289,8 @@
 
   window.SlaterConn = {
     get online() { return state.online; },
+    tabId: TAB_ID,
+    mayTake: mayTake,
     isOfflineError: isOfflineError,
     addSource: function (name, s) { sources[name] = s; render(); },
     changed: function () { render(); },
