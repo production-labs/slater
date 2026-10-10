@@ -1,4 +1,5 @@
-// Built-in global roles (roles.owner_id = NULL). List revised by John 2026-10-03.
+// Built-in global roles (roles.owner_id = NULL). List revised by John 2026-10-03;
+// ASL Interpreter added 2026-10-10 (81 roles: 14 staff / 56 crew / 11 talent).
 // Source of truth for the seed. Re-running the migration updates existing
 // global roles to match this list (matched by lowercased name), inserts
 // missing ones, and ARCHIVES global roles that are no longer on the list
@@ -81,6 +82,7 @@ const CREW_DEPARTMENTS = [
     ['Location Manager', null],
     ['Hair and Makeup Artist', 'HMU'],
     ['Captioner', 'CART'],
+    ['ASL Interpreter', 'ASL'], // added 2026-10-10 (John: industry standard)
     ['Craft Services', 'Crafty'],
     ['Driver', null],
   ]],

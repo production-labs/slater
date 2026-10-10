@@ -17,7 +17,7 @@ Executive Producer (EP), Producer, Senior Producer (Sr. Producer), Line Producer
 - **Audio (5):** A1 (Audio Engineer) (A1), A2 (Audio Assistant) (A2), Sound Mixer, Boom Operator, RF Technician
 - **Live and Broadcast (10):** Technical Director (TD), Broadcast Engineer, Video Engineer / Shader (V1), Graphics Operator (GFX), Streaming Engineer, Playback Operator, Teleprompter Operator (Prompter), Stage Manager (SM), LED / Screens Technician, Virtual Event Producer
 - **Art and Wardrobe (5):** Production Designer, Art Director, Set Dresser, Prop Master, Wardrobe Stylist
-- **Production Support (8):** 2nd Assistant Director (2nd AD), Script Supervisor, Production Assistant (PA), Location Manager, Hair and Makeup Artist (HMU), Captioner (CART), Craft Services (Crafty), Driver
+- **Production Support (9):** 2nd Assistant Director (2nd AD), Script Supervisor, Production Assistant (PA), Location Manager, Hair and Makeup Artist (HMU), Captioner (CART), ASL Interpreter (ASL, added 2026-10-10), Craft Services (Crafty), Driver
 - **Post (11):** Editor, Assistant Editor (AE), Motion Graphics Artist, Animator, Colorist, VFX Artist, Audio Post Mixer, Sound Designer, Dialogue Editor, ADR Mixer, Composer
 
 ## Talent (11)

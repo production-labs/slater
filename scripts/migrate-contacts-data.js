@@ -58,7 +58,9 @@ const BLANK_HOSPITALS = true;
 // industry-standard job under another name. Company-specific labels (Content,
 // Stream Tech, V-Cam Op, Mng. Producer, ...) are dropped and reported; John
 // re-adds those as custom roles himself. Not aliased on purpose: Graphic
-// Designer (a different job from Motion Graphics Artist), ASL interpreters.
+// Designer (a different job from Motion Graphics Artist). ASL 1/2 and
+// "A1 - Agency Contact" added 2026-10-10 (John: industry standard; ASL
+// Interpreter was added to the built-in list for it).
 const ALIASES = {
   'prod': 'Producer',
   'camera': 'Camera Operator',
@@ -66,6 +68,9 @@ const ALIASES = {
   'audio': 'Sound Mixer',
   'virtual event prod.': 'Virtual Event Producer',
   'motion designer': 'Motion Graphics Artist',
+  'asl 1': 'ASL Interpreter',
+  'asl 2': 'ASL Interpreter',
+  'a1 - agency contact': 'A1 (Audio Engineer)',
 };
 
 if (!process.env.DATABASE_URL) { console.error('DATABASE_URL is not set.'); process.exit(2); }
