@@ -3,7 +3,6 @@
 // agencies into the v2 tables and link their projects.
 //
 //   node scripts/migrate-contacts-data.js [--dry-run] [--allow-remote]
-//        [--merge-identical] [--blank-hospitals] [--proposed-aliases]
 //
 // Prerequisite: the v2 schema (scripts/migrate-data-model.js).
 //
@@ -29,14 +28,14 @@
 //     users.default_organization_id. Companies -> organizations; a company
 //     with an agency's name merges into it (agency values win). Project
 //     client text matching no org -> ONE new org per distinct value.
-//   - People: one contact per old entry (--merge-identical: entries with the
-//     same name + phone + email and no conflicting address/title become one
-//     contact with all their roles). Staff/crew role text -> built-in role by
+//   - People: one contact per old entry, EXCEPT identical copies (same name
+//     + phone + email, no conflicting address/talent title) become ONE
+//     contact with all their roles (John, 2026-10-10). Staff/crew role text -> built-in role by
 //     name, abbreviation or ALIAS; no match = dropped + reported (no custom
 //     roles are created). Talent title -> contacts.title; role = talent role
 //     with that exact name, else Interview Subject.
-//   - Locations: old phone/email appended to notes; hospital copied
-//     (--blank-hospitals: left empty, the app looks it up on first use).
+//   - Locations: old phone/email appended to notes; old hospital NOT copied
+//     (John, 2026-10-10): left empty so the fixed lookup fills it on first use.
 //   - Projects (same rules as public/project-people-v2.js linkLegacy):
 //     card -> contact by unique exact name (active contacts), contact_ack =
 //     that contact's updated_at; role by name/abbreviation (+ alias), card's
@@ -49,25 +48,25 @@ const Regions = require('../public/regions');
 const args = new Set(process.argv.slice(2));
 const DRY_RUN = args.has('--dry-run');
 const ALLOW_REMOTE = args.has('--allow-remote');
-const MERGE_IDENTICAL = args.has('--merge-identical');
-const BLANK_HOSPITALS = args.has('--blank-hospitals');
-const PROPOSED_ALIASES = args.has('--proposed-aliases');
+// Decided by John 2026-10-10 (were rehearsal switches).
+const MERGE_IDENTICAL = true;
+const BLANK_HOSPITALS = true;
 
 // Old free text (lowercased, spaces collapsed) -> built-in role name.
 // Only used when the text doesn't already match a role name/abbreviation.
+// Rule (John, 2026-10-10): an alias only where the old text is the SAME
+// industry-standard job under another name. Company-specific labels (Content,
+// Stream Tech, V-Cam Op, Mng. Producer, ...) are dropped and reported; John
+// re-adds those as custom roles himself. Not aliased on purpose: Graphic
+// Designer (a different job from Motion Graphics Artist), ASL interpreters.
 const ALIASES = {
   'prod': 'Producer',
   'camera': 'Camera Operator',
   'sound': 'Sound Mixer',
   'audio': 'Sound Mixer',
-};
-// Pending John's OK (Session 6 rehearsal). Enabled by --proposed-aliases.
-const PROPOSED = {
   'virtual event prod.': 'Virtual Event Producer',
-  'graphic designer': 'Motion Graphics Artist',
   'motion designer': 'Motion Graphics Artist',
 };
-if (PROPOSED_ALIASES) Object.assign(ALIASES, PROPOSED);
 
 if (!process.env.DATABASE_URL) { console.error('DATABASE_URL is not set.'); process.exit(2); }
 const target = new URL(process.env.DATABASE_URL);
@@ -228,7 +227,7 @@ async function migrateUser(c, user, report) {
       if (hasData(e, PERSON_FIELDS)) entries.push({ bucket: b, i, e, ref: `${b}.${i}` });
     });
   }
-  // Groups: one per entry, or identical copies together (--merge-identical).
+  // Groups: one per entry, or identical copies together (see MERGE_IDENTICAL).
   const groups = [];
   for (const en of entries) {
     const g = MERGE_IDENTICAL && groups.find(gr => {
