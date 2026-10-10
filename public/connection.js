@@ -283,13 +283,16 @@
   }
 
   // Leaving the page with changes that aren't on the server: browser warning.
+  var leaving = false; // set by allowLeave(): logging out on purpose
   window.addEventListener('beforeunload', function (e) {
+    if (leaving) return;
     if (pendingCount() > 0 || heldNotices()) { e.preventDefault(); e.returnValue = ''; return ''; }
   });
 
   window.SlaterConn = {
     get online() { return state.online; },
     tabId: TAB_ID,
+    allowLeave: function () { leaving = true; },
     mayTake: mayTake,
     isOfflineError: isOfflineError,
     addSource: function (name, s) { sources[name] = s; render(); },

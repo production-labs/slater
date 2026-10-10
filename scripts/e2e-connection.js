@@ -297,6 +297,37 @@ async function main() {
     assert(Object.keys(await pending(page)).length === 0, 'queue empty');
   });
 
+  await step('logging out in ANOTHER tab: this tab still tries its save, says "logged out", keeps the change', async () => {
+    const b = await newPage(false);
+    await b.waitForFunction(() => typeof logout === 'function');
+    await Promise.all([b.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}), b.evaluate(() => logout())]);
+    assert(/login/.test(b.url()), 'tab B went to the login page: ' + b.url());
+    await setTitle(page, 'After logout elsewhere');
+    await until(async () => /logged out/.test(await barText(page)), 'logged-out panel in tab A (John: no message at all)');
+    assert((await pending(page))[KEY], 'change kept in the queue');
+    const st = await page.evaluate(async (e, pw) => (await fetch('/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e, password: pw }) })).status, EMAIL, PASS);
+    assert(st === 200, 'relogin ' + st);
+    await until(async () => await title() === 'After logout elsewhere', 'sent after logging back in', 20000);
+    await b.close({ runBeforeUnload: false });
+  });
+
+  await step('logging out with changes not yet sent asks first', async () => {
+    await page.setOfflineMode(true);
+    await until(async () => /You're offline/.test(await barText(page)), 'offline bar');
+    await setTitle(page, 'Unsent at logout');
+    await until(async () => (await pending(page))[KEY], 'queued');
+    await page.evaluate(() => logout());
+    await page.waitForSelector('#modal-overlay.open', { visible: true, timeout: 5000 });
+    const msg = await page.$eval('#modal-msg', e => e.textContent);
+    assert(/haven't reached Slater yet/.test(msg), 'warning text: ' + msg);
+    // "Stay logged in"
+    await page.evaluate(() => document.querySelector('.modal-btns .lb:first-child').click());
+    assert(/localhost:\d+\/\?/.test(page.url()) || !/login/.test(page.url()), 'still in the app');
+    assert((await pending(page))[KEY], 'change still kept');
+    await page.setOfflineMode(false);
+    await until(async () => await title() === 'Unsent at logout', 'sent once back online');
+  });
+
   console.log('\nContacts');
   const nContacts = async name => (await db.query(`SELECT COUNT(*)::int n FROM contacts WHERE owner_id=$1 AND name=$2`, [userId, name])).rows[0].n;
   const queue = () => page.evaluate(() => JSON.parse(localStorage.getItem('slater_pending_contacts') || '[]'));

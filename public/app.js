@@ -6335,8 +6335,10 @@ function autosaveNow(onlyIfChanged) {
   if (onlyIfChanged === true && _formSnap[currentSheetKey] != null && snap === _formSnap[currentSheetKey]) return;
   _formSnap[currentSheetKey] = snap;
   var db = libLoad();
-  if (!db[currentSheetKey]) return;
-  data.label = db[currentSheetKey].label || libLabel(data);
+  // Not "return if the project isn't in this browser's list": logging out in
+  // another tab wipes that list, and this tab then dropped every edit silently
+  // (found by John, Session 7 test 5). The save goes out and the server decides.
+  data.label = (db[currentSheetKey] && db[currentSheetKey].label) || libLabel(data);
   data.savedAt = Date.now();
   var ne = document.getElementById("note-editor");
   data._note_draft = ne ? ne.innerHTML : "";
@@ -8845,6 +8847,25 @@ API.getMe().then(function(data) {
 }).catch(function() {});
 
 function logout() {
+  // Logging out clears Slater's data from this browser (right for a shared
+  // computer), including saves that haven't reached the server yet, from ANY
+  // tab. Ask first instead of losing them silently.
+  var raw = {}, cq = [];
+  try { raw = JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || "{}") || {}; } catch (e) {}
+  try { cq = JSON.parse(localStorage.getItem("slater_pending_contacts") || "[]") || []; } catch (e) {}
+  var n = Object.keys(raw).length + cq.length + Object.keys(_pendingReceipts).length;
+  if (n && !logout._confirmed) {
+    modalConfirm("Unsaved changes",
+      "You have " + n + (n === 1 ? " change" : " changes") + " that haven't reached Slater yet (made while offline or logged out). " +
+      "Logging out now deletes " + (n === 1 ? "it" : "them") + " from this device. Reconnect or log in again first to keep " + (n === 1 ? "it" : "them") + ".",
+      function() { logout._confirmed = true; logout(); }, "Log out anyway", null, "Stay logged in");
+    return;
+  }
+  // Leaving on purpose: no last-second save, no leave-page warning.
+  clearTimeout(_autosaveTimer);
+  currentSheetKey = null;
+  _pendingReceipts = {};
+  if (window.SlaterConn) SlaterConn.allowLeave();
   var keysToRemove = [];
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
