@@ -282,6 +282,29 @@ async function main() {
     await until(() => page.evaluate(() => Object.keys(_pendingReceipts).length === 0), 'nothing left');
   });
 
+  await step('receipt attached offline is READ when back online (vendor/date/amount filled, typed fields kept)', async () => {
+    // Stand-in for the receipt reader: no real (paid) API call.
+    let ocrCalls = 0;
+    await page.setRequestInterception(true);
+    const h = r => {
+      if (r.url().includes('/api/ocr')) { ocrCalls++; return r.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ vendor: 'Test Cafe', date: '2026-10-01', amount: 12.5, category: '' }) }); }
+      r.continue();
+    };
+    page.on('request', h);
+    await page.setOfflineMode(true);
+    await until(async () => /You're offline/.test(await barText(page)), 'offline bar');
+    const img = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEUVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const id = await page.evaluate(i => { addExpense({}); const cid = expenses[expenses.length - 1]; document.getElementById(cid + '_amount').value = '99.00'; setReceiptThumb(cid, i); ocrReceipt(cid, i); return cid; }, img);
+    assert(/back online/.test(await page.$eval('#' + id + '_vendor', e => e.placeholder)), 'vendor placeholder says it will be read later');
+    assert(ocrCalls === 0, 'no read attempted while offline');
+    await page.setOfflineMode(false);
+    await until(() => page.$eval('#' + id + '_vendor', e => e.value === 'Test Cafe'), 'vendor filled after reconnect');
+    assert(await page.$eval('#' + id + '_amount', e => e.value) === '99.00', 'typed amount not overwritten');
+    assert(ocrCalls === 1, 'read once: ' + ocrCalls);
+    page.off('request', h);
+    await page.setRequestInterception(false);
+  });
+
   await step('logged out mid-edit: says so, keeps the change, sends it after logging back in', async () => {
     await db.query(`DELETE FROM sessions WHERE sess::text LIKE $1`, ['%"userId":' + userId + ',%']);
     await setTitle(page, 'While logged out');

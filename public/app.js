@@ -6825,9 +6825,30 @@ function handleReceiptUpload(id, input) {
   reader.readAsDataURL(file);
 }
 
+// Receipts attached while offline can't be read yet: remembered here (this
+// tab's memory; images are too big for localStorage) and read when the
+// connection is back, if the card still has that same photo (Session 7).
+var _pendingOcr = {}; // expense card id -> image data
+function retryPendingOcr() {
+  var ids = Object.keys(_pendingOcr);
+  ids.forEach(function(id) {
+    var img = _pendingOcr[id];
+    delete _pendingOcr[id];
+    var hidden = document.getElementById(id+"_receipt_data");
+    if (hidden && hidden.value === img) ocrReceipt(id, img); // photo unchanged, card still there
+  });
+  return Promise.resolve();
+}
+if (window.SlaterConn) SlaterConn.addSource("receipt-reading", { pending: function() { return 0; }, retry: retryPendingOcr });
+
 function ocrReceipt(id, imageData) {
   // Show scanning indicator
   var vendorEl = document.getElementById(id+"_vendor");
+  if (window.SlaterConn && !SlaterConn.online) {
+    _pendingOcr[id] = imageData;
+    if (vendorEl) vendorEl.placeholder = "Will read this receipt when you're back online";
+    return;
+  }
   if (vendorEl) { vendorEl.placeholder = "Scanning receipt..."; }
 
   fetch('/api/ocr', {
@@ -6849,10 +6870,18 @@ function ocrReceipt(id, imageData) {
     if (catEl     && data.category)                      catEl.value     = data.category;
     if (vendorEl) vendorEl.placeholder = "Vendor / description";
     updateExpTotals();
+    // Filled in by code, so no input event fires: save it.
+    if (typeof autosaveTrigger === "function") autosaveTrigger();
   })
   .catch(function(err) {
-    console.warn("OCR error:", err);
     var vendorEl = document.getElementById(id+"_vendor");
+    // Couldn't reach the server (dropped mid-request): read it when back.
+    if (window.SlaterConn && (!SlaterConn.online || SlaterConn.isOfflineError(err))) {
+      _pendingOcr[id] = imageData;
+      if (vendorEl) vendorEl.placeholder = "Will read this receipt when you're back online";
+      return;
+    }
+    console.warn("OCR error:", err);
     if (vendorEl) vendorEl.placeholder = "Vendor / description";
   });
 }
