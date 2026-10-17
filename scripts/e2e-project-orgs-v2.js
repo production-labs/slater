@@ -51,7 +51,7 @@ async function main() {
   otherId = (await db.query(`INSERT INTO users (email, password_hash, name) VALUES ($1,$2,'PO2 Other') RETURNING id`, [OTHER, hash])).rows[0].id;
   const foreignOrg = (await db.query(`INSERT INTO organizations (owner_id, name, is_agency) VALUES ($1,'Not Yours Inc',true) RETURNING id`, [otherId])).rows[0].id;
 
-  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT) }), stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: 'test' }) /* per-browser ?contacts= toggle */, stdio: ['ignore', 'pipe', 'pipe'] });
   let serverLog = ''; server.stdout.on('data', d => serverLog += d); server.stderr.on('data', d => serverLog += d);
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch (_) {} await sleep(250); }
 

@@ -4,7 +4,7 @@
 
 This is the procedure agreed in John's answers #11 (SESSION_STATUS.md): a short maintenance window, a fresh backup, the migration, the verification, a smoke test, and only then turning off the old way of saving contacts.
 
-Written 2026-10-10 (Session 6). The switch (steps 1, 10, 11.5) was built in Session 8, 2026-10-17.
+Written 2026-10-10 (Session 6). The switch (steps 1, 10, 11.5) was built in Session 8, 2026-10-17. Last full rehearsal (step 6 on the 2026-10-17 nightly backup, Session 9): all three checks passed.
 
 ## Before the day
 
@@ -12,10 +12,21 @@ These can be done any time before the window. None of them change production dat
 
 ### 1. Everything is merged and deployed
 
-- Sessions 7 and 8 are finished, tested, and merged from `data-model-rewrite` to `main`, and Railway has deployed `main`.
+- Sessions 7, 8 and 9 are finished, tested, and merged from `data-model-rewrite` to `main`, and Railway has deployed `main`.
 - The new behavior is behind a switch: the variable `CONTACTS_V2_CUTOVER` on the `slater` service in Railway. **Don't add it yet.** Not set (or `off`) = Slater behaves exactly as today, and `?contacts=v2` in the address bar does nothing. `on` = everyone gets the new Contacts screens, old contacts and agency saving is refused, and the old "contacts come back" merge code no longer runs. (`test` is for your Mac only: it keeps the per-browser `?contacts=v2` / `?contacts=v1` toggle. Never use it on Railway.) This is what lets the code be deployed before the window: merging doesn't switch anyone over by itself.
 - After Railway deploys the merge, reload any Slater tab that was open from before it (or just close them all). Tabs from before the merge don't know about the switch.
 - Production still runs fine with the switch off and the new tables not created yet (Sessions 2 to 5 were built to allow this). Open a project and generate a call sheet to be sure.
+
+The merge itself (any day before the window; it changes nothing users see):
+
+```
+cd ~/Sites/slater
+git checkout main && git pull
+git merge --no-ff data-model-rewrite
+git push                      # Railway deploys main in 2-3 minutes
+```
+
+Then in Railway > `slater` > Deployments > the new one > Logs, look for `Contacts cutover switch: off`. Log in, open a real project, generate its call sheet. Checked in advance (Session 9, 2026-10-17): every call sheet, workback and expense report for all 19 production projects is identical between the code that was live on `main` and this branch with the switch off.
 
 ### 2. Tools on your Mac
 
@@ -24,7 +35,7 @@ cd ~/Sites/slater
 git checkout main && git pull
 npm install
 /opt/homebrew/opt/postgresql@18/bin/psql --version     # must print 18.x
-railway status                                          # must show the Slater project
+railway status                                          # must show Project: striking-eagerness, Environment: production
 npm i --prefix /tmp/cv2-e2e puppeteer-core              # for the document comparison
 ```
 
@@ -38,7 +49,9 @@ If `railway run` complains about the database proxy, see step 4b of `docs/RESTOR
 railway run --service Postgres --environment production -- sh -c 'DATABASE_URL="$DATABASE_PUBLIC_URL" node scripts/migrate-data-model.js --allow-remote --dry-run'
 ```
 
-This one only tests the schema. The data migration can't be dry-run on production until the schema exists, so its dry run happens in the window (step 7).
+This one only tests the schema. The data migration can't be dry-run on production until the schema exists, so its dry run happens in the window (step 7). While it runs (a few seconds) a save from an open Slater tab waits for it, then goes through.
+
+It must end with `Verification passed. DRY RUN: rolled back, nothing was changed.` Done 2026-10-17 (Session 9): passed, 81 built-in roles, existing data unchanged (2 users, 19 projects, 5 agencies, 9 receipts, 10 licenses).
 
 Every script prints its `Target:` first. **It must be the Railway proxy host (`...proxy.rlwy.net`), not `localhost`.** If it says localhost, stop: the variable didn't come through and you are looking at your own Mac.
 
@@ -54,11 +67,17 @@ Close every Slater tab on every device (laptop, phone, iPad). Make sure nobody e
 
 Not last night's nightly: one taken now (answers #11, step 1).
 
+**Save it outside `~/Sites/slater`.** It's a full copy of everyone's data; inside the project folder, the usual `git add -A` would put it on GitHub.
+
+Run it from `~/Sites/slater` (`railway` only knows the project there); the file goes to `~/Slater-backups`:
+
 ```
-railway run --service Postgres --environment production -- sh -c '/opt/homebrew/opt/postgresql@18/bin/pg_dump "$DATABASE_PUBLIC_URL" --no-owner --no-privileges -f pre-cutover-$(date -u +%Y%m%d-%H%M%S).sql'
+mkdir -p ~/Slater-backups
+railway run --service Postgres --environment production -- sh -c '/opt/homebrew/opt/postgresql@18/bin/pg_dump "$DATABASE_PUBLIC_URL" --no-owner --no-privileges -f ~/Slater-backups/pre-cutover-$(date -u +%Y%m%d-%H%M%S).sql'
+ls -l ~/Slater-backups/     # note the file name; it should be a few MB (2026-10-17: about 3.7 MB), not tiny
 ```
 
-Keep this file somewhere safe for at least a month. It is the undo for everything below.
+Keep this file for at least a month. It is the undo for everything below.
 
 ### 6. Rehearse on that exact backup (local, about 10 minutes)
 
@@ -66,7 +85,7 @@ The same scripts against a copy of the backup on your Mac, plus a before/after c
 
 ```
 PG=/opt/homebrew/opt/postgresql@18/bin
-F=pre-cutover-XXXXXXXX-XXXXXX.sql            # the file from step 5
+F=~/Slater-backups/pre-cutover-XXXXXXXX-XXXXXX.sql   # the file from step 5
 $PG/initdb -D /tmp/slater-scratch -U postgres --auth=trust
 $PG/pg_ctl -D /tmp/slater-scratch -o "-p 5433 -k /tmp" -l /tmp/slater-scratch.log start
 $PG/createdb -h /tmp -p 5433 -U postgres scratch
@@ -81,12 +100,14 @@ DATABASE_URL=$S NODE_PATH=/tmp/cv2-e2e/node_modules node scripts/doc-snapshot.js
 diff -r /tmp/slater-doc-snapshots/cutover-before /tmp/slater-doc-snapshots/cutover-after && echo DOCS IDENTICAL
 ```
 
+The restore prints a few small `set_config` / `setval` tables. That's normal; an error would say `ERROR` and stop.
+
 Go on only if:
 - the migration ends with `Verification passed. Committed.`
 - the verification ends with `VERIFICATION PASSED for every user.`
 - the documents print `DOCS IDENTICAL`.
 
-Read the migration report while you're here. It lists the merged duplicates, the aliases used, and the roles that were dropped (people keep their contact, just without that role). On the 2026-10-10 rehearsal those were Content, Stream Tech, V-Cam Op, Mng. Producer and Graphic Designer. Those are the custom roles to re-add in step 11.
+Read the migration report while you're here (save it: add `> ~/Slater-backups/migration-report.txt` to the `migrate-contacts-data.js` line, then open that file). It lists the merged duplicates, the aliases used, and the roles that were dropped (people keep their contact, just without that role). On the 2026-10-17 rehearsal those were Content, Stream Tech, V-Cam Op / V Cam Op, MNG PRD / Mng. Producer, Graphic Designer, Producer / TD and MP Prod (plus "Client Services" on one key personnel card). Those are the custom roles to re-add in step 12.
 
 If anything fails, stop. Nothing has touched production. Keep the output and fix it on the branch first.
 
@@ -123,11 +144,11 @@ railway run --service Postgres --environment production -- sh -c 'DATABASE_URL="
 
 Read only. Must end with `VERIFICATION PASSED for every user.` Do not continue until it does.
 
-### 9. Restart the app
+### 9. Open the test tab for step 11.5
 
-Railway > `slater` service > restart (or redeploy the current deployment).
+Log in on your laptop and open a **test** project (not a real one) in one tab. Leave it open. It's on the old screens (the switch is still off); step 11.5 uses it to check that a tab left open across the switch can't save the old way. This is the only Slater tab open until step 11.
 
-**Required.** The server checks once, at startup, whether the new project columns exist, and remembers the answer. A server that started before step 7a keeps acting as if they don't exist until it restarts.
+(The app restart that the new tables need happens by itself in step 10: changing a Railway variable redeploys. The server checks for the new tables and project columns once, at startup.)
 
 ### 10. Flip the switch
 
@@ -145,16 +166,18 @@ If it instead says `CONTACTS_V2_CUTOVER=on, BUT THE NEW TABLES ARE NOT IN THIS D
 
 Log in on your laptop.
 
-1. **Contacts:** the new screen opens with no `?contacts=v2` in the address bar. People, Organizations, Locations and Roles all have your data. On the 2026-10-10 data: 34 people, 7 organizations, 8 locations for John.
+Use a **new** tab (not the step 9 one, which is for item 5).
+
+1. **Contacts:** the new screen opens with no `?contacts=v2` in the address bar. People, Organizations, Locations and Roles all have your data. On the 2026-10-17 data: 35 people, 10 organizations, 8 locations for John (the step 7b report has today's numbers).
 2. **Smith Tower hospital:** Contacts > Locations > "Worktank HQ - Smith Tower" > **Look up**. The old saved hospital (Swedish Medical Center Ballard) was wrong and was deliberately not carried over. Expect Harborview. Each project's Smith Tower days pick it up the next time that project is opened and saved.
 3. **A real active project:** open it. Crew, talent and key personnel cards show "Linked". The agency and client are filled in. Schedule days show their locations.
 4. **Documents:** generate the call sheet, workback and expense report for that project. They should look exactly as before (step 6 already proved the text is identical).
-5. **Old saving is refused:** a tab that was open before the switch still shows the old screens until it reloads, and the server refuses its saves. To check: before step 10, leave one tab open on a test project (not a real one). After step 10, type in that tab's project title. Within about 10 seconds a red panel at the bottom says **"Slater has been updated. Reload this page to keep working."** Click **Reload**. The tab comes back on the new screens and the title you typed is saved (open the project in another tab to confirm). Old contacts and agency saves from such a tab are refused the same way. Automated version: `scripts/e2e-cutover.js`.
+5. **Old saving is refused:** a tab that was open before the switch still shows the old screens until it reloads, and the server refuses its saves. To check: go to the step 9 tab and type in its project title. Within about 10 seconds a red panel at the bottom says **"Slater has been updated. Reload this page to keep working."** Click **Reload**. The tab comes back on the new screens and the title you typed is saved (open the project in another tab to confirm). Old contacts and agency saves from such a tab are refused the same way. Automated version: `scripts/e2e-cutover.js`.
 6. **Phone:** log in on your phone and open Contacts and the same project.
 
 ### 12. After the window
 
-- Re-add your company-specific roles as custom roles: Contacts > Roles > + New. From the rehearsal: Content, Stream Tech, V-Cam Op, Managing Producer (Kiko Toledo's MNG PRD), and Graphic Designer if you want it. Then give them back to the people listed in the migration report.
+- Re-add your company-specific roles as custom roles: Contacts > Roles > + New. From the 2026-10-17 rehearsal: Content, Stream Tech, V-Cam Op, Managing Producer (Kiko Toledo's MNG PRD), Producer / TD (Michael Ganyo), MP Prod (Alex Altebef), and Graphic Designer (Michelle Poole) if you want it. Then give them back to the people listed in the migration report ("Contacts whose old role didn't match"). Jen's account has the same kind of list.
 - If you turned on the database proxy for this (`docs/RESTORE.md` 4b), remove it.
 - Note the date. **Nothing old is dropped for at least a week** (answers #11, step 7): `users.contacts`, the `agencies` table, `projects.agency_id`, `data.agency_id`, `data.client_company` and `data.client` all stay. Dropping them is its own later task, with its own backup first.
 - The bookkeeping columns (`contacts.legacy_bucket`, `organizations.legacy_agency_id` / `legacy_source`) and the `mig:` values in `client_uid` stay until then too. The verification script needs them.

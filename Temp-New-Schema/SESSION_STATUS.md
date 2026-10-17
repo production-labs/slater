@@ -4,7 +4,18 @@ Last updated: 2026-10-10
 
 ## Where we are
 
-**PICK UP HERE (2026-10-17):** Session 8 BUILT (Opus). Session 8 DONE: John's hands-on test ALL 5 CHECKS PASSED 2026-10-17 (off ignores ?contacts=v2; stale-tab flip off -> on: red panel, Reload, title kept; on: new Contacts/Agencies without the URL flag, call sheet OK; flip back off: same reload flow to old screens; back to test mode). NEXT: Session 9 (buffer + runbook polish), then merge to main with the Railway variable unset. See "Session 8" below. Next after John's test: Session 9 (buffer + runbook polish), then merge to main with the switch unset (= off).
+**PICK UP HERE (2026-10-17, later):** Session 9 DONE (see below). NEXT: John's OK to MERGE to main (commands in docs/CUTOVER.md step 1; switch stays unset = off), then pick the cutover window.
+
+### Session 9, 2026-10-17 (Opus): buffer + runbook polish
+- Production schema DRY RUN (John OK'd): `migrate-data-model.js --allow-remote --dry-run` against crossover.proxy.rlwy.net passed, rolled back; read-only check after: 0 new tables in prod. Prod today: 2 users, 19 projects, 5 agencies, 9 receipts, 10 licenses. The prod TCP proxy already exists (no need for RESTORE.md 4b).
+- Full step 6 rehearsal on the 2026-10-17 nightly (`slater-2026-10-17-090446.sql.gz`, 2,495,737 bytes, in /tmp/slater-backup-dl): restore clean; migration `Verification passed. Committed.`; verify PASSED for every user; docs IDENTICAL for 19 projects (after = switch ON). John: 43 old entries -> 35 contacts (7 merged), 10 orgs (new from client text: "Port of Tacoma / NWSA"), 8 locations; people linked 96/97 (Kendra Hubbell unlinked, kp), roles 78/115. NEW dropped labels since 10-10: "Producer / TD" (Michael Ganyo), "MP Prod" (Alex Altebef), kp "Client Services": dropped per John's rule, added to the step 12 re-add list. Jen: 19 -> 18.
+- Merge check: docs for all 19 prod projects from origin/main code vs this branch with switch off on an UNmigrated copy: IDENTICAL.
+- FIXED doc-snapshot.js: hung since Session 7 (blocked writes -> unsaved-changes prompt on reload in headless Chrome); now accepts the prompt + clears the blocked-save queue per project; sets CONTACTS_V2_CUTOVER itself (v1 = off, v2 = on) and checks the page got that mode; tolerates pre-switch code (main) for v1.
+- Browser tests now set CONTACTS_V2_CUTOVER=test themselves (no dependence on local .env).
+- Runbook fixes (docs/CUTOVER.md): backup saved to ~/Slater-backups (NOT in the repo: `git add -A` would push everyone's data to GitHub) + .gitignore for dump names; railway only works from ~/Sites/slater (checked); railway status shows "striking-eagerness"; step 3 expected output + today's numbers; step 6 note on setval output, save the report, updated dropped-role list; step 9 rewritten: the restart happens via step 10's redeploy, and step 9 now opens the test tab for 11.5 (old text conflicted with step 4 "close everything"); step 11 counts for 10-17 data; step 12 re-add list updated; merge commands + deploy-log check in step 1.
+- Scratch server on port 5433 torn down at end of session.
+
+**Earlier (2026-10-17):** Session 8 DONE: John's hands-on test ALL 5 CHECKS PASSED 2026-10-17 (off ignores ?contacts=v2; stale-tab flip off -> on: red panel, Reload, title kept; on: new Contacts/Agencies without the URL flag, call sheet OK; flip back off: same reload flow to old screens; back to test mode). NEXT: Session 9 (buffer + runbook polish), then merge to main with the Railway variable unset. See "Session 8" below. Next after John's test: Session 9 (buffer + runbook polish), then merge to main with the switch unset (= off).
 
 ### Session 8, 2026-10-17 (Opus): the cutover switch
 

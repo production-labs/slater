@@ -52,7 +52,12 @@ async function main() {
     userId: user.id, userEmail: user.email, userName: user.name,
   }, expires]);
 
-  const server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT) }), stdio: 'ignore' });
+  // The cutover switch decides which screens the page uses (routes/cutover.js):
+  // v1 = off, v2 = on, exactly as production will run before / after cutover.
+  // (`on` needs the new tables; the server falls back to off without them,
+  // which the check below catches.)
+  const MODE = flag === 'v2' ? 'on' : 'off';
+  const server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: MODE }), stdio: 'ignore' });
   let browser;
   try {
     for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch (_) {} await sleep(250); }
@@ -61,6 +66,9 @@ async function main() {
     await page.setViewport({ width: 1400, height: 900 });
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
+    // Writes are blocked below, so Slater keeps them as "not saved yet" and
+    // asks before the page reloads (Session 7). Leave without asking.
+    page.on('dialog', d => d.accept().catch(() => {}));
     await page.setRequestInterception(true);
     let blocked = 0;
     page.on('request', r => {
@@ -72,10 +80,17 @@ async function main() {
     fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
     const cdp = await page.createCDPSession();
     await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DL });
-    await page.goto(BASE + '/?contacts=' + flag, { waitUntil: 'networkidle2' });
+    await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
+    const mode = await page.evaluate(() => window.SLATER_CONTACTS_MODE);
+    // undefined = code from before the switch existed (e.g. main before the merge): old screens only.
+    if (mode !== MODE && !(mode === undefined && MODE === 'off')) throw new Error('server is running the switch as "' + mode + '", wanted "' + MODE + '" (v2 needs the new tables: run the migration first)');
 
     for (const key of keys) {
-      await page.evaluate(k => localStorage.setItem('slater_last_project', k), key);
+      await page.evaluate(k => {
+        localStorage.setItem('slater_last_project', k);
+        localStorage.removeItem('slater_pending_saves'); // blocked saves: never sent, never reloaded from
+        if (window.SlaterConn) SlaterConn.allowLeave();
+      }, key);
       await page.reload({ waitUntil: 'networkidle2' });
       await page.waitForFunction((k, f) => currentSheetKey === k && (f === 'v1' || (window.ContactsV2 && ContactsV2.store.loaded)), { timeout: 15000 }, key, flag)
         .catch(() => { throw new Error('project did not open: ' + key); });

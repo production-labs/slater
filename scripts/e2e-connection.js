@@ -80,7 +80,7 @@ async function main() {
     crew: [], talent: [], kp_cards: [], schedule_days: [{ date_iso: '2026-12-01', label: 'Day 1' }],
   }), userId]);
 
-  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT) }), stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: 'test' }) /* per-browser ?contacts= toggle */, stdio: ['ignore', 'pipe', 'pipe'] });
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch (_) {} await sleep(250); }
   browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-first-run'] });
   page = await browser.newPage();
