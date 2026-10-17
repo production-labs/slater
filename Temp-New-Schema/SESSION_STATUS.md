@@ -4,7 +4,7 @@ Last updated: 2026-10-10
 
 ## Where we are
 
-**PICK UP HERE (2026-10-17):** Session 8 BUILT (Opus). John's hands-on test: stale-tab flip (off -> on under an open tab, red panel, Reload, title kept) PASSED 2026-10-17; other checks (off ignores ?contacts=v2, on screens + call sheet, flip back off) to confirm. See "Session 8" below. Next after John's test: Session 9 (buffer + runbook polish), then merge to main with the switch unset (= off).
+**PICK UP HERE (2026-10-17):** Session 8 BUILT (Opus). Session 8 DONE: John's hands-on test ALL 5 CHECKS PASSED 2026-10-17 (off ignores ?contacts=v2; stale-tab flip off -> on: red panel, Reload, title kept; on: new Contacts/Agencies without the URL flag, call sheet OK; flip back off: same reload flow to old screens; back to test mode). NEXT: Session 9 (buffer + runbook polish), then merge to main with the Railway variable unset. See "Session 8" below. Next after John's test: Session 9 (buffer + runbook polish), then merge to main with the switch unset (= off).
 
 ### Session 8, 2026-10-17 (Opus): the cutover switch
 
