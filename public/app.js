@@ -1,3 +1,16 @@
+// Save-queue state (Session 7; the queue itself is next to autosaveNow).
+var _serverSavedAt = {};   // project key -> data.savedAt of the last server copy seen
+var _flushing = {};        // project key -> in-flight flush promise
+var _pendingReceipts = {}; // "<key>_<index>" -> { key, i, img } (memory only: images are big)
+var _lastSentOk = {};      // project key -> savedAt of the last save THIS tab got onto the server
+var _unloading = false;    // set in beforeunload: the page is going away
+var _formSnap = {};        // project key -> gather() JSON at the last load/save in this tab
+var _mySavedAts = {};      // project key -> every savedAt THIS tab produced (newest last, max 50)
+function _noteMine(key, t) {
+  var a = _mySavedAts[key] || (_mySavedAts[key] = []);
+  if (t != null && a.indexOf(t) < 0) { a.push(t); if (a.length > 50) a.shift(); }
+}
+
   
  // ── Server API client ─────────────────────────────────────────────────────────
  const API = {
@@ -10,12 +23,27 @@
      } catch(e) { return null; }
    },
    async getProject(key) {
+     // Changes saved on this device while offline go first, so the older
+     // server copy can't replace them (Session 7).
+     try { _adoptOrphans(); await flushProjectSave(key); } catch(e) {}
      try {
        const r = await fetch(this.base+'/api/projects/'+key);
        if (r.status === 401) return { _unauthenticated: true };
        if (!r.ok) return null;
-       return await r.json();
+       const j = await r.json();
+       if (j && j.data) noteServerCopy(key, j.data);
+       return j;
      } catch(e) { return null; }
+   },
+   // Raw read for the save queue: the project JSON, null if the server has no
+   // such project, undefined if the server couldn't be reached or refused.
+   async _fetchProject(key) {
+     try {
+       const r = await fetch(this.base+'/api/projects/'+key, { cache: 'no-store' });
+       if (r.status === 404) return null;
+       if (!r.ok) return undefined;
+       return await r.json();
+     } catch(e) { return undefined; }
    },
    async saveProject(key, label, data) {
      try {
@@ -376,9 +404,157 @@ function lookupHospForDay(dayId, addr) {
   }).catch(function() {});
 }
 
+// ── Nearest hospital for a location record (Session 5 follow-up) ─────────────
+// {address, city, state, zip, country} -> "Name\nStreet\nCity, ST zip".
+// Rejects with an Error whose message can be shown to the user.
+// Why not geocode(): a free-text search silently returns the wrong place for
+// spelled-out streets ("122 Fifth Avenue, New York" landed in New Rochelle,
+// "506 Second Avenue, Seattle" in Ballard). This uses a structured search,
+// "Fifth" -> "5th", and only accepts a result whose zip (or city) matches;
+// otherwise it falls back to the zip code's center, which is close enough to
+// find the nearest ER. Overpass is often busy, so it tries mirrors.
+var _ORDINALS = ["first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth","eleventh","twelfth","thirteenth","fourteenth","fifteenth","sixteenth","seventeenth","eighteenth","nineteenth","twentieth"];
+function _ordinalDigits(s) {
+  return s.replace(new RegExp("\\b(" + _ORDINALS.join("|") + ")\\b", "gi"), function(m) {
+    var n = _ORDINALS.indexOf(m.toLowerCase()) + 1;
+    return n + ((n % 100 >= 11 && n % 100 <= 13) ? "th" : (["th","st","nd","rd"][n % 10] || "th"));
+  });
+}
+var _locateCache = {};
+var _nominatimQueue = Promise.resolve();
+function _nominatim(params) {
+  // Nominatim allows about one request per second.
+  var run = _nominatimQueue.then(function() {
+    var u = new URL("https://nominatim.openstreetmap.org/search");
+    Object.keys(params).forEach(function(k) { if (params[k]) u.searchParams.set(k, params[k]); });
+    u.searchParams.set("format", "json"); u.searchParams.set("limit", "1"); u.searchParams.set("addressdetails", "1");
+    return fetch(u.toString(), {headers:{"Accept-Language":"en"}}).then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { return d[0] || null; });
+  });
+  _nominatimQueue = run.catch(function() {}).then(function() { return new Promise(function(r) { setTimeout(r, 1100); }); });
+  return run;
+}
+async function locateAddress(loc) {
+  var street = String(loc.address || "")
+    .replace(/,?\s*(suite|ste\.?|floor|fl\.?|apt\.?|apartment|unit|#)\s*[\w-]*/gi, "")
+    .split(",")[0].trim();   // "506 Second Ave, Seattle, WA 98104" typed all in one line
+  street = _ordinalDigits(street);
+  var city = (loc.city || "").trim(), state = (loc.state || "").trim(), zip = (loc.zip || "").trim();
+  var cc = (loc.country || "").toLowerCase() || undefined;
+  var ck = [street, city, state, zip, cc].join("|").toLowerCase();
+  if (_locateCache[ck]) return _locateCache[ck];
+  // A street alone matches streets in every state ("1116 N Cedar Street"
+  // landed in Colorado Springs), so a city or zip is required, and every
+  // result must agree with the state (and the zip or city) that was entered.
+  if (!zip && !city) throw new Error("Add a city and state, or a zip, first.");
+  function stateOk(r) {
+    if (!state) return true;
+    var a = r.address || {}, st = state.toLowerCase();
+    var iso = String(a["ISO3166-2-lvl4"] || "").toLowerCase();       // "us-wa"
+    if (iso && iso.split("-").pop() === st) return true;
+    return !!a.state && a.state.toLowerCase() === st;                // non-US: full name
+  }
+  function matches(r) {
+    if (!r || !stateOk(r)) return false;
+    var a = r.address || {};
+    if (zip && a.postcode) return a.postcode.slice(0, 5).toLowerCase() === zip.slice(0, 5).toLowerCase();
+    var c = (a.city || a.town || a.village || a.hamlet || "").toLowerCase();
+    return !!city && c === city.toLowerCase();
+  }
+  var r = null, approx = false;
+  if (street) {
+    r = await _nominatim({street:street, city:city, state:state, postalcode:zip, countrycodes:cc});
+    if (!matches(r)) r = await _nominatim({q:[street, city, state, zip].filter(Boolean).join(", "), countrycodes:cc});
+    if (!matches(r)) r = null;
+  }
+  if (!r && zip) { r = await _nominatim({postalcode:zip, countrycodes:cc}); if (r && !stateOk(r)) r = null; approx = !!street; }
+  if (!r && city) { r = await _nominatim({city:city, state:state, countrycodes:cc}); if (r && !stateOk(r)) r = null; approx = true; }
+  if (!r) throw new Error("Couldn't find that address on the map.");
+  var out = {lat: parseFloat(r.lat), lng: parseFloat(r.lon), approx: approx};
+  _locateCache[ck] = out;
+  return out;
+}
+var _OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
+async function nearestHospitalAt(lat, lng) {
+  var radii = [15000, 40000], reached = false;
+  for (var i = 0; i < radii.length; i++) {
+    var q = "[out:json][timeout:20];nwr[\"amenity\"=\"hospital\"](around:" + radii[i] + "," + lat + "," + lng + ");out center tags;";
+    var data = null;
+    // Every server busy: wait a few seconds and go round once more.
+    for (var j = 0; j < _OVERPASS.length * 2 && !data; j++) {
+      if (j === _OVERPASS.length) await new Promise(function(r) { setTimeout(r, 4000); });
+      try {
+        var ctl = new AbortController(); var tm = setTimeout(function() { ctl.abort(); }, 20000);
+        var res = await fetch(_OVERPASS[j % _OVERPASS.length], {method:"POST", body:"data=" + encodeURIComponent(q), headers:{"Content-Type":"application/x-www-form-urlencoded"}, signal:ctl.signal});
+        clearTimeout(tm);
+        if (res.ok) data = await res.json();
+      } catch (e) {}
+    }
+    if (!data) continue;
+    reached = true;
+    var kmLng = 111 * Math.cos(lat * Math.PI / 180);
+    var list = (data.elements || []).filter(function(el) { return el.tags && el.tags.name && el.tags.emergency !== "no"; })
+      .map(function(el) {
+        var la = el.lat != null ? el.lat : el.center && el.center.lat, ln = el.lon != null ? el.lon : el.center && el.center.lon;
+        return {tags: el.tags, er: el.tags.emergency === "yes", km: Math.sqrt(Math.pow((la - lat) * 111, 2) + Math.pow((ln - lng) * kmLng, 2))};
+      }).sort(function(a, b) { return a.km - b.km; });
+    if (!list.length) continue;
+    // Nearest hospital with an emergency room; else the nearest hospital.
+    var tg = (list.filter(function(h) { return h.er; })[0] || list[0]).tags;
+    var st2 = [tg["addr:housenumber"], tg["addr:street"]].filter(Boolean).join(" ");
+    var ci = tg["addr:city"] || "", st3 = tg["addr:state"] || tg["addr:province"] || "", po = tg["addr:postcode"] || "";
+    return [tg.name, st2, ([ci, st3].filter(Boolean).join(", ") + (po ? " " + po : "")).trim()].filter(Boolean).join("\n");
+  }
+  throw new Error(reached ? "No hospital found within 40 km." : "The hospital lookup service is busy. Try again in a minute.");
+}
+async function findNearestHospital(loc) {
+  var at = await locateAddress(loc);
+  return nearestHospitalAt(at.lat, at.lng);
+}
+
 function getLocByName(name) {
   if (!name) return null;
+  if (window.ProjectPeopleV2) return ProjectPeopleV2.locationByName(name);
   return (loadContacts().locations || []).find(function(l) { return l.name === name; }) || null;
+}
+
+// Data model rewrite (Session 5): with the v2 flag, schedule days pick from
+// the v2 Locations and save location_id plus the name (loc_id / loc_name, as
+// before). Flag off: the old contacts blob, matched by name.
+function scheduleLocations() {
+  if (window.ProjectPeopleV2) return ProjectPeopleV2.locations();
+  var list = (loadContacts().locations || []).filter(function(l) { return !!l.name; });
+  list.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  return list;
+}
+function getDayLoc(dayId) {
+  var inp = document.getElementById(dayId+"_loc_id");
+  if (window.ProjectPeopleV2) {
+    var idEl = document.getElementById(dayId+"_location_id");
+    return ProjectPeopleV2.location(idEl ? idEl.value : "", inp ? inp.value : "");
+  }
+  return inp && inp.value ? getLocByName(inp.value) : null;
+}
+function dayLocAddress(loc) {
+  return loc ? [loc.address, loc.city, [loc.state, loc.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") : "";
+}
+// Redraw a day's location name + address after the v2 store loads or a
+// location changes in Contacts (no lookups, no autosave).
+function refreshDayLocDisplay(dayId) {
+  var inp = document.getElementById(dayId+"_loc_id");
+  if (!inp) return;
+  var loc = getDayLoc(dayId);
+  if (loc && document.activeElement !== inp && inp.value !== loc.name) inp.value = loc.name;
+  var infoDiv = document.getElementById(dayId+"_loc_info");
+  var addr = dayLocAddress(loc);
+  if (infoDiv) { infoDiv.textContent = addr; infoDiv.style.display = addr ? "block" : "none"; }
+  var hospWrapEl = document.getElementById(dayId+"_hospital_wrap");
+  if (hospWrapEl && loc) hospWrapEl.style.display = [loc.address, loc.city, loc.state].filter(Boolean).length ? "" : "none";
+  // v2: the day shows (and saves) the linked location's hospital.
+  var hospEl = document.getElementById(dayId+"_hospital");
+  if (hospEl && loc && loc.hospital && window.ProjectPeopleV2) {
+    var h = parseHospitalText(loc.hospital);
+    if (hospEl.textContent !== h) { hospEl.textContent = h; hospEl.style.display = "block"; }
+  }
 }
 
 function doLookup() {
@@ -386,9 +562,7 @@ function doLookup() {
   scheduleDays.forEach(function(dayId) {
     var iso = (document.getElementById(dayId+"_date_iso")||{}).value||"";
     if (!iso) return;
-    var inp = document.getElementById(dayId+"_loc_id");
-    if (!inp || !inp.value) return;
-    var loc = getLocByName(inp.value);
+    var loc = getDayLoc(dayId);
     if (!loc || !loc.address) return;
     var addr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
     if (!addr) return;
@@ -663,7 +837,7 @@ function addCrew(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, crew));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at"><input type="hidden" id="${id}_contact_id"><input type="hidden" id="${id}_role_id"><input type="hidden" id="${id}_contact_ack">`;
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -672,14 +846,15 @@ function addCrew(afterId=null) {
   updateCrewStatusBar();
   updateDeclinedSection("crew");
   scheduleDays.forEach(function(d) { updateDayCrewBadge(d); });
-  setTimeout(() => acAttachCrew(id), 0);
+  // v2 picker attaches now: a late attach would move the field while typing.
+  if (window.ProjectPeopleV2) acAttachCrew(id); else setTimeout(() => acAttachCrew(id), 0);
 }
 function addTalent(afterId=null) {
   const id = "talent_"+(++_uid);
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at">`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at"><input type="hidden" id="${id}_contact_id"><input type="hidden" id="${id}_role_id"><input type="hidden" id="${id}_contact_ack">`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -688,7 +863,8 @@ function addTalent(afterId=null) {
   updateTalentStatusBar();
   updateDeclinedSection("talent");
   scheduleDays.forEach(function(d) { updateDayTalentBadge(d); });
-  setTimeout(() => acAttachTalent(id), 0);
+  // v2 picker attaches now: a late attach would move the field while typing.
+  if (window.ProjectPeopleV2) acAttachTalent(id); else setTimeout(() => acAttachTalent(id), 0);
 }
 function ri(id, arr) { const i = arr.indexOf(id); if (i > -1) arr.splice(i,1); document.getElementById(id).remove(); }
 function confirmRemoveCrew(id) {
@@ -712,7 +888,8 @@ function addKP(cardData) {
   cardData = cardData || {};
   var id = "kp_"+(++_uid);
   var d = document.createElement("div"); d.className="card"; d.id=id;
-  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role">'+icon('pencil','pencil-icon')+'</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" onchange="updateCrewStatusPill(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>';
+  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role">'+icon('pencil','pencil-icon')+'</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" onchange="updateCrewStatusPill(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>'+
+    '<input type="hidden" id="'+id+'_contact_id"><input type="hidden" id="'+id+'_role_id"><input type="hidden" id="'+id+'_contact_ack">';
   kp.push(id);
   document.getElementById("kp-list").appendChild(d);
   var sv = function(eid, val) { var e=document.getElementById(eid); if(e && val!==undefined) e.value=val||""; };
@@ -721,6 +898,7 @@ function addKP(cardData) {
   sv(id+"_phone", cardData.phone||"");
   sv(id+"_email", cardData.email||"");
   sv(id+"_status", cardData.status||"tbd");
+  setCardLinkFields(id, cardData);
   updateCrewStatusPill(id, cardData.status||"tbd");
   (function(cardId) {
     document.getElementById(cardId+"_del").onclick = function() {
@@ -735,7 +913,8 @@ function addKP(cardData) {
     };
   })(id);
   updateAddKPButton();
-  setTimeout(() => acAttachKP(id), 0);
+  // v2 picker attaches now: a late attach would move the field while typing.
+  if (window.ProjectPeopleV2) acAttachKP(id); else setTimeout(() => acAttachKP(id), 0);
 }
 
 function getDefaultKP() {
@@ -1185,11 +1364,11 @@ function addScheduleDay(data, insertAfterDayId) {
   const locRow = document.createElement("div"); locRow.className = "sday-loc-row";
   const locLbl = document.createElement("label"); locLbl.textContent = "Location";
 
-  // Sort locations alphabetically
-  var _contactLocs = (loadContacts().locations || []).filter(function(l) { return !!l.name; });
-  _contactLocs.sort(function(a, b) { return a.name.localeCompare(b.name); });
-  var _locByName = {};
-  _contactLocs.forEach(function(l) { _locByName[l.name] = l; });
+  // Locations are read fresh each time (the v2 store can load after the card).
+  // locIdInp holds the v2 location id (empty with the flag off).
+  const locIdInp = document.createElement("input"); locIdInp.type = "hidden";
+  locIdInp.id = dayId+"_location_id";
+  locIdInp.value = data.location_id ? String(data.location_id) : "";
 
   // Helper: update address display + hospital visibility when a location is selected/cleared
   function _applyLocSelection(loc) {
@@ -1213,8 +1392,14 @@ function addScheduleDay(data, insertAfterDayId) {
       hospEl.textContent = parsedHosp;
       hospEl.style.display = parsedHosp ? "block" : "none";
     }
-    var locAddr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
-    if (locAddr) lookupHospForDay(dayId, locAddr);
+    // The location's own hospital wins; never overwrite it with a lookup.
+    // v2: a location with no hospital is looked up once and saved back to
+    // the location in Contacts (project-people-v2.js).
+    if (!loc.hospital) {
+      var locAddr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
+      if (window.ProjectPeopleV2 && loc.id) ProjectPeopleV2.fillLocationHospital(loc);
+      else if (locAddr) lookupHospForDay(dayId, locAddr);
+    }
     var notesEl = document.getElementById(dayId+"_loc_notes");
     if (notesEl && !notesEl.value && loc.notes) notesEl.value = loc.notes;
     checkShowBlacks(dayId);
@@ -1236,7 +1421,7 @@ function addScheduleDay(data, insertAfterDayId) {
 
   function _buildLocList(query) {
     locList.innerHTML = "";
-    var filtered = _contactLocs.filter(function(l) {
+    var filtered = scheduleLocations().filter(function(l) {
       return !query || l.name.toLowerCase().indexOf(query.toLowerCase()) !== -1;
     });
     if (!filtered.length) { locList.classList.remove("open"); return; }
@@ -1246,6 +1431,7 @@ function addScheduleDay(data, insertAfterDayId) {
       item.addEventListener("mousedown", function(e) {
         e.preventDefault();
         locInp.value = loc.name;
+        locIdInp.value = loc.id != null && window.ProjectPeopleV2 ? String(loc.id) : "";
         locList.classList.remove("open");
         _applyLocSelection(loc);
       });
@@ -1255,16 +1441,21 @@ function addScheduleDay(data, insertAfterDayId) {
   }
 
   locInp.addEventListener("focus", function() { _buildLocList(""); });
-  locInp.addEventListener("input", function() { _buildLocList(locInp.value); });
+  locInp.addEventListener("input", function() { locIdInp.value = ""; _buildLocList(locInp.value); });
   locInp.addEventListener("blur", function() {
     setTimeout(function() { locList.classList.remove("open"); }, 150);
-    if (locInp.value && !_locByName[locInp.value]) {
+    var typed = locInp.value ? getLocByName(locInp.value) : null;
+    if (locInp.value && !typed) {
       locInp.value = "";
+      locIdInp.value = "";
       _applyLocSelection(null);
+    } else if (typed && !locIdInp.value && window.ProjectPeopleV2) {
+      locIdInp.value = String(typed.id);
     }
   });
 
   locWrap.appendChild(locInp);
+  locWrap.appendChild(locIdInp);
   locWrap.appendChild(locList);
 
   const addLocBtn = document.createElement("button");
@@ -1272,7 +1463,26 @@ function addScheduleDay(data, insertAfterDayId) {
   addLocBtn.title = "Manage locations";
   addLocBtn.textContent = "+";
   addLocBtn.style.cssText = "padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:16px;font-family:inherit;cursor:pointer;color:var(--film-can);line-height:1;flex-shrink:0";
-  addLocBtn.onclick = function() { contactsTab = "locations"; openContacts(); };
+  // Keep focus in the field so its blur doesn't clear a typed new name.
+  addLocBtn.addEventListener("mousedown", function(e) { e.preventDefault(); });
+  addLocBtn.onclick = function() {
+    var typed = locInp.value.trim();
+    if (window.ProjectPeopleV2 && window.ContactsV2) {
+      locList.classList.remove("open");
+      // v2: a typed name that isn't a location yet opens a new location with
+      // that name; once it's created, this day links to it.
+      var known = typed ? getLocByName(typed) : null;
+      ContactsV2.open("locations", typed && !known ? { newLocation: { name: typed }, onCreated: function(row) {
+        if (!document.getElementById(dayId+"_loc_id")) return; // day was removed meanwhile
+        locInp.value = row.name;
+        locIdInp.value = String(row.id);
+        _applyLocSelection(row);
+        if (typeof autosaveTrigger === "function") autosaveTrigger();
+      } } : undefined);
+      return;
+    }
+    contactsTab = "locations"; openContacts();
+  };
 
   const locSelRow = document.createElement("div"); locSelRow.className = "sday-loc-sel-row";
   locSelRow.appendChild(addLocBtn); locSelRow.appendChild(locWrap);
@@ -1285,17 +1495,18 @@ function addScheduleDay(data, insertAfterDayId) {
   body.appendChild(locInfoDiv);
 
   // Show address if a location is already selected on load
+  function _initLoc() {
+    if (window.ProjectPeopleV2) return ProjectPeopleV2.location(locIdInp.value, locInp.value);
+    return locInp.value ? getLocByName(locInp.value) : null;
+  }
   (function() {
-    var initLoc = _locByName[locInp.value];
-    if (initLoc) {
-      var addrParts = [initLoc.address, initLoc.city, [initLoc.state, initLoc.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-      if (addrParts) { locInfoDiv.textContent = addrParts; locInfoDiv.style.display = "block"; }
-    }
+    var addrParts = dayLocAddress(_initLoc());
+    if (addrParts) { locInfoDiv.textContent = addrParts; locInfoDiv.style.display = "block"; }
   })();
 
   // Hospital field — hidden when selected location has no address
   var _initLocHasAddr = (function() {
-    var l = _locByName[locInp.value];
+    var l = _initLoc();
     return l ? !![l.address, l.city, l.state].filter(Boolean).length : true;
   })();
   const hospWrap = document.createElement("div"); hospWrap.className = "fl"; hospWrap.id = dayId+"_hospital_wrap";
@@ -1790,6 +2001,7 @@ function getScheduleDays() {
       sunset:       v(dayId+"_sunset"),
       loc_id:       (document.getElementById(dayId+"_loc_id")||{}).value||"",
       loc_name:     (document.getElementById(dayId+"_loc_id")||{}).value||"",
+      location_id:  Number((document.getElementById(dayId+"_location_id")||{}).value) || undefined,
       hospital:     (document.getElementById(dayId+"_hospital")||{}).textContent||"",
       loc_notes:    v(dayId+"_loc_notes"),
       show_blacks:       (document.getElementById(dayId+"_show_blacks")||{}).checked||false,
@@ -3198,8 +3410,12 @@ function saveContactsData(data) {
   API.saveContacts(data);
 }
 
-// Merge contacts from a saved call sheet object
+// Merge contacts from a saved call sheet object.
+// Old Contacts only. With the new Contacts screens on (cutover switch), this
+// never runs: name-keyed copying is what brought deleted/renamed contacts
+// back (bug 3), and the server refuses old contacts saves anyway.
 function mergeContactsFromSheet(data) {
+  if (orgsV2On()) return;
   const db = loadContacts();
   if (!db.staff)     db.staff     = [];
   if (!db.crew)      db.crew      = [];
@@ -3304,6 +3520,7 @@ function acAttach(nameEl, getPhoneEl, getEmailEl, bucket) {
 
 // Attach autocomplete to all relevant fields
 function acAttachKP(id) {
+  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
   const nameEl = document.getElementById(id+"_name");
   acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "staff");
 }
@@ -3319,17 +3536,41 @@ function acAttachAll() {
 }
 
 function acAttachCrew(id) {
+  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
   const nameEl = document.getElementById(id+"_name");
   acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "crew");
 }
 function acAttachTalent(id) {
+  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
   const nameEl = document.getElementById(id+"_name");
   acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "talent");
+}
+
+// Data model rewrite (Session 5): crew / talent / key personnel cards can be
+// linked to a v2 contact and role. The ids live in hidden fields on the card
+// so they survive drag-reorder and save with the project, flag on or off.
+// contact_ack = the contact's updated_at the card last agreed with (picked,
+// updated, or dismissed); see project-people-v2.js.
+function cardLinkFields(id) {
+  var out = {};
+  var c = v(id+"_contact_id"), r = v(id+"_role_id"), a = v(id+"_contact_ack");
+  if (c) out.contact_id = Number(c);
+  if (r) out.role_id = Number(r);
+  if (c && a) out.contact_ack = a;
+  return out;
+}
+function setCardLinkFields(id, d) {
+  d = d || {};
+  [["_contact_id", d.contact_id], ["_role_id", d.role_id], ["_contact_ack", d.contact_ack]].forEach(function(p) {
+    var e = document.getElementById(id+p[0]); if (e) e.value = p[1] == null ? "" : String(p[1]);
+  });
 }
 
 // Contacts modal
 let contactsCurrent = null;
 function openContacts() {
+  // Data model rewrite: new Contacts screen, opt-in per browser (?contacts=v2) until cutover.
+  if (window.ContactsV2 && ContactsV2.enabled()) return ContactsV2.open();
   function renderContacts(data) {
     contactsCurrent = JSON.parse(JSON.stringify(data));
     if (!contactsCurrent.staff)     contactsCurrent.staff     = [];
@@ -4548,18 +4789,63 @@ function crewConfigSave(configs) {
   localStorage.setItem(CREW_CFG_KEY, JSON.stringify(configs));
 }
 
+// A config is a list of crew slots in on-screen order. "roles" (position
+// text) is the original format and is always written, so older copies of the
+// app can still load it. "items" adds the linked role id and, when saved with
+// crew, the assigned person (name/phone/email + contact link). Status, notes
+// and contacted time are never saved: recalled crew always start at TBD.
 function saveCrewConfig() {
-  var roles = crew.map(function(id) {
-    var pos = document.getElementById(id + '_position');
-    return pos ? pos.value.trim() : '';
-  }).filter(function(r) { return r; });
-  if (!roles.length) { setStatus("No roles to save. Add some crew members with positions first.", "err"); return; }
-  var name = prompt("Config name:");
-  if (!name || !name.trim()) return;
-  var configs = crewConfigLoad();
-  configs.push({ id: "cc_" + Date.now(), name: name.trim(), roles: roles });
-  crewConfigSave(configs);
-  setStatus("Crew config saved.", "ok");
+  var slots = crew.map(function(id) {
+    var link = cardLinkFields(id);
+    return {
+      position: v(id+"_position"), role_id: link.role_id || null,
+      name: v(id+"_name"), phone: v(id+"_phone"), email: v(id+"_email"),
+      contact_id: link.contact_id || null, contact_ack: link.contact_ack || null,
+      declined: v(id+"_status") === "declined",
+    };
+  });
+  var roleSlots = slots.filter(function(c) { return c.position; });
+  var crewSlots = slots.filter(function(c) { return c.position || (c.name && !c.declined); });
+  if (!crewSlots.length) { setStatus("No crew to save. Add some crew members first.", "err"); return; }
+  var people = crewSlots.filter(function(c) { return c.name && !c.declined; }).length;
+
+  var msg = document.getElementById("modal-msg");
+  document.getElementById("modal-title").textContent = "Save crew config";
+  msg.innerHTML = '<div class="fl" style="margin:4px 0 12px"><label>Config name</label><input type="text" id="cc-save-name" autocomplete="off"></div>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;cursor:pointer"><input type="radio" name="cc-save-mode" value="roles" checked style="margin-top:3px"><span><strong style="color:var(--text-primary)">Roles only</strong><br><span style="font-size:12px;color:var(--text-muted)">' + roleSlots.length + ' role' + (roleSlots.length === 1 ? '' : 's') + ', no names</span></span></label>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer' + (people ? '' : ';opacity:.5') + '"><input type="radio" name="cc-save-mode" value="crew"' + (people ? '' : ' disabled') + ' style="margin-top:3px"><span><strong style="color:var(--text-primary)">Roles and assigned crew</strong><br><span style="font-size:12px;color:var(--text-muted)">' + (people ? people + ' ' + (people === 1 ? 'person' : 'people') + '. Status is not saved; everyone comes back as TBD.' : 'No one is assigned yet.') + (slots.some(function(c) { return c.declined && c.name; }) ? ' Declined crew are saved as open roles.' : '') + '</span></span></label>';
+  var okBtn = document.getElementById("modal-ok");
+  var cancelBtn = document.querySelector(".modal-btns .lb:first-child");
+  okBtn.textContent = "Save";
+  if (cancelBtn) { cancelBtn.textContent = "Cancel"; cancelBtn.onclick = function() { modalCancel(); }; }
+  modalCallback = null;
+  okBtn.onclick = function() {
+    var name = (document.getElementById("cc-save-name").value || "").trim();
+    if (!name) { document.getElementById("cc-save-name").focus(); return; }
+    var withCrew = (document.querySelector('input[name="cc-save-mode"]:checked') || {}).value === "crew";
+    var list = withCrew ? crewSlots : roleSlots;
+    if (!list.length) { setStatus("No roles to save. Add some crew members with positions first.", "err"); return; }
+    var items = list.map(function(c) {
+      var it = { position: c.position };
+      if (c.role_id) it.role_id = c.role_id;
+      if (withCrew && c.name && !c.declined) {
+        it.name = c.name; it.phone = c.phone; it.email = c.email;
+        if (c.contact_id) { it.contact_id = c.contact_id; if (c.contact_ack) it.contact_ack = c.contact_ack; }
+      }
+      return it;
+    });
+    modalCancel();
+    var configs = crewConfigLoad();
+    configs.push({ id: "cc_" + Date.now(), name: name, with_crew: withCrew, items: items,
+      roles: items.map(function(it) { return it.position; }).filter(Boolean) });
+    crewConfigSave(configs);
+    setStatus("Crew config saved" + (withCrew ? " with crew." : "."), "ok");
+  };
+  document.getElementById("modal-overlay").classList.add("open");
+  setTimeout(function() { var n = document.getElementById("cc-save-name"); if (n) n.focus(); }, 0);
+}
+function crewConfigItems(cfg) {
+  return cfg.items || (cfg.roles || []).map(function(r) { return { position: r }; });
 }
 
 function openCrewConfigManager() {
@@ -4598,7 +4884,8 @@ function renderCrewConfigManager() {
         if (found) { found.name = newName.trim(); crewConfigSave(cfgs); renderCrewConfigManager(); }
       }; })(cfg);
       var meta = document.createElement("div"); meta.className = "tmpl-row-meta";
-      meta.textContent = cfg.roles.length + " roles";
+      var _n = crewConfigItems(cfg).length;
+      meta.textContent = _n + (_n === 1 ? " role" : " roles") + (cfg.with_crew ? ", with crew" : "");
       var loadBtn = document.createElement("button"); loadBtn.className = "lb"; loadBtn.style.fontSize = "11px"; loadBtn.textContent = "Load";
       loadBtn.onclick = (function(c) { return function() { loadCrewConfig(c); }; })(cfg);
       var delBtn = document.createElement("button"); delBtn.className = "lb danger"; delBtn.style.fontSize = "11px"; delBtn.textContent = "Delete";
@@ -4619,14 +4906,22 @@ function renderCrewConfigManager() {
 }
 
 function loadCrewConfig(config) {
-  config.roles.forEach(function(role) {
+  var items = crewConfigItems(config);
+  // addCrew() puts each new card on top, so add in reverse to keep the
+  // saved order (older versions loaded configs upside down).
+  items.slice().reverse().forEach(function(it) {
     addCrew();
     var newId = crew[0];
-    var posField = document.getElementById(newId + '_position');
-    if (posField) posField.value = role;
+    var set = function(f, val) { var e = document.getElementById(newId + f); if (e && val) e.value = val; };
+    set('_position', it.position);
+    set('_name', it.name); set('_phone', it.phone); set('_email', it.email);
+    setCardLinkFields(newId, { role_id: it.role_id, contact_id: it.contact_id, contact_ack: it.contact_ack });
+    // Status: addCrew() starts every card at TBD with no contacted time.
   });
   closeCrewConfigModal();
-  setStatus("Crew config loaded - " + config.roles.length + " roles added.", "ok");
+  if (window.ProjectPeopleV2) ProjectPeopleV2.render();
+  if (typeof autosaveTrigger === "function") autosaveTrigger();
+  setStatus("Crew config loaded - " + items.length + (items.length === 1 ? " role" : " roles") + " added" + (config.with_crew ? " with crew, all TBD." : "."), "ok");
 }
 
 // ── Template manager modal ────────────────────────────────────────────────────
@@ -5108,7 +5403,19 @@ async function exportLibrary() {
     }
     projects[key] = data;
   }
-  var contacts = loadContacts();
+  // New Contacts screens: the export carries the new records (people,
+  // organizations, locations, your roles, archived ones too) as contacts_v2.
+  // The old-format list in this browser stopped updating at cutover, so it
+  // isn't exported then.
+  var contacts = orgsV2On() ? undefined : loadContacts();
+  var contactsV2 = undefined;
+  if (orgsV2On()) {
+    try {
+      var rv = await fetch("/api/v2/sync?since=" + encodeURIComponent("1970-01-01T00:00:00.000000Z"), { credentials: "same-origin" });
+      if (rv.ok) { contactsV2 = await rv.json(); delete contactsV2.cursor; }
+    } catch (e) { /* export the projects anyway */ }
+    if (!contactsV2) setStatus("Contacts couldn't be included in this export (connection problem). Projects were exported.", "warn");
+  }
   var templates = JSON.parse(localStorage.getItem("slater_wb_templates")||"[]");
   var defaults  = JSON.parse(localStorage.getItem("slater_wb_defaults")||"{}");
   var payload = {
@@ -5116,6 +5423,7 @@ async function exportLibrary() {
     exported: new Date().toISOString(),
     projects: projects,
     contacts: contacts,
+    contacts_v2: contactsV2,
     templates: templates,
     template_defaults: defaults,
   };
@@ -5164,8 +5472,12 @@ function importLibrary(input) {
         }
       });
 
-      // Merge contacts
-      if (payload.contacts) {
+      // Merge contacts (old Contacts only). With the new Contacts screens,
+      // contacts in a backup file are not imported: they're kept in Slater
+      // per record, and an old-format list would bring back deleted entries.
+      if (payload.contacts && orgsV2On()) {
+        setTimeout(function() { setStatus("Contacts in the backup file were not imported. Your contacts in Slater are unchanged.", "warn"); }, 1500);
+      } else if (payload.contacts) {
         var existingContacts = loadContacts();
         ["staff","crew","talent","locations","companies"].forEach(function(bucket) {
           if (!payload.contacts[bucket]) return;
@@ -5229,7 +5541,22 @@ function saveAgencyData(data) {
 // ── Loaded agencies cache ─────────────────────────────────────────────────────
 var _loadedAgencies = [];
 
+// ── Project organization links on v2 (data-model-rewrite, Session 4) ─────────
+// With the v2 contacts flag on (?contacts=v2), the project's agency and client
+// are organizations from Contacts, held here by id. public/project-orgs-v2.js
+// draws the pickers and answers the doc helpers below. The server copies the
+// ids into projects.agency_org_id / client_org_id (the source of truth).
+// Flag off: none of this runs and the old agency/company pickers are used.
+var _orgLinks = { agency_org_id: null, client_org_id: null, legacy_agency_id: null, legacy_client: "" };
+// The cutover switch decides (public/connection.js slaterContactsV2(): on =
+// everyone, off = nobody, test = the per-browser ?contacts=v2 toggle).
+function orgsV2On() {
+  return typeof window.slaterContactsV2 === "function" ? window.slaterContactsV2() : false;
+}
+function orgsV2() { return orgsV2On() && window.ProjectOrgsV2 ? window.ProjectOrgsV2 : null; }
+
 function refreshAgencySelector() {
+  if (orgsV2On()) { if (window.ProjectOrgsV2) ProjectOrgsV2.render(); return; }
   var sel = document.getElementById("project_agency_id");
   if (!sel) return;
   var current = sel.value;
@@ -5390,6 +5717,8 @@ function applyAgencySettings(data) {
 var _agencyEditing = null; // null = list view, object = form view
 
 function openAgencyManager() {
+  // v2: agencies are organizations; manage them in Contacts > Organizations.
+  if (orgsV2On() && window.ContactsV2) { ContactsV2.open("organizations"); return; }
   _agencyEditing = null;
   document.getElementById("agency-manager-modal").classList.add("open");
   renderAgencyManager();
@@ -5610,6 +5939,8 @@ function getAgencyLogoB64() {
 }
 
 function getAgencyInfo() {
+  var _v2 = orgsV2();
+  if (_v2) { var _v2Info = _v2.agencyInfo(); if (_v2Info) return _v2Info; }
   var agencyEl = document.getElementById("project_agency_id");
   var agencyId = agencyEl ? agencyEl.value || null : null;
   if (agencyId && _loadedAgencies.length) {
@@ -5649,10 +5980,19 @@ function getAgencyInfo() {
   return loadAgencyData();
 }
 
-function lookupCompanyLogo(companyName) {
-  if (!companyName) return null;
+// Client company record for branding: { name, logo } or null.
+// v2: the linked client organization (or an org with that exact name);
+// otherwise, and as a fallback before the migration, the old companies list.
+function findClientCompany(companyName) {
+  var _v2 = orgsV2();
+  if (_v2) { var org = _v2.clientOrg(companyName); if (org) return org; }
+  if (!companyName || !companyName.trim()) return null;
   var db = loadContacts();
-  var co = (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === (companyName||"").trim().toLowerCase(); });
+  return (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === companyName.trim().toLowerCase(); }) || null;
+}
+
+function lookupCompanyLogo(companyName) {
+  var co = findClientCompany(companyName);
   if (!co || !co.logo) return null;
   if (co.logo.includes("image/svg")) return null;
   return co.logo.split(",")[1] || null;
@@ -5669,8 +6009,7 @@ function updateBrandingPreview() {
   } else if (val === "client") {
     var companyEl = document.getElementById("client_company");
     var companyName = companyEl ? companyEl.value.trim() : "";
-    var db = loadContacts();
-    var co = companyName ? (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === companyName.toLowerCase(); }) : null;
+    var co = findClientCompany(companyName);
     if (co && co.logo) {
       preview.src = co.logo;
       preview.style.display = "";
@@ -5702,8 +6041,7 @@ function updateBrandingWarning() {
     warn.style.display = "";
     return;
   }
-  var db = loadContacts();
-  var co = (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === companyName.toLowerCase(); });
+  var co = findClientCompany(companyName);
   if (!co || !co.logo) {
     warn.textContent = "No logo on file for this company. Add one in Contacts.";
     warn.style.display = "";
@@ -5713,6 +6051,7 @@ function updateBrandingWarning() {
 }
 
 function acAttachCompany() {
+  if (orgsV2On()) return; // v2: project-orgs-v2.js attaches the organization picker
   var nameEl = document.getElementById("client_company");
   if (!nameEl || nameEl._acCoAttached) return;
   nameEl._acCoAttached = true;
@@ -5903,8 +6242,8 @@ function applyCrop() {
   const scaleX = img.naturalWidth / dispW;
   const scaleY = img.naturalHeight / parseInt(container.style.height);
 
-  // Output at 240x240
-  const OUTPUT = 240;
+  // Output at 512x512 (raised from 240; logos are flat graphics so PNG stays small)
+  const OUTPUT = 512;
   canvas.width = OUTPUT;
   canvas.height = OUTPUT;
   const ctx = canvas.getContext("2d");
@@ -5957,8 +6296,36 @@ function _applyLoadedProject(key, data) {
   if (currentSheetKey !== key) return false;
   loadFormData(data);
   _formKey = key;
+  _formSnap[key] = _snapNow();
   return true;
 }
+// What the form holds right now, for "has this tab changed anything?".
+function _snapNow() {
+  try { return JSON.stringify(gather()); } catch (e) { return null; }
+}
+function _tabHasEdits(key) {
+  return _formSnap[key] == null || _snapNow() !== _formSnap[key];
+}
+// Switching back to a tab: if the project was saved elsewhere meanwhile and
+// this tab has no edits of its own, show the newer copy. Projects are saved
+// whole, so a stale tab would otherwise save its old copy back over newer
+// work on its next save.
+function _refreshIfStale() {
+  var key = currentSheetKey;
+  if (!key || _formKey !== key || _navigating || _autosaveTimer) return;
+  if (pendingSavesLoad()[key] || _tabHasEdits(key)) return;
+  API._fetchProject(key).then(function(server) {
+    if (!server || !server.data || currentSheetKey !== key || _formKey !== key || _navigating) return;
+    var sv = server.data.savedAt;
+    if (sv === _serverSavedAt[key] || sv === _lastSentOk[key]) return; // nothing new
+    if (_tabHasEdits(key) || pendingSavesLoad()[key]) return; // typing started meanwhile
+    noteServerCopy(key, server.data);
+    _navigating = true;
+    try { _applyLoadedProject(key, server.data); } finally { _navigating = false; }
+    setStatus("Updated with the latest changes from another tab or device.", "warn");
+  });
+}
+document.addEventListener("visibilitychange", function() { if (!document.hidden) _refreshIfStale(); });
 
 // localStorage fallback, only if it holds a full copy of the project. The
 // dropdown sync stores label-only stubs, and loading a stub blanks the form.
@@ -5977,17 +6344,26 @@ function autosaveTrigger() {
   }, _autosaveDelay);
 }
 
-function autosaveNow() {
+// onlyIfChanged: background saves (tab hidden, page closing) skip when this
+// tab hasn't changed anything since it loaded or last saved, so a stale tab
+// can't save its old copy over newer work from another tab or device.
+function autosaveNow(onlyIfChanged) {
   if (!currentSheetKey) return;
   if (_formKey !== currentSheetKey) {
     console.warn("Autosave skipped: " + currentSheetKey + " has not finished loading");
     return;
   }
   var data = gather();
+  var snap = JSON.stringify(data);
+  if (onlyIfChanged === true && _formSnap[currentSheetKey] != null && snap === _formSnap[currentSheetKey]) return;
+  _formSnap[currentSheetKey] = snap;
   var db = libLoad();
-  if (!db[currentSheetKey]) return;
-  data.label = db[currentSheetKey].label || libLabel(data);
+  // Not "return if the project isn't in this browser's list": logging out in
+  // another tab wipes that list, and this tab then dropped every edit silently
+  // (found by John, Session 7 test 5). The save goes out and the server decides.
+  data.label = (db[currentSheetKey] && db[currentSheetKey].label) || libLabel(data);
   data.savedAt = Date.now();
+  _noteMine(currentSheetKey, data.savedAt);
   var ne = document.getElementById("note-editor");
   data._note_draft = ne ? ne.innerHTML : "";
   var expenses = data.expenses || [];
@@ -5997,25 +6373,258 @@ function autosaveNow() {
   libSaveAll(db);
   _allProjectsCache[currentSheetKey] = { label: data.label, data: data };
   mergeContactsFromSheet(data);
-  showAutosaveIndicator();
-  // Also save to server
-  API.saveProject(currentSheetKey, data.label, data).then(function(result) {
-    if (result) console.log("Autosaved to server:", currentSheetKey);
-    else console.warn("Server autosave failed, localStorage only");
+  // Save to the server. "Autosaved" only shows once the server has it; a save
+  // that doesn't get there is kept in the save queue below and sent later.
+  var key = currentSheetKey;
+  var offline = window.SlaterConn && !SlaterConn.online;
+  if (_unloading && !offline && !pendingSavesLoad()[key]) {
+    // Page is closing: the browser may cancel this request, and code after
+    // it may never run. Queue the copy FIRST, then send. Next visit, the queue
+    // sees whether it landed (same savedAt on the server: dropped, not re-sent).
+    queueProjectSave(key, data.label, data);
+    API.saveProject(key, data.label, data).then(function(result) {
+      if (!result) return;
+      _lastSentOk[key] = data.savedAt;
+      var p = pendingSavesLoad();
+      if (p[key] && p[key].data.savedAt === data.savedAt) { delete p[key]; pendingSavesStore(p); }
+    });
+    return;
+  }
+  if (offline || pendingSavesLoad()[key]) {
+    // Offline, or earlier changes are still waiting: queue it (synchronously,
+    // so it survives the tab closing) and let the queue send it in order.
+    queueProjectSave(key, data.label, data);
+    if (!offline) flushProjectSave(key);
+    showAutosaveIndicator(false);
+    return;
+  }
+  API.saveProject(key, data.label, data).then(function(result) {
+    if (result) {
+      _serverSavedAt[key] = data.savedAt;
+      if (!(_lastSentOk[key] >= data.savedAt)) _lastSentOk[key] = data.savedAt;
+      if (currentSheetKey === key) showAutosaveIndicator();
+    } else {
+      console.warn("Server autosave failed; kept on this device and queued:", key);
+      queueProjectSave(key, data.label, data);
+      if (currentSheetKey === key) showAutosaveIndicator(false);
+    }
   });
 }
 
-function showAutosaveIndicator() {
+// ok === false: the change is kept on this device but isn't on the server yet.
+function showAutosaveIndicator(ok) {
   var ind = document.getElementById("autosave-indicator");
   if (!ind) return;
   var now = new Date();
   var t = now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}).toLowerCase();
-  ind.innerHTML = "Autosaved at:<br>" + t;
+  ind.innerHTML = ok === false ? "Not saved yet:<br>kept on this device" : "Autosaved at:<br>" + t;
   ind.classList.add("show");
   clearTimeout(ind._hideTimer);
   ind._hideTimer = setTimeout(function() { ind.classList.remove("show"); }, 4000);
 }
 
+
+// ── Saves that didn't reach the server (Session 7) ──────────────────────────
+// A project save that fails (offline, server error, logged out) is kept in
+// localStorage under PENDING_SAVES_KEY, so it survives closing the tab, and
+// is sent when the connection is back or before that project next loads.
+//   { <project key>: { label, data, base, conflict, at } }
+// base = the server copy's data.savedAt this device last saw. Before sending,
+// the queue re-reads the server copy: if it changed since (another device
+// saved while this one was offline), nothing is overwritten silently; the
+// bar asks "Use my version" / "Keep the other version". Projects are still
+// whole-bundle saves; real merging comes with the project-items branch.
+var PENDING_SAVES_KEY = "slater_pending_saves";
+// _serverSavedAt / _flushing / _pendingReceipts are declared at the top of
+// this file: API.getProject (above) can reach this queue during startup.
+
+// Every tab of this browser shares localStorage, so each queued save records
+// the tab that owns it ("<project key>::<tab id>" -> entry with key + owner).
+// pendingSavesLoad() shows THIS tab's entries keyed by project key, and
+// pendingSavesStore() writes them back without touching other tabs' entries.
+// Found by John: tab B's save folded into tab A's queued offline copy.
+// A closed tab's entries are taken over by _adoptOrphans() (connection.js
+// decides which tabs are gone).
+function _tabId() { return window.SlaterConn ? SlaterConn.tabId : "local"; }
+function _pendingRaw() {
+  var raw;
+  try { raw = JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || "{}") || {}; } catch (e) { raw = {}; }
+  Object.keys(raw).forEach(function(id) { if (!raw[id].key) { raw[id].key = id; raw[id].owner = null; } }); // older format: anyone's
+  return raw;
+}
+function _pendingWriteRaw(raw) {
+  if (Object.keys(raw).length) localStorage.setItem(PENDING_SAVES_KEY, JSON.stringify(raw));
+  else localStorage.removeItem(PENDING_SAVES_KEY);
+}
+function pendingSavesLoad() {
+  var raw = _pendingRaw(), me = _tabId(), view = {};
+  Object.keys(raw).forEach(function(id) { if (raw[id].owner === me) view[raw[id].key] = raw[id]; });
+  return view;
+}
+// Take over queued saves of tabs that are gone. If this tab already has one
+// for the same project, keep the newer copy and remember both as "ours".
+function _adoptOrphans() {
+  var raw = _pendingRaw(), me = _tabId(), changed = false;
+  Object.keys(raw).forEach(function(id) {
+    var e = raw[id];
+    if (e.owner === me || !(window.SlaterConn ? SlaterConn.mayTake(e.owner) : true)) return;
+    var mineId = Object.keys(raw).filter(function(j) { return raw[j].owner === me && raw[j].key === e.key; })[0];
+    if (!mineId) { e.owner = me; delete raw[id]; raw[e.key + "::" + me] = e; }
+    else {
+      var m = raw[mineId], newer = (e.data.savedAt > m.data.savedAt) ? e : m;
+      var ours = (m.ours || []).concat(e.ours || [], [m.data.savedAt, e.data.savedAt]).filter(function(v, i, a) { return v != null && a.indexOf(v) === i; }).slice(-50);
+      raw[mineId] = Object.assign({}, newer, { owner: me, key: e.key, base: m.base, conflict: null, ours: ours });
+      delete raw[id];
+    }
+    changed = true;
+  });
+  if (changed) { try { _pendingWriteRaw(raw); } catch (e) {} if (window.SlaterConn) SlaterConn.changed(); }
+  return changed;
+}
+function pendingSavesStore(p) {
+  try {
+    var raw = _pendingRaw(), me = _tabId();
+    Object.keys(raw).forEach(function(id) { if (raw[id].owner === me) delete raw[id]; });
+    Object.keys(p).forEach(function(key) { raw[key + "::" + me] = Object.assign({}, p[key], { key: key, owner: me }); });
+    _pendingWriteRaw(raw);
+  } catch (e) {
+    console.warn("Could not keep an offline copy:", e);
+    setStatus("This device is out of storage, so offline changes can't be kept. Reconnect before closing Slater.", "err");
+  }
+  if (window.SlaterConn) SlaterConn.changed();
+}
+function noteServerCopy(key, data) {
+  if (data && data.savedAt != null) _serverSavedAt[key] = data.savedAt;
+}
+function queueProjectSave(key, label, data) {
+  // This tab already got a newer copy onto the server (saves can finish out
+  // of order). Only this tab's own timestamps are compared: another device's
+  // clock may be ahead, and comparing against it would drop real changes.
+  if (_lastSentOk[key] != null && data.savedAt <= _lastSentOk[key]) return;
+  var p = pendingSavesLoad();
+  var prev = p[key];
+  // ours = every savedAt this device produced for the project while it was
+  // queued. A server copy carrying one of them is OUR earlier save that got
+  // through (e.g. a request cancelled as the page closed), not another device.
+  var ours = (prev && prev.ours ? prev.ours : []).concat(prev ? [prev.data.savedAt] : [], _mySavedAts[key] || [], [data.savedAt]);
+  p[key] = {
+    label: label, data: data, at: Date.now(),
+    base: prev ? prev.base : (_serverSavedAt[key] != null ? _serverSavedAt[key] : null),
+    conflict: prev ? prev.conflict : null,
+    // Whose change this is: the login page keeps queued saves only for the
+    // person logging in (it clears everything else for privacy).
+    user: (prev && prev.user) || window._slaterUserId || null,
+    ours: ours.filter(function(v, i, a) { return v != null && a.indexOf(v) === i; }).slice(-50),
+  };
+  pendingSavesStore(p);
+}
+function _escText(t) {
+  return String(t == null ? "" : t).replace(/[&<>"']/g, function(c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; });
+}
+// After a conflict is settled, the open project is reloaded so the screen
+// shows what the server now holds. currentSheetKey is cleared first so the
+// unload autosave doesn't push the screen's copy back over it.
+function _reloadIfOpen(key) {
+  if (currentSheetKey !== key) return;
+  clearTimeout(_autosaveTimer);
+  currentSheetKey = null;
+  location.reload();
+}
+function _showProjectConflict(key) {
+  var e = pendingSavesLoad()[key];
+  if (!e || !e.conflict || !window.SlaterConn) return;
+  var when = new Date(e.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
+  SlaterConn.notice("conflict-" + key,
+    "<strong>“" + _escText(e.label || key) + "” was changed on another device</strong> while this one was offline. " +
+    "Your changes from " + _escText(when) + " are kept on this device and weren't saved over it.",
+    [{ label: "Use my version", fn: function() { flushProjectSave(key, true).then(function(ok) { if (ok) _reloadIfOpen(key); }); } },
+     { label: "Keep the other version", fn: function() { discardProjectSave(key); } }],
+    true);
+}
+function discardProjectSave(key) {
+  var p = pendingSavesLoad();
+  delete p[key];
+  pendingSavesStore(p);
+  if (window.SlaterConn) SlaterConn.clearNotice("conflict-" + key);
+  _reloadIfOpen(key);
+}
+// Send the queued copy of one project. Resolves true when nothing is left
+// waiting for it. force = "Use my version" (skip the other-device check).
+function flushProjectSave(key, force) {
+  if (_flushing[key]) return _flushing[key];
+  var entry = pendingSavesLoad()[key];
+  if (!entry) return Promise.resolve(true);
+  if (entry.conflict && !force) { _showProjectConflict(key); return Promise.resolve(false); }
+  var sent = entry.data.savedAt;
+  _flushing[key] = API._fetchProject(key).then(function(server) {
+    if (server === undefined) return false; // still can't reach the server
+    var sSaved = server && server.data ? server.data.savedAt : undefined;
+    if (sSaved !== undefined && sSaved === sent) {
+      // Already on the server (the send got through before). Nothing to send.
+      _serverSavedAt[key] = sent;
+      if (!(_lastSentOk[key] >= sent)) _lastSentOk[key] = sent;
+      var p0 = pendingSavesLoad();
+      if (p0[key] && p0[key].data.savedAt === sent) { delete p0[key]; pendingSavesStore(p0); }
+      if (window.SlaterConn) SlaterConn.clearNotice("conflict-" + key);
+      return true;
+    }
+    var ours = (entry.ours || []).concat(_mySavedAts[key] || [], [_lastSentOk[key]]);
+    var changedElsewhere = sSaved !== undefined && ours.indexOf(sSaved) < 0 &&
+      (entry.base != null ? sSaved !== entry.base : sSaved > sent);
+    if (changedElsewhere && !force) {
+      var p = pendingSavesLoad();
+      if (p[key]) { p[key].conflict = { serverSavedAt: sSaved }; pendingSavesStore(p); }
+      _showProjectConflict(key);
+      return false;
+    }
+    return API.saveProject(key, entry.label, entry.data).then(function(result) {
+      if (!result) return false;
+      _serverSavedAt[key] = sent;
+      if (!(_lastSentOk[key] >= sent)) _lastSentOk[key] = sent;
+      var p = pendingSavesLoad();
+      if (p[key] && p[key].data.savedAt === sent) delete p[key];
+      else if (p[key]) { p[key].base = sent; p[key].conflict = null; } // edited again meanwhile: send that next
+      pendingSavesStore(p);
+      if (window.SlaterConn) SlaterConn.clearNotice("conflict-" + key);
+      if (currentSheetKey === key) showAutosaveIndicator();
+      return true;
+    });
+  }).then(function(ok) {
+    delete _flushing[key];
+    if (ok && pendingSavesLoad()[key]) return flushProjectSave(key);
+    return ok;
+  }, function(e) {
+    delete _flushing[key];
+    console.warn("Queued save failed for " + key, e);
+    return false;
+  });
+  return _flushing[key];
+}
+function flushAllPendingSaves() {
+  _adoptOrphans();
+  var keys = Object.keys(pendingSavesLoad());
+  var chain = keys.reduce(function(c, k) { return c.then(function() { return flushProjectSave(k); }); }, Promise.resolve());
+  return chain.then(function() {
+    var ids = Object.keys(_pendingReceipts);
+    return Promise.all(ids.map(function(id) {
+      var r = _pendingReceipts[id];
+      return API.saveReceipt(r.key, r.i, r.img).then(function(ok) {
+        if (ok && _pendingReceipts[id] === r) delete _pendingReceipts[id];
+      });
+    }));
+  }).then(function() { if (window.SlaterConn) SlaterConn.changed(); });
+}
+if (window.SlaterConn) {
+  SlaterConn.addSource("projects", {
+    pending: function() {
+      var p = pendingSavesLoad();
+      return Object.keys(p).filter(function(k) { return !p[k].conflict; }).length + Object.keys(_pendingReceipts).length;
+    },
+    retry: flushAllPendingSaves,
+  });
+  // Left over from an earlier visit: send them (or show the conflict again).
+  setTimeout(function() { if (SlaterConn.online) flushAllPendingSaves(); else Object.keys(pendingSavesLoad()).forEach(_showProjectConflict); }, 0);
+}
 
 function updateNoteDraftIndicator(content) {
   var ind = document.getElementById("note-draft-indicator");
@@ -6040,9 +6649,7 @@ function checkShowBlacks(dayId) {
 }
 
 function triggerSunLookup(dayId) {
-  var inp = document.getElementById(dayId+"_loc_id");
-  if (!inp || !inp.value) return;
-  var loc = getLocByName(inp.value);
+  var loc = getDayLoc(dayId);
   if (!loc || !loc.address) return;
   var iso = (document.getElementById(dayId+"_date_iso")||{}).value||"";
   var addr = [loc.address, loc.city, loc.state].filter(Boolean).join(", ");
@@ -6236,9 +6843,30 @@ function handleReceiptUpload(id, input) {
   reader.readAsDataURL(file);
 }
 
+// Receipts attached while offline can't be read yet: remembered here (this
+// tab's memory; images are too big for localStorage) and read when the
+// connection is back, if the card still has that same photo (Session 7).
+var _pendingOcr = {}; // expense card id -> image data
+function retryPendingOcr() {
+  var ids = Object.keys(_pendingOcr);
+  ids.forEach(function(id) {
+    var img = _pendingOcr[id];
+    delete _pendingOcr[id];
+    var hidden = document.getElementById(id+"_receipt_data");
+    if (hidden && hidden.value === img) ocrReceipt(id, img); // photo unchanged, card still there
+  });
+  return Promise.resolve();
+}
+if (window.SlaterConn) SlaterConn.addSource("receipt-reading", { pending: function() { return 0; }, retry: retryPendingOcr });
+
 function ocrReceipt(id, imageData) {
   // Show scanning indicator
   var vendorEl = document.getElementById(id+"_vendor");
+  if (window.SlaterConn && !SlaterConn.online) {
+    _pendingOcr[id] = imageData;
+    if (vendorEl) vendorEl.placeholder = "Will read this receipt when you're back online";
+    return;
+  }
   if (vendorEl) { vendorEl.placeholder = "Scanning receipt..."; }
 
   fetch('/api/ocr', {
@@ -6260,10 +6888,18 @@ function ocrReceipt(id, imageData) {
     if (catEl     && data.category)                      catEl.value     = data.category;
     if (vendorEl) vendorEl.placeholder = "Vendor / description";
     updateExpTotals();
+    // Filled in by code, so no input event fires: save it.
+    if (typeof autosaveTrigger === "function") autosaveTrigger();
   })
   .catch(function(err) {
-    console.warn("OCR error:", err);
     var vendorEl = document.getElementById(id+"_vendor");
+    // Couldn't reach the server (dropped mid-request): read it when back.
+    if (window.SlaterConn && (!SlaterConn.online || SlaterConn.isOfflineError(err))) {
+      _pendingOcr[id] = imageData;
+      if (vendorEl) vendorEl.placeholder = "Will read this receipt when you're back online";
+      return;
+    }
+    console.warn("OCR error:", err);
     if (vendorEl) vendorEl.placeholder = "Vendor / description";
   });
 }
@@ -7066,16 +7702,19 @@ function modalCancel() {
 
 // ── Gather all form data ──────────────────────────────────────────────────
 function gather() {
-  return {
+  var _v2Links = orgsV2On();
+  var _d = {
     project_type:v("project_type")||"live_event",
-    agency_id: (function(){ var el=document.getElementById("project_agency_id"); return el?el.value||null:null; })(),
+    // v2: the select holds organization ids; the server rewrites agency_id
+    // to the old-format agency for rollback, so send back what we loaded.
+    agency_id: _v2Links ? _orgLinks.legacy_agency_id : (function(){ var el=document.getElementById("project_agency_id"); return el?el.value||null:null; })(),
     doc_branding:(function(){ var el=document.querySelector('input[name="doc_branding"]:checked'); return el?el.value:"agency"; })(),
     project_title:v("project_title"), client:v("client_company"), client_company:v("client_company"), client_name:v("client_name"), billing_code:v("billing_code"),
-    kp_cards: kp.map(function(id) { return {_id:id, role:v(id+"_role")||"", name:v(id+"_name")||"", phone:v(id+"_phone")||"", email:v(id+"_email")||"", status:v(id+"_status")||"tbd"}; }),
+    kp_cards: kp.map(function(id) { return Object.assign({_id:id, role:v(id+"_role")||"", name:v(id+"_name")||"", phone:v(id+"_phone")||"", email:v(id+"_email")||"", status:v(id+"_status")||"tbd"}, cardLinkFields(id)); }),
     hospital:v("hospital"), breakfast:v("breakfast")||"8:00 am", lunch:v("lunch")||"12:00 pm",
     sunrise:v("sunrise"), sunset:v("sunset"),
 
-    crew: crew.map(id => ({id:id,position:v(id+"_position"),name:v(id+"_name"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined})).filter(c => c.position||c.name||c.email||c.phone||c.notes),
+    crew: crew.map(id => Object.assign({id:id,position:v(id+"_position"),name:v(id+"_name"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined}, cardLinkFields(id))).filter(c => c.position||c.name||c.email||c.phone||c.notes),
     crew_summary: (function() {
       var counts = {tbd:0, contacted:0, pencil:0, hold:0, confirmed:0, declined:0, total:0};
       crew.forEach(function(id) {
@@ -7085,7 +7724,7 @@ function gather() {
       });
       return counts;
     })(),
-    talent: talent.map(id => ({id:id,name:v(id+"_name"),title:v(id+"_title"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined})),
+    talent: talent.map(id => Object.assign({id:id,name:v(id+"_name"),title:v(id+"_title"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined}, cardLinkFields(id))),
     timezone: v("timezone")||"PT",
     kickoff_date_iso: v("kickoff_date_iso"),
     kickoff_time: v("kickoff_time"),
@@ -7099,6 +7738,11 @@ function gather() {
     expenses: getExpenses(),
     notes: notesGetData(),
   };
+  if (_v2Links) {
+    _d.agency_org_id = _orgLinks.agency_org_id || null;
+    _d.client_org_id = _orgLinks.client_org_id || null;
+  }
+  return _d;
 }
 
 // ── Load form data from a saved object ───────────────────────────────────
@@ -7109,8 +7753,18 @@ function loadFormData(data) {
   s("project_title", data.project_title);
   s("client_company", data.client_company||data.client||"");
   s("client_name", data.client_name||""); s("billing_code", data.billing_code);
-  var agencySelEl = document.getElementById("project_agency_id");
-  if (agencySelEl && data.agency_id) agencySelEl.value = data.agency_id;
+  if (orgsV2On()) {
+    _orgLinks = {
+      agency_org_id: data.agency_org_id || null,
+      client_org_id: data.client_org_id || null,
+      legacy_agency_id: data.agency_id || null,
+      legacy_client: data.client_company || data.client || "",
+    };
+    if (window.ProjectOrgsV2) ProjectOrgsV2.onProjectLoaded();
+  } else {
+    var agencySelEl = document.getElementById("project_agency_id");
+    if (agencySelEl && data.agency_id) agencySelEl.value = data.agency_id;
+  }
   var dbEl = document.querySelector('input[name="doc_branding"][value="' + (data.doc_branding||"agency") + '"]');
   if (dbEl) dbEl.checked = true;
   updateBrandingWarning();
@@ -7145,6 +7799,7 @@ function loadFormData(data) {
     var sel = document.getElementById(id+"_status");
     if (sel) sel.setAttribute("data-prev", statusVal);
     if (c.contacted_at) s(id+"_contacted_at", c.contacted_at);
+    setCardLinkFields(id, c);
     updateCrewStatusPill(id, statusVal);
     updateContactedAgo(id);
   });
@@ -7164,6 +7819,7 @@ function loadFormData(data) {
     var sel = document.getElementById(id+"_status");
     if (sel) sel.setAttribute("data-prev", talentStatus);
     if (t.contacted_at) s(id+"_contacted_at", t.contacted_at);
+    setCardLinkFields(id, t);
     updateCrewStatusPill(id, talentStatus);
     updateContactedAgo(id);
   });
@@ -7194,6 +7850,8 @@ function loadFormData(data) {
   var ne = document.getElementById("note-editor");
   if (ne) ne.innerHTML = data._note_draft || "";
   updateNoteDraftIndicator(data._note_draft || "");
+  // v2: link people + locations saved before Session 5, check for contact changes.
+  if (window.ProjectPeopleV2) ProjectPeopleV2.onProjectLoaded();
 }
 
 // ── Clear form ────────────────────────────────────────────────────────────
@@ -7202,6 +7860,10 @@ function clearForm() {
    "hospital","breakfast","lunch","sunrise","sunset"
   ].forEach(function(id) { const e = document.getElementById(id); if(e) e.value = ""; });
   const ptReset = document.getElementById("project_type"); if(ptReset) ptReset.value = "location_shoot";
+  if (orgsV2On()) {
+    _orgLinks = { agency_org_id: null, client_org_id: null, legacy_agency_id: null, legacy_client: "" };
+    if (window.ProjectOrgsV2) ProjectOrgsV2.onProjectCleared();
+  }
   var dbReset = document.querySelector('input[name="doc_branding"][value="agency"]'); if(dbReset) dbReset.checked = true;
   updateBrandingWarning();
   const kdReset = document.getElementById("kickoff_date_iso"); if(kdReset) kdReset.value = "";
@@ -7212,6 +7874,7 @@ function clearForm() {
   document.getElementById("kp-list").innerHTML = ""; kp = [];
   getDefaultKP().forEach(function(c) { addKP(c); });
   updateAddKPButton();
+  if (window.ProjectPeopleV2) ProjectPeopleV2.onProjectLoaded(); // link the default EP / Producer roles
   document.getElementById("crew-list").innerHTML = ""; crew = []; updateCrewStatusBar(); updateDeclinedSection("crew");
   document.getElementById("talent-list").innerHTML = ""; talent = []; updateTalentStatusBar(); updateDeclinedSection("talent");
   loadScheduleDays([]);
@@ -7239,8 +7902,11 @@ function saveReceipts(projectKey, expenses) {
   // Save each receipt to server
   expenses.forEach(function(e, i) {
     if (e.receipt) {
-      API.saveReceipt(projectKey, i, e.receipt).then(function(result) {
-        if (!result) console.warn("Server receipt save failed for index", i);
+      var id = projectKey + "_" + i, img = e.receipt;
+      API.saveReceipt(projectKey, i, img).then(function(result) {
+        if (result) { if (_pendingReceipts[id] && _pendingReceipts[id].img === img) delete _pendingReceipts[id]; }
+        else { console.warn("Server receipt save failed for index", i, "(kept, will retry)"); _pendingReceipts[id] = { key: projectKey, i: i, img: img }; }
+        if (window.SlaterConn) SlaterConn.changed();
       });
     }
   });
@@ -7536,21 +8202,13 @@ function generateDayICS(dayId) {
   var wrapT = parseT(wrapRaw);
   if (!wrapT && callT) wrapT = {h: Math.min(callT.h + 12, 23), m: callT.m};
 
-  var locId = (document.getElementById(dayId+"_loc_id")||{}).value||"";
-  var loc = null;
-  if (locId) {
-    var _lnEl = document.getElementById(locId+"_name");
-    if (_lnEl) {
-      loc = {
-        name:     _lnEl.value||"",
-        address:  (document.getElementById(locId+"_address")||{}).value||"",
-        city:     (document.getElementById(locId+"_city")||{}).value||"",
-        state:    (document.getElementById(locId+"_state")||{}).value||"",
-        zip:      (document.getElementById(locId+"_zip")||{}).value||"",
-        hospital: (document.getElementById(locId+"_hospital")||{}).value||"",
-      };
-    }
-  }
+  // The day's location (was read from the removed Location tab, so .ics
+  // files had no location at all). Hospital = what the day card shows.
+  var _dl = getDayLoc(dayId);
+  var loc = _dl ? {
+    name: _dl.name||"", address: _dl.address||"", city: _dl.city||"", state: _dl.state||"", zip: _dl.zip||"",
+    hospital: (document.getElementById(dayId+"_hospital")||{}).textContent || _dl.hospital || "",
+  } : null;
 
   var entries = (daySchedItems[dayId]||[]).map(function(eid) {
     return {time: v(eid+"_time"), desc: v(eid+"_desc")};
@@ -7945,9 +8603,9 @@ async function generateDoc() {
     const pr_rows = (data.kp_cards||[]).map(function(p){return {role:p.role||"",name:p.name||"",phone:p.phone||""};});
     function getDayLocInfo(dayData) {
       var locName = dayData.loc_name || dayData.loc_id || "";
-      if (!locName) return {name:"", address:"", notes:""};
-      var locs = loadContacts().locations || [];
-      var found = locs.find(function(l) { return l.name === locName; });
+      var found = window.ProjectPeopleV2 ? ProjectPeopleV2.location(dayData.location_id, locName) : null;
+      if (!locName && !found) return {name:"", address:"", notes:""};
+      if (!window.ProjectPeopleV2) found = (loadContacts().locations || []).find(function(l) { return l.name === locName; });
       if (found) return {
         name: found.name||"",
         address: [found.address, found.city, [found.state, found.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
@@ -7981,6 +8639,7 @@ async function generateDoc() {
             if (ag.address) lines.push(pr([tx(ag.address,{s:16})],{a:AlignmentType.CENTER}));
             var csz = [ag.city||"",ag.state||""].filter(Boolean).join(", ")+(ag.zip?" "+ag.zip:"");
             if (csz.trim()) lines.push(pr([tx(csz.trim(),{s:16})],{a:AlignmentType.CENTER}));
+            if (ag.country_label) lines.push(pr([tx(ag.country_label,{s:16})],{a:AlignmentType.CENTER}));
             if (ag.phone) lines.push(pr([tx(ag.phone,{s:16})],{a:AlignmentType.CENTER}));
             return lines;
           })():[pr([tx("")])]}),
@@ -8187,8 +8846,8 @@ async function generateDoc() {
       return sd.hospital || data.hospital || "";
     }
 
-    const day1 = {call_time:sd0.call_time,date:sd0.date,end_date:sd0.end_date||"",label:sd0.label,breakfast:sd0.breakfast,lunch:sd0.lunch,sunrise:sd0.sunrise,sunset:sd0.sunset,hospital:getDayHospital(sd0),loc_name:sd0.loc_name,loc_id:sd0.loc_id,tzAbbr,excluded_crew:sd0.excluded_crew||[],excluded_talent:sd0.excluded_talent||[],category:sd0.category||"shoot_day",f1_label:sd0.f1_label||"",f3_label:sd0.f3_label||""};
-    const day2 = {call_time:sd1.call_time,date:sd1.date,end_date:sd1.end_date||"",label:sd1.label,breakfast:sd1.breakfast,lunch:sd1.lunch,sunrise:sd1.sunrise,sunset:sd1.sunset,golive:sd1.golive,hospital:getDayHospital(sd1),loc_name:sd1.loc_name,loc_id:sd1.loc_id,tzAbbr,excluded_crew:sd1.excluded_crew||[],excluded_talent:sd1.excluded_talent||[],category:sd1.category||"shoot_day",f1_label:sd1.f1_label||"",f3_label:sd1.f3_label||""};
+    const day1 = {call_time:sd0.call_time,date:sd0.date,end_date:sd0.end_date||"",label:sd0.label,breakfast:sd0.breakfast,lunch:sd0.lunch,sunrise:sd0.sunrise,sunset:sd0.sunset,hospital:getDayHospital(sd0),loc_name:sd0.loc_name,loc_id:sd0.loc_id,location_id:sd0.location_id,tzAbbr,excluded_crew:sd0.excluded_crew||[],excluded_talent:sd0.excluded_talent||[],category:sd0.category||"shoot_day",f1_label:sd0.f1_label||"",f3_label:sd0.f3_label||""};
+    const day2 = {call_time:sd1.call_time,date:sd1.date,end_date:sd1.end_date||"",label:sd1.label,breakfast:sd1.breakfast,lunch:sd1.lunch,sunrise:sd1.sunrise,sunset:sd1.sunset,golive:sd1.golive,hospital:getDayHospital(sd1),loc_name:sd1.loc_name,loc_id:sd1.loc_id,location_id:sd1.location_id,tzAbbr,excluded_crew:sd1.excluded_crew||[],excluded_talent:sd1.excluded_talent||[],category:sd1.category||"shoot_day",f1_label:sd1.f1_label||"",f3_label:sd1.f3_label||""};
     const doc = new Document({sections:[
       {properties:pp, headers:{default:makeHeader("Worktank Call Sheet", sd0.label||"Day 1 of 2")}, children:buildCallSheet(day1)},
       {properties:pp, headers:{default:makeHeader("Worktank Call Sheet", sd0.label||"Day 1 of 2")}, children:buildSchedulePage(day1, sd0.sched_entries||[])},
@@ -8240,10 +8899,30 @@ function updateSidebarUser(data) {
 }
 
 API.getMe().then(function(data) {
+  if (data && data.id) window._slaterUserId = data.id; // queued saves record whose they are
   updateSidebarUser(data);
 }).catch(function() {});
 
 function logout() {
+  // Logging out clears Slater's data from this browser (right for a shared
+  // computer), including saves that haven't reached the server yet, from ANY
+  // tab. Ask first instead of losing them silently.
+  var raw = {}, cq = [];
+  try { raw = JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || "{}") || {}; } catch (e) {}
+  try { cq = JSON.parse(localStorage.getItem("slater_pending_contacts") || "[]") || []; } catch (e) {}
+  var n = Object.keys(raw).length + cq.length + Object.keys(_pendingReceipts).length;
+  if (n && !logout._confirmed) {
+    modalConfirm("Unsaved changes",
+      "You have " + n + (n === 1 ? " change" : " changes") + " that haven't reached Slater yet (made while offline or logged out). " +
+      "Logging out now deletes " + (n === 1 ? "it" : "them") + " from this device. Reconnect or log in again first to keep " + (n === 1 ? "it" : "them") + ".",
+      function() { logout._confirmed = true; logout(); }, "Log out anyway", null, "Stay logged in");
+    return;
+  }
+  // Leaving on purpose: no last-second save, no leave-page warning.
+  clearTimeout(_autosaveTimer);
+  currentSheetKey = null;
+  _pendingReceipts = {};
+  if (window.SlaterConn) SlaterConn.allowLeave();
   var keysToRemove = [];
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
@@ -8311,8 +8990,9 @@ setTimeout(refreshWbDaySelector, 200);
 })();
 // Fetch all projects in the background to populate Rundown tabs
 setTimeout(fetchAllProjectsForRundown, 1000);
-// Backfill contacts from all existing saved call sheets
+// Backfill contacts from all existing saved call sheets (old Contacts only)
 (function() {
+  if (orgsV2On()) return;
   try {
     const sheets = JSON.parse(localStorage.getItem("slater_callsheets")||"{}");
     const vals = Object.values(sheets);
@@ -8344,11 +9024,14 @@ document.getElementById("notes-search-clear").addEventListener("click", function
 API.getAgencies().then(function(agencies) {
   _loadedAgencies = agencies || [];
   refreshAgencySelector();
+  if (orgsV2On()) return; // v2: project-orgs-v2.js applies the default organization
   var def = _loadedAgencies.find(function(a) { return a.is_default; }) || _loadedAgencies[0];
   if (def) applyAgencyDefaults(def);
   else applyAgencySettings();
 });
-API.getContacts().then(function(serverData) {
+// Old Contacts only: merge this browser's copy with the server's and upload
+// the result. Off with the new Contacts screens (they sync per record).
+if (!orgsV2On()) API.getContacts().then(function(serverData) {
   if (!serverData) return;
   var local = loadContacts();
   var merged = Object.assign({}, local);
@@ -8385,14 +9068,17 @@ function _safeUnloadAutosave() {
     console.warn("Unload autosave skipped: talent cards present but all empty (possible load corruption)");
     return;
   }
-  autosaveNow();
+  autosaveNow(true);
 }
 document.addEventListener("visibilitychange", function() {
   if (document.hidden && currentSheetKey) _safeUnloadAutosave();
 });
 window.addEventListener("beforeunload", function() {
+  _unloading = true;
   if (currentSheetKey) _safeUnloadAutosave();
 });
+// Leaving was cancelled ("Stay on page"): back to normal saving.
+window.addEventListener("focus", function() { _unloading = false; });
 
 // ── SAMPLE DATA (remove before go-live) ───────────────────────────────────
 

@@ -83,6 +83,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:11px 22px;border-radius:8px;font-size:14px;font-weight:500;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s ease;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .toast.ok{background:#2d7a3e;color:#fff}
 .toast.err{background:var(--accent);color:#fff}
+.toast.warn{background:#E9DFC8;color:#181818} /* notices, e.g. saved on this device while offline (Session 7) */
 .toast.show{opacity:1}
 @media(max-width:600px){.g2,.g3{grid-template-columns:1fr}.tabs{flex-wrap:wrap}}
 

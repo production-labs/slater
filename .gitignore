@@ -6,3 +6,8 @@ public/20*.html
 public/index-dnu.html
 Scratch Pad
 Business Setup.pages
+# Database dumps hold everyone's data: never commit them (docs/CUTOVER.md step 5)
+pre-cutover-*.sql*
+pre-restore-*.sql*
+slater-20*.sql*
+*.dump
