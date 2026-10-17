@@ -55,6 +55,14 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: 'Not logged in' });
 }
 
+// Contacts cutover switch (CONTACTS_V2_CUTOVER = off / on / test; see
+// routes/cutover.js and docs/CUTOVER.md). Must come before the API routes:
+// it refuses saves from the wrong screens.
+const cutover = require('./routes/cutover');
+cutover.init(pool);
+app.get('/slater-config.js', cutover.configScript);
+app.use('/api', cutover.guard);
+
 app.use('/api/contacts', requireAuth, require('./routes/contacts'));
 app.use('/api/users/me/contacts', requireAuth, require('./routes/contacts'));
 app.use('/api/users', require('./routes/users'));
@@ -65,7 +73,8 @@ app.use('/api/receipts', requireAuth, require('./routes/receipts'));
 app.use('/api/ocr', requireAuth, require('./routes/ocr'));
 app.use('/api/licenses', require('./routes/licenses'));
 // New data model (data-model-rewrite). Requires scripts/migrate-data-model.js
-// to have been run; not called by the frontend until Session 3.
+// to have been run. Used by the page only when the cutover switch is on (or
+// in `test` mode with ?contacts=v2).
 app.use('/api/v2', requireAuth, require('./routes/v2'));
 
 app.get('/health', (req, res) => {

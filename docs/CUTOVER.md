@@ -4,7 +4,7 @@
 
 This is the procedure agreed in John's answers #11 (SESSION_STATUS.md): a short maintenance window, a fresh backup, the migration, the verification, a smoke test, and only then turning off the old way of saving contacts.
 
-Written 2026-10-10 (Session 6). Steps marked **[Session 8]** depend on work that isn't built yet; Session 8 must deliver them as described or update this page.
+Written 2026-10-10 (Session 6). The switch (steps 1, 10, 11.5) was built in Session 8, 2026-10-17.
 
 ## Before the day
 
@@ -13,7 +13,8 @@ These can be done any time before the window. None of them change production dat
 ### 1. Everything is merged and deployed
 
 - Sessions 7 and 8 are finished, tested, and merged from `data-model-rewrite` to `main`, and Railway has deployed `main`.
-- **[Session 8]** The new behavior is behind an on/off switch on the `slater` service in Railway (proposed name: `CONTACTS_V2_CUTOVER`), **off** by default. Off = Slater behaves exactly as today. On = everyone gets the new Contacts screen, the old contacts and agency saving is refused, and the old "contacts come back" merge code no longer runs. This is what lets the code be deployed before the window: merging must not switch anyone over by itself.
+- The new behavior is behind a switch: the variable `CONTACTS_V2_CUTOVER` on the `slater` service in Railway. **Don't add it yet.** Not set (or `off`) = Slater behaves exactly as today, and `?contacts=v2` in the address bar does nothing. `on` = everyone gets the new Contacts screens, old contacts and agency saving is refused, and the old "contacts come back" merge code no longer runs. (`test` is for your Mac only: it keeps the per-browser `?contacts=v2` / `?contacts=v1` toggle. Never use it on Railway.) This is what lets the code be deployed before the window: merging doesn't switch anyone over by itself.
+- After Railway deploys the merge, reload any Slater tab that was open from before it (or just close them all). Tabs from before the merge don't know about the switch.
 - Production still runs fine with the switch off and the new tables not created yet (Sessions 2 to 5 were built to allow this). Open a project and generate a call sheet to be sure.
 
 ### 2. Tools on your Mac
@@ -128,9 +129,17 @@ Railway > `slater` service > restart (or redeploy the current deployment).
 
 **Required.** The server checks once, at startup, whether the new project columns exist, and remembers the answer. A server that started before step 7a keeps acting as if they don't exist until it restarts.
 
-### 10. Flip the switch [Session 8]
+### 10. Flip the switch
 
-Railway > `slater` service > Variables: set `CONTACTS_V2_CUTOVER=on`. Railway redeploys on its own. Wait for the deploy to finish.
+Railway > `slater` service > Variables: add `CONTACTS_V2_CUTOVER` with the value `on`. Railway redeploys on its own. Wait for the deploy to finish.
+
+Then check the deploy log (Railway > `slater` > Deployments > the new one > Logs). It must say:
+
+```
+Contacts cutover switch: on (new tables found)
+```
+
+If it instead says `CONTACTS_V2_CUTOVER=on, BUT THE NEW TABLES ARE NOT IN THIS DATABASE`, the server has refused the switch and is running as `off` (safe: everyone still has the old screens). Step 7a didn't run against this database. Stop and work out why before going on.
 
 ### 11. Smoke test (answers #11, step 5)
 
@@ -140,7 +149,7 @@ Log in on your laptop.
 2. **Smith Tower hospital:** Contacts > Locations > "Worktank HQ - Smith Tower" > **Look up**. The old saved hospital (Swedish Medical Center Ballard) was wrong and was deliberately not carried over. Expect Harborview. Each project's Smith Tower days pick it up the next time that project is opened and saved.
 3. **A real active project:** open it. Crew, talent and key personnel cards show "Linked". The agency and client are filled in. Schedule days show their locations.
 4. **Documents:** generate the call sheet, workback and expense report for that project. They should look exactly as before (step 6 already proved the text is identical).
-5. **Old saving is refused [Session 8]:** an old tab or device that reopens Slater must reload into the new screen, not save in the old format. Session 8 defines exactly how to check this.
+5. **Old saving is refused:** a tab that was open before the switch still shows the old screens until it reloads, and the server refuses its saves. To check: before step 10, leave one tab open on a test project (not a real one). After step 10, type in that tab's project title. Within about 10 seconds a red panel at the bottom says **"Slater has been updated. Reload this page to keep working."** Click **Reload**. The tab comes back on the new screens and the title you typed is saved (open the project in another tab to confirm). Old contacts and agency saves from such a tab are refused the same way. Automated version: `scripts/e2e-cutover.js`.
 6. **Phone:** log in on your phone and open Contacts and the same project.
 
 ### 12. After the window
@@ -154,6 +163,6 @@ Log in on your laptop.
 
 **Before step 10 (switch still off):** nothing users see has changed. The app ignores the new tables while the switch is off, and the old data was never touched. Fix the problem on the branch and come back another day. A partly-run step 7 has either committed fully or rolled back fully; there is no in-between. To start completely clean anyway, restore the step 5 backup (`docs/RESTORE.md` step 4).
 
-**After step 10:** set `CONTACTS_V2_CUTOVER=off`. Slater goes back to the old contacts and agencies, which are exactly as they were at step 5. **Anything you changed in Contacts after the switch is not in the old data**, so write down what you changed. Then fix and redo the switch.
+**After step 10:** set `CONTACTS_V2_CUTOVER=off` (or delete the variable). Slater goes back to the old contacts and agencies, which are exactly as they were at step 5. **Anything you changed in Contacts after the switch is not in the old data**, so write down what you changed. Then fix and redo the switch. Tabs left open from the "on" period get the same "Slater has been updated" panel; their project edits are saved after they reload. Project edits made while the switch was on stay (the projects are shared by both screens).
 
 **Last resort:** restore the step 5 backup (`docs/RESTORE.md` step 4). Everything done in Slater after step 5 is lost, including project edits.

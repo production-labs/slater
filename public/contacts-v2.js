@@ -1,8 +1,9 @@
 // Contacts v2 (data-model-rewrite, Session 3)
 //
 // Two-pane contacts manager (People / Organizations / Locations) on /api/v2.
-// Replaces the bucket-based Contacts modal at cutover. Until then it is OFF by
-// default and only opens when enabled for this browser:
+// Replaces the bucket-based Contacts modal at cutover. On for everyone when the
+// CONTACTS_V2_CUTOVER switch is on; off for everyone when it's off. Local
+// development (switch = test) keeps the per-browser toggle:
 //   ?contacts=v2   turn on   (remembered in localStorage)
 //   ?contacts=v1   turn off
 // Project tab agency/client pickers read organizations from this store
@@ -21,12 +22,17 @@
 (function () {
   'use strict';
 
+  // On / off is decided by the cutover switch (public/connection.js
+  // slaterContactsV2()). Only in `test` mode (local development) does the
+  // per-browser toggle apply: ?contacts=v2 / ?contacts=v1, remembered here.
   var FLAG_KEY = 'slater_contacts_v2';
   (function readUrlFlag() {
+    if (window.SLATER_CONTACTS_MODE !== 'test') return;
     var v = new URLSearchParams(location.search).get('contacts');
     if (v === 'v2') localStorage.setItem(FLAG_KEY, '1');
     else if (v === 'v1') localStorage.removeItem(FLAG_KEY);
   })();
+  function enabled() { return typeof window.slaterContactsV2 === 'function' && window.slaterContactsV2(); }
 
   // ---------------------------------------------------------------- utils
   function esc(s) {
@@ -1225,7 +1231,9 @@
       });
     });
   }
-  if (window.SlaterConn) {
+  // Only with the new screens on: with the switch off the server refuses
+  // /api/v2 saves, so anything queued here waits until it's on again.
+  if (window.SlaterConn && enabled()) {
     SlaterConn.addSource('contacts', {
       pending: function () { return queueLoad().filter(function (x) { return x.owner === myTab(); }).length; },
       retry: retryAfterReconnect,
@@ -1525,10 +1533,10 @@
       return origSave.apply(this, arguments);
     };
   }
-  if (localStorage.getItem(FLAG_KEY) === '1') hookMyInfo();
+  if (enabled()) hookMyInfo();
 
   window.ContactsV2 = {
-    enabled: function () { return localStorage.getItem(FLAG_KEY) === '1'; },
+    enabled: enabled,
     open: open,
     // Used by project-orgs-v2.js (Session 4).
     sync: syncShared,

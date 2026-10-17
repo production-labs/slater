@@ -3410,8 +3410,12 @@ function saveContactsData(data) {
   API.saveContacts(data);
 }
 
-// Merge contacts from a saved call sheet object
+// Merge contacts from a saved call sheet object.
+// Old Contacts only. With the new Contacts screens on (cutover switch), this
+// never runs: name-keyed copying is what brought deleted/renamed contacts
+// back (bug 3), and the server refuses old contacts saves anyway.
 function mergeContactsFromSheet(data) {
+  if (orgsV2On()) return;
   const db = loadContacts();
   if (!db.staff)     db.staff     = [];
   if (!db.crew)      db.crew      = [];
@@ -5399,7 +5403,19 @@ async function exportLibrary() {
     }
     projects[key] = data;
   }
-  var contacts = loadContacts();
+  // New Contacts screens: the export carries the new records (people,
+  // organizations, locations, your roles, archived ones too) as contacts_v2.
+  // The old-format list in this browser stopped updating at cutover, so it
+  // isn't exported then.
+  var contacts = orgsV2On() ? undefined : loadContacts();
+  var contactsV2 = undefined;
+  if (orgsV2On()) {
+    try {
+      var rv = await fetch("/api/v2/sync?since=" + encodeURIComponent("1970-01-01T00:00:00.000000Z"), { credentials: "same-origin" });
+      if (rv.ok) { contactsV2 = await rv.json(); delete contactsV2.cursor; }
+    } catch (e) { /* export the projects anyway */ }
+    if (!contactsV2) setStatus("Contacts couldn't be included in this export (connection problem). Projects were exported.", "warn");
+  }
   var templates = JSON.parse(localStorage.getItem("slater_wb_templates")||"[]");
   var defaults  = JSON.parse(localStorage.getItem("slater_wb_defaults")||"{}");
   var payload = {
@@ -5407,6 +5423,7 @@ async function exportLibrary() {
     exported: new Date().toISOString(),
     projects: projects,
     contacts: contacts,
+    contacts_v2: contactsV2,
     templates: templates,
     template_defaults: defaults,
   };
@@ -5455,8 +5472,12 @@ function importLibrary(input) {
         }
       });
 
-      // Merge contacts
-      if (payload.contacts) {
+      // Merge contacts (old Contacts only). With the new Contacts screens,
+      // contacts in a backup file are not imported: they're kept in Slater
+      // per record, and an old-format list would bring back deleted entries.
+      if (payload.contacts && orgsV2On()) {
+        setTimeout(function() { setStatus("Contacts in the backup file were not imported. Your contacts in Slater are unchanged.", "warn"); }, 1500);
+      } else if (payload.contacts) {
         var existingContacts = loadContacts();
         ["staff","crew","talent","locations","companies"].forEach(function(bucket) {
           if (!payload.contacts[bucket]) return;
@@ -5527,13 +5548,10 @@ var _loadedAgencies = [];
 // ids into projects.agency_org_id / client_org_id (the source of truth).
 // Flag off: none of this runs and the old agency/company pickers are used.
 var _orgLinks = { agency_org_id: null, client_org_id: null, legacy_agency_id: null, legacy_client: "" };
+// The cutover switch decides (public/connection.js slaterContactsV2(): on =
+// everyone, off = nobody, test = the per-browser ?contacts=v2 toggle).
 function orgsV2On() {
-  try {
-    var q = new URLSearchParams(location.search).get("contacts");
-    if (q === "v2") return true;
-    if (q === "v1") return false;
-    return localStorage.getItem("slater_contacts_v2") === "1";
-  } catch (e) { return false; }
+  return typeof window.slaterContactsV2 === "function" ? window.slaterContactsV2() : false;
 }
 function orgsV2() { return orgsV2On() && window.ProjectOrgsV2 ? window.ProjectOrgsV2 : null; }
 
@@ -8972,8 +8990,9 @@ setTimeout(refreshWbDaySelector, 200);
 })();
 // Fetch all projects in the background to populate Rundown tabs
 setTimeout(fetchAllProjectsForRundown, 1000);
-// Backfill contacts from all existing saved call sheets
+// Backfill contacts from all existing saved call sheets (old Contacts only)
 (function() {
+  if (orgsV2On()) return;
   try {
     const sheets = JSON.parse(localStorage.getItem("slater_callsheets")||"{}");
     const vals = Object.values(sheets);
@@ -9010,7 +9029,9 @@ API.getAgencies().then(function(agencies) {
   if (def) applyAgencyDefaults(def);
   else applyAgencySettings();
 });
-API.getContacts().then(function(serverData) {
+// Old Contacts only: merge this browser's copy with the server's and upload
+// the result. Off with the new Contacts screens (they sync per record).
+if (!orgsV2On()) API.getContacts().then(function(serverData) {
   if (!serverData) return;
   var local = loadContacts();
   var merged = Object.assign({}, local);

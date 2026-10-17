@@ -89,12 +89,45 @@
     return String((init && init.method) || (input && typeof input === 'object' && input.method) || 'GET').toUpperCase();
   }
 
+  // Contacts cutover switch (Session 8). /slater-config.js (loaded just before
+  // this file) sets window.SLATER_CONTACTS_MODE from the server's
+  // CONTACTS_V2_CUTOVER variable: 'on' = new Contacts screens for everyone,
+  // 'off' (or missing) = old screens for everyone, 'test' = per-browser toggle
+  // (?contacts=v2 / ?contacts=v1, remembered) for local development.
+  // This is THE check; app.js orgsV2On() and ContactsV2.enabled() use it.
+  var CONTACTS_MODE = window.SLATER_CONTACTS_MODE || 'off';
+  function contactsV2() {
+    if (CONTACTS_MODE === 'on') return true;
+    if (CONTACTS_MODE !== 'test') return false;
+    try {
+      var q = new URLSearchParams(location.search).get('contacts');
+      if (q === 'v2') return true;
+      if (q === 'v1') return false;
+      return localStorage.getItem('slater_contacts_v2') === '1';
+    } catch (e) { return false; }
+  }
+  window.slaterContactsV2 = contactsV2;
+
+  // Every save says which screens sent it, so the server can refuse a save
+  // from a tab still showing the other screens (routes/cutover.js).
+  function withScreensHeader(input, init) {
+    if (typeof input !== 'string') return init; // Request objects: not used by Slater
+    var h = new Headers((init && init.headers) || {});
+    h.set('X-Slater-Contacts', contactsV2() ? 'v2' : 'v1');
+    return Object.assign({}, init, { headers: h });
+  }
+
   window.fetch = function (input, init) {
     if (!isApi(input)) return origFetch(input, init);
     var write = methodOf(input, init) !== 'GET';
+    if (write) init = withScreensHeader(input, init);
     return origFetch(input, init).then(function (r) {
       if (r.status >= 502 && r.status <= 504) goOffline();
-      else {
+      else if (write && r.status === 409) {
+        // The switch changed since this tab loaded: it must reload.
+        r.clone().json().then(function (b) { if (b && b.error === 'reload_required') setReloadNeeded(); }, function () {});
+        goOnline();
+      } else {
         if (write && r.status === 401) setLoggedOut(true);
         else if (r.ok && state.loggedOut && write) setLoggedOut(false);
         goOnline();
@@ -155,6 +188,20 @@
     }
   }
 
+  // Slater was switched to (or back from) the new Contacts screens while this
+  // tab was open. Its saves are refused until it reloads; unsent project
+  // changes stay in this tab's save queue (kept across the reload, same tab
+  // id) and are sent after it.
+  function setReloadNeeded() {
+    if (state.reloadNeeded) return;
+    state.reloadNeeded = true;
+    render();
+  }
+  function reloadNow() {
+    leaving = true; // nothing can save from this tab anyway; the queue survives the reload
+    location.reload();
+  }
+
   function scheduleProbe() {
     if (probeTimer) return;
     probeTimer = setTimeout(function () {
@@ -182,7 +229,7 @@
     Object.keys(sources).forEach(function (name) {
       var s = sources[name];
       chain = chain.then(function () {
-        if (!state.online || !s.retry) return;
+        if (!state.online || state.reloadNeeded || !s.retry) return; // refused until reload
         return Promise.resolve().then(s.retry).catch(function (e) { console.warn('retry ' + name + ' failed', e); });
       });
     });
@@ -261,6 +308,10 @@
       rows.push(row('bad', n
         ? '<strong>You\'re offline.</strong> Changes aren\'t saved yet. Keep working: Slater saves them as soon as the connection is back.'
         : '<strong>You\'re offline.</strong> Anything you change now is saved as soon as the connection is back.'));
+    } else if (state.reloadNeeded) {
+      rows.push(row('bad', '<strong>Slater has been updated.</strong> Reload this page to keep working. ' +
+        (n ? 'Your project changes are kept and saved after the reload.' : 'Nothing has been lost.'), 'reload', [{ label: 'Reload' }]));
+      notices.reload = { actions: [{ label: 'Reload', fn: reloadNow }] };
     } else if (state.loggedOut) {
       rows.push(row('bad', '<strong>You\'ve been logged out.</strong> Your changes are kept here. Log in again in a new tab and they\'ll save on their own.', 'login',
         [{ label: 'Log in (new tab)' }]));
@@ -275,7 +326,7 @@
       rows.push(row('ok', 'Back online. All changes saved.'));
     }
     Object.keys(notices).forEach(function (id) {
-      if (id === 'login' || id === 'retry') return;
+      if (id === 'login' || id === 'retry' || id === 'reload') return;
       rows.push(row('', notices[id].html, id, notices[id].actions));
     });
     bar.innerHTML = rows.join('');
@@ -291,6 +342,8 @@
 
   window.SlaterConn = {
     get online() { return state.online; },
+    get reloadNeeded() { return !!state.reloadNeeded; },
+    contactsMode: CONTACTS_MODE,
     tabId: TAB_ID,
     allowLeave: function () { leaving = true; },
     mayTake: mayTake,
