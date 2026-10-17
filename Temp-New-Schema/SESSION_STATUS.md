@@ -1,10 +1,27 @@
 # Data Model Rewrite: Session Status
 
-Last updated: 2026-10-10
+Last updated: 2026-10-17
 
 ## Where we are
 
-**PICK UP HERE (2026-10-17, later):** Session 9 DONE (see below). NEXT: John's OK to MERGE to main (commands in docs/CUTOVER.md step 1; switch stays unset = off), then pick the cutover window.
+**PICK UP HERE (2026-10-17, evening): CUTOVER DONE. v2 Contacts is LIVE in production.**
+
+### Cutover, 2026-10-17 (times PDT)
+- 15:46 merged `data-model-rewrite` to main (`5a53461`), deployed with the switch unset (off).
+- 15:53 backup: `~/Slater-backups/pre-cutover-20261017-225302.sql` (not in the repo).
+- 15:56 rehearsal on that backup, 16:01 prod dry run, 16:02 **prod migration committed**: PASS for both users. Report: `~/Slater-backups/migration-report-prod.txt`. John: 43 old entries -> 35 contacts (7 merged), 10 orgs (incl. new "Port of Tacoma / NWSA"), 8 locations; people linked 96/97 (Kendra Hubbell unlinked, kp), roles 78/115, schedule locations 28/28. Jen: 19 -> 18 contacts, 4 orgs, 3 locations. Old data (users.contacts, agencies, receipts, licenses, project rows) unchanged.
+- 16:04 step 9 test project "Test for Data Migration" created on the old screens.
+- 16:06 Railway `CONTACTS_V2_CUTOVER=on`; deploy `cc387397` logs `Contacts cutover switch: on (new tables found)`.
+- Checked later the same evening: live `/slater-config.js` returns `"on"`; an old `/api/contacts` write is refused with 409 `contacts_moved`. John generated a real call sheet on prod: all good (step 11).
+- Re-running `verify-data-model-migration.js` on prod AFTER cutover reports 1 FAIL: "Test for Data Migration" has `agency_org_id` null (legacy `data.agency_id` 1, expected org 15). Expected, not a bug: it was created before the switch flipped, and its only later save was the stale tab's queued edit. `matchLegacy()` links it on next open and the link is saved with the next edit. The verifier only knows migrated data, so projects created after cutover may trip it. John can just delete that project.
+
+### Remaining
+1. Step 12: John re-adds custom roles (Contacts > Roles > + New): Content, Stream Tech, V-Cam Op, Managing Producer (Kiko Toledo), Producer / TD (Michael Ganyo), MP Prod (Alex Altebef), Client Services (kp), Graphic Designer (Michelle Poole, optional); then reassigns per the migration report. Same for Jen's account.
+2. Delete "Test for Data Migration".
+3. Later cleanup (once rollback is no longer wanted): remove the old Contacts modal / Agency Manager code and drop the old columns (users.contacts, agencies table, data.agency_id mirrors).
+4. Backlog: phone UI issues (John to list specifics).
+
+**Earlier PICK UP HERE (2026-10-17, later):** Session 9 DONE (see below). NEXT: John's OK to MERGE to main (commands in docs/CUTOVER.md step 1; switch stays unset = off), then pick the cutover window.
 
 ### Session 9, 2026-10-17 (Opus): buffer + runbook polish
 - Production schema DRY RUN (John OK'd): `migrate-data-model.js --allow-remote --dry-run` against crossover.proxy.rlwy.net passed, rolled back; read-only check after: 0 new tables in prod. Prod today: 2 users, 19 projects, 5 agencies, 9 receipts, 10 licenses. The prod TCP proxy already exists (no need for RESTORE.md 4b).
