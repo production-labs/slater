@@ -1,7 +1,7 @@
 // End-to-end browser test for project crew / talent / key personnel and
 // schedule locations on v2 (data-model-rewrite, Session 5). LOCAL DATABASE ONLY.
 //
-// Drives real Chrome with ?contacts=v2 and checks projects.data after saves.
+// Drives real Chrome and checks projects.data after saves.
 // Creates a temporary user and deletes it afterwards.
 // Same one-time setup as e2e-contacts-v2.js:
 //   npm i --prefix /tmp/cv2-e2e puppeteer-core
@@ -44,7 +44,7 @@ async function main() {
   const hash = await bcrypt.hash(PASS, 10);
   userId = (await db.query(`INSERT INTO users (email, password_hash, name) VALUES ($1,$2,'PP2 Tester') RETURNING id`, [EMAIL, hash])).rows[0].id;
 
-  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: 'test' }) /* per-browser ?contacts= toggle */, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT) }), stdio: ['ignore', 'pipe', 'pipe'] });
   let serverLog = ''; server.stdout.on('data', d => serverLog += d); server.stderr.on('data', d => serverLog += d);
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch (_) {} await sleep(250); }
 
@@ -129,7 +129,7 @@ async function main() {
   console.log('\nNew project');
   let key;
   await step('new project: default EP / Producer cards link to their roles, text unchanged', async () => {
-    await page.goto(BASE + '/?contacts=v2', { waitUntil: 'networkidle2' });
+    await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
     await page.evaluate(() => localStorage.removeItem('slater_last_project'));
     await page.reload({ waitUntil: 'networkidle2' });
     await storeLoaded();
@@ -616,18 +616,16 @@ async function main() {
     await shot('05-config-recalled');
   });
 
-  console.log('\nFlag off');
-  await step('opening + saving with the flag off keeps the links', async () => {
-    await page.goto(BASE + '/?contacts=v1', { waitUntil: 'networkidle2' });
+  console.log('\nReopen');
+  await step('reopening + saving keeps the links', async () => {
     await page.evaluate(k => localStorage.setItem('slater_last_project', k), key);
     await page.reload({ waitUntil: 'networkidle2' });
     await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, key);
-    assert(!(await page.evaluate(() => !!window.ProjectPeopleV2)), 'v2 module off');
-    await page.evaluate(() => { document.getElementById('project_title').value = 'People V2 Project (v1 edit)'; });
-    const d = await saveUntil(key, d => d.project_title === 'People V2 Project (v1 edit)', 'v1 save');
+    await storeLoaded();
+    await page.evaluate(() => { document.getElementById('project_title').value = 'People V2 Project (reopened)'; });
+    const d = await saveUntil(key, d => d.project_title === 'People V2 Project (reopened)', 'reopen save');
     assert(d.crew.some(c => c.contact_id === dana.id) && d.kp_cards[0].contact_id === erin.id && d.talent[0].contact_id === hannah.id, 'links kept');
     assert(d.schedule_days.length >= 1, 'schedule days kept');
-    await page.goto(BASE + '/?contacts=v2', { waitUntil: 'networkidle2' });
   });
 
   if (/Error/.test(serverLog)) console.log('\nServer log (errors):\n' + serverLog.split('\n').filter(l => /Error/i.test(l)).join('\n'));

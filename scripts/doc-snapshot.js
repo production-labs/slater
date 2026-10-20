@@ -1,6 +1,6 @@
-// Document snapshot for before/after comparisons (data-model-rewrite).
+// Document snapshot for before/after comparisons of a code change.
 // LOCAL DATABASE ONLY. READ-ONLY: every non-GET /api request from the page is
-// blocked, so opening projects can't autosave or touch the contacts blob.
+// blocked, so opening projects can't autosave anything.
 //
 // Logs in as an existing user by inserting a session row (no password needed,
 // nothing about the user changes; the session row is deleted at the end),
@@ -9,7 +9,8 @@
 //   /tmp/slater-doc-snapshots/<label>/<project key>.<doc>.txt
 //
 // Run (same puppeteer setup as e2e-contacts-v2.js):
-//   NODE_PATH=/tmp/cv2-e2e/node_modules node scripts/doc-snapshot.js <label> [v1|v2] [email]
+//   NODE_PATH=/tmp/cv2-e2e/node_modules node scripts/doc-snapshot.js <label> [email]
+// e.g. run it on main (git stash / checkout), then on your branch, and diff.
 // Compare two runs:
 //   diff -r /tmp/slater-doc-snapshots/<before> /tmp/slater-doc-snapshots/<after>
 const path = require('path');
@@ -23,9 +24,8 @@ const signature = require(APP + '/node_modules/cookie-signature');
 const puppeteer = require('puppeteer-core');
 
 const label = process.argv[2];
-const flag = process.argv[3] || 'v2';
-const email = process.argv[4] || 'john@vandonald.com';
-if (!label || !/^v[12]$/.test(flag)) { console.error('usage: doc-snapshot.js <label> [v1|v2] [email]'); process.exit(2); }
+const email = process.argv[3] || 'john@vandonald.com';
+if (!label) { console.error('usage: doc-snapshot.js <label> [email]'); process.exit(2); }
 if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(new URL(process.env.DATABASE_URL).hostname)) {
   console.error('Refusing to run against a non-local database.'); process.exit(2);
 }
@@ -52,12 +52,10 @@ async function main() {
     userId: user.id, userEmail: user.email, userName: user.name,
   }, expires]);
 
-  // The cutover switch decides which screens the page uses (routes/cutover.js):
-  // v1 = off, v2 = on, exactly as production will run before / after cutover.
-  // (`on` needs the new tables; the server falls back to off without them,
-  // which the check below catches.)
-  const MODE = flag === 'v2' ? 'on' : 'off';
-  const server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: MODE }), stdio: 'ignore' });
+  // CONTACTS_V2_CUTOVER=on only matters for code from before 2026-10-20 (the
+  // old Contacts switch, e.g. an older checkout to compare against); newer
+  // code ignores it.
+  const server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: 'on' }), stdio: 'ignore' });
   let browser;
   try {
     for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch (_) {} await sleep(250); }
@@ -81,9 +79,6 @@ async function main() {
     const cdp = await page.createCDPSession();
     await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DL });
     await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
-    const mode = await page.evaluate(() => window.SLATER_CONTACTS_MODE);
-    // undefined = code from before the switch existed (e.g. main before the merge): old screens only.
-    if (mode !== MODE && !(mode === undefined && MODE === 'off')) throw new Error('server is running the switch as "' + mode + '", wanted "' + MODE + '" (v2 needs the new tables: run the migration first)');
 
     for (const key of keys) {
       await page.evaluate(k => {
@@ -92,7 +87,7 @@ async function main() {
         if (window.SlaterConn) SlaterConn.allowLeave();
       }, key);
       await page.reload({ waitUntil: 'networkidle2' });
-      await page.waitForFunction((k, f) => currentSheetKey === k && (f === 'v1' || (window.ContactsV2 && ContactsV2.store.loaded)), { timeout: 15000 }, key, flag)
+      await page.waitForFunction(k => currentSheetKey === k && window.ContactsV2 && ContactsV2.store.loaded, { timeout: 15000 }, key)
         .catch(() => { throw new Error('project did not open: ' + key); });
       await sleep(1200);
       for (const [name, fn] of DOCS) {

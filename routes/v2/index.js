@@ -1,7 +1,5 @@
-// v2 API: new data model (contacts, organizations, roles, locations).
-// Mounted at /api/v2 behind requireAuth. Lives alongside the old
-// /api/contacts and /api/agencies endpoints, which are untouched until
-// cutover (Session 8). Nothing in the frontend calls v2 yet (Session 3+).
+// Contacts API: people (contacts), organizations, roles, locations.
+// Mounted at /api/v2 behind requireAuth.
 //
 //   GET /api/v2/sync ?since=<cursor>
 //     One round trip for offline sync. Same rules as each resource's

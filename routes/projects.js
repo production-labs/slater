@@ -6,41 +6,26 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-// ── Organization links (data-model-rewrite, Session 4) ──────────────────────
-// Projects are still saved as one JSON bundle. The links to the project's
-// agency and client organizations ALSO live in real columns,
+// ── Organization links ──────────────────────────────────────────────────────
+// Projects are saved as one JSON bundle. The links to the project's agency
+// and client organizations ALSO live in real columns,
 // projects.agency_org_id / client_org_id, so the database can protect them
 // (an organization in use can't be permanently deleted).
 //
 // The columns are the source of truth. On every save:
 //   - If the bundle carries the key (data.agency_org_id / data.client_org_id,
-//     sent by the v2 project pickers), the column takes that value, but only
-//     if the organization belongs to the saving user; anything else becomes
+//     sent by the project pickers), the column takes that value, but only if
+//     the organization belongs to the saving user; anything else becomes
 //     NULL and is reported back in `org_link_warnings`.
-//   - If the key is missing (old pickers, flag off), the column keeps its
+//   - If the key is missing (e.g. an imported backup), the column keeps its
 //     value. Either way the bundle copy is rewritten to match the column.
-//   - For rollback, a v2 save also rewrites the old data.agency_id to the
-//     agency's legacy agencies.id (NULL for organizations created in v2).
-//     data.client_company is written by the client (the org's name).
+//   - data.client_company is written by the client (the org's name).
 // On load the column values are copied over the bundle copy, so the column
 // wins if they ever disagree.
-//
-// The columns only exist once scripts/migrate-data-model.js has run. Until
-// then (production today) this route behaves exactly as before.
 const LINKS = [
   { key: 'agency_org_id', col: 'agency_org_id' },
   { key: 'client_org_id', col: 'client_org_id' },
 ];
-
-let hasOrgColumns = null; // null = not checked yet
-async function orgColumnsExist() {
-  if (hasOrgColumns !== null) return hasOrgColumns;
-  const r = await pool.query(
-    `SELECT COUNT(*)::int AS n FROM information_schema.columns
-      WHERE table_name = 'projects' AND column_name IN ('agency_org_id', 'client_org_id')`);
-  hasOrgColumns = r.rows[0].n === 2;
-  return hasOrgColumns;
-}
 
 function overlayLinks(row) {
   if (!row || !row.data || typeof row.data !== 'object') return row;
@@ -90,7 +75,7 @@ router.post('/:key', async (req, res) => {
   let { data } = req.body;
   const userId = req.session.userId;
   try {
-	if (!(await orgColumnsExist()) || !data || typeof data !== 'object' || Array.isArray(data)) {
+	if (!data || typeof data !== 'object' || Array.isArray(data)) {
 	  const result = await pool.query(
 	    `INSERT INTO projects (key, label, data, owner_id, updated_at)
 	     VALUES ($1, $2, $3, $4, NOW())
@@ -116,6 +101,7 @@ router.post('/:key', async (req, res) => {
 	  }
 
 	  data = Object.assign({}, data);
+	  delete data.agency_id; // old agencies-table link (before 2026-10-17); never read
 	  const finalIds = {};
 	  const warnings = [];
 	  const wanted = [];
@@ -133,7 +119,7 @@ router.post('/:key', async (req, res) => {
 	  const owned = new Map();
 	  if (wanted.length) {
 	    const r = await client.query(
-	      'SELECT id, legacy_agency_id FROM organizations WHERE owner_id = $1 AND id = ANY($2::int[])',
+	      'SELECT id FROM organizations WHERE owner_id = $1 AND id = ANY($2::int[])',
 	      [userId, wanted]);
 	    r.rows.forEach(o => owned.set(o.id, o));
 	  }
@@ -145,12 +131,6 @@ router.post('/:key', async (req, res) => {
 	    }
 	    data[l.key] = finalIds[l.key];
 	  });
-
-	  // Rollback copy of the agency link in the old format.
-	  if (Object.prototype.hasOwnProperty.call(req.body.data, 'agency_org_id')) {
-	    const org = finalIds.agency_org_id ? owned.get(finalIds.agency_org_id) : null;
-	    data.agency_id = org && org.legacy_agency_id ? String(org.legacy_agency_id) : null;
-	  }
 
 	  const result = await client.query(
 	    `INSERT INTO projects (key, label, data, owner_id, updated_at, agency_org_id, client_org_id)

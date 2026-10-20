@@ -1,8 +1,5 @@
 // Project organization pickers on v2 (data-model-rewrite, Session 4)
 //
-// Only active with the v2 contacts flag (?contacts=v2). Flag off: this file
-// does nothing and the old agency dropdown + company autocomplete are used.
-//
 // The project's links live in app.js `_orgLinks` (agency_org_id,
 // client_org_id) so they survive whichever script loads first. This file:
 //   - fills the existing Agency dropdown (#project_agency_id) with the user's
@@ -13,18 +10,14 @@
 //   - answers getAgencyInfo() / findClientCompany() in app.js, so the call
 //     sheet, workback and expense report read agency and client from the org.
 //
-// The Company text box keeps the org's name, which app.js saves as the old
-// data.client_company (rollback, and what the docs print). Typed text that
-// isn't an organization stays plain text with no link, as today, and shows a
-// hint offering to add it.
-//
-// Projects saved before the Session 6 migration have no org ids yet. On load
-// they are linked the way the migration will do it: agency by the old agency
-// id (organizations.legacy_agency_id), client by exact name (trim + lowercase).
+// The Company text box keeps the org's name, which app.js saves as
+// data.client_company (what the docs print). Typed text that isn't an
+// organization stays plain text with no link and shows a hint offering to
+// add it. A project with no client organization yet is linked on load to an
+// organization with exactly that name (trim + lowercase), if there is one.
 
 (function () {
   'use strict';
-  if (typeof orgsV2On !== 'function' || !orgsV2On()) return;
 
   var CV2 = window.ContactsV2;
   if (!CV2) { console.warn('project-orgs-v2: ContactsV2 missing'); return; }
@@ -210,12 +203,6 @@
     if (!store.loaded) { pendingLegacyMatch = true; return; }
     pendingLegacyMatch = false;
     var touched = false;
-    if (!_orgLinks.agency_org_id && _orgLinks.legacy_agency_id) {
-      var la = String(_orgLinks.legacy_agency_id);
-      var a = Object.keys(store.organizations).map(function (k) { return store.organizations[k]; })
-        .filter(function (o) { return o.legacy_agency_id != null && String(o.legacy_agency_id) === la; })[0];
-      if (a) { _orgLinks.agency_org_id = a.id; touched = true; }
-    }
     if (!_orgLinks.client_org_id && _orgLinks.legacy_client) {
       var m = byName(_orgLinks.legacy_client);
       if (m) { _orgLinks.client_org_id = m.id; touched = true; }
@@ -264,8 +251,8 @@
     if (!code || code === CV2.defaultCountry()) return '';
     return Regions && Regions.countryName ? Regions.countryName(code) : code;
   }
-  // Same shape as app.js getAgencyInfo(). null = no organizations at all
-  // (before the migration), so app.js falls back to the old agencies.
+  // The doc helpers' agency record (app.js getAgencyInfo()). null = no agency
+  // organizations at all, or the store hasn't loaded yet.
   function agencyInfo() {
     if (!store.loaded) return null;
     var o = org(_orgLinks.agency_org_id);

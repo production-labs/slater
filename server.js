@@ -37,7 +37,6 @@ app.use(session({
 
 pool.query('SELECT 1').then(async () => {
   console.log('Database connected');
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS contacts JSONB DEFAULT '{}'`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS logo TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT FALSE`);
   console.log('Migrations complete');
@@ -55,26 +54,13 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: 'Not logged in' });
 }
 
-// Contacts cutover switch (CONTACTS_V2_CUTOVER = off / on / test; see
-// routes/cutover.js and docs/CUTOVER.md). Must come before the API routes:
-// it refuses saves from the wrong screens.
-const cutover = require('./routes/cutover');
-cutover.init(pool);
-app.get('/slater-config.js', cutover.configScript);
-app.use('/api', cutover.guard);
-
-app.use('/api/contacts', requireAuth, require('./routes/contacts'));
-app.use('/api/users/me/contacts', requireAuth, require('./routes/contacts'));
 app.use('/api/users', require('./routes/users'));
 
-app.use('/api/agencies', requireAuth, require('./routes/agencies'));
 app.use('/api/projects', requireAuth, require('./routes/projects'));
 app.use('/api/receipts', requireAuth, require('./routes/receipts'));
 app.use('/api/ocr', requireAuth, require('./routes/ocr'));
 app.use('/api/licenses', require('./routes/licenses'));
-// New data model (data-model-rewrite). Requires scripts/migrate-data-model.js
-// to have been run. Used by the page only when the cutover switch is on (or
-// in `test` mode with ?contacts=v2).
+// Contacts: people, organizations, locations, roles (routes/v2).
 app.use('/api/v2', requireAuth, require('./routes/v2'));
 
 app.get('/health', (req, res) => {
@@ -211,7 +197,6 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const id = req.params.id;
     await pool.query('DELETE FROM receipts WHERE owner_id = $1', [id]);
     await pool.query('DELETE FROM projects WHERE owner_id = $1', [id]);
-    await pool.query('DELETE FROM agencies WHERE user_id = $1', [id]);
     await pool.query("DELETE FROM sessions WHERE sess::jsonb->>'userId' = $1::text", [id]);
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
     res.json({ success: true });

@@ -104,81 +104,6 @@ function _noteMine(key, t) {
        return await r.json();
      } catch(e) { return null; }
    },
-   async getAgencies() {
-     try {
-       const r = await fetch(this.base+'/api/agencies');
-       if (!r.ok) return [];
-       return await r.json();
-     } catch(e) { return []; }
-   },
-   async createAgency(data) {
-     try {
-       const r = await fetch(this.base+'/api/agencies', {
-         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
-       });
-       if (!r.ok) return null;
-       return await r.json();
-     } catch(e) { return null; }
-   },
-   async updateAgency(id, data) {
-     try {
-       const r = await fetch(this.base+'/api/agencies/'+id, {
-         method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
-       });
-       if (!r.ok) return null;
-       return await r.json();
-     } catch(e) { return null; }
-   },
-   async deleteAgency(id) {
-     try {
-       const r = await fetch(this.base+'/api/agencies/'+id, {method:'DELETE'});
-       if (!r.ok) return null;
-       return await r.json();
-     } catch(e) { return null; }
-   },
-   async setDefaultAgency(id) {
-     try {
-       const r = await fetch(this.base+'/api/agencies/'+id+'/set-default', {method:'POST'});
-       if (!r.ok) return null;
-       return await r.json();
-     } catch(e) { return null; }
-   },
-   async getAgencySettings() {
-     try {
-       const r = await fetch(this.base+'/api/users/me/agency');
-       if (!r.ok) return null;
-       return await r.json();
-     } catch(e) { return null; }
-   },
-   async saveAgencySettings(data) {
-     try {
-       const r = await fetch(this.base+'/api/users/me/agency', {
-         method:'PUT',
-         headers:{'Content-Type':'application/json'},
-         body:JSON.stringify(data)
-       });
-       if (!r.ok) return null;
-       return await r.json();
-     } catch(e) { return null; }
-   },
-   async getContacts() {
-     try {
-       const r = await fetch(this.base+'/api/users/me/contacts');
-       if (!r.ok) return null;
-       return await r.json();
-     } catch(e) { return null; }
-   },
-   async saveContacts(data) {
-     try {
-       const r = await fetch(this.base+'/api/users/me/contacts', {
-         method:'PUT',
-         headers:{'Content-Type':'application/json'},
-         body:JSON.stringify(data)
-       });
-       if (!r.ok) return null;
-       return await r.json();
-     } catch(e) { return null; }
-   },
  };
   
 const LB64 = "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"
@@ -512,19 +437,14 @@ async function findNearestHospital(loc) {
 }
 
 function getLocByName(name) {
-  if (!name) return null;
-  if (window.ProjectPeopleV2) return ProjectPeopleV2.locationByName(name);
-  return (loadContacts().locations || []).find(function(l) { return l.name === name; }) || null;
+  if (!name || !window.ProjectPeopleV2) return null;
+  return ProjectPeopleV2.locationByName(name);
 }
 
-// Data model rewrite (Session 5): with the v2 flag, schedule days pick from
-// the v2 Locations and save location_id plus the name (loc_id / loc_name, as
-// before). Flag off: the old contacts blob, matched by name.
+// Schedule days pick from Contacts > Locations and save location_id plus the
+// name (loc_id / loc_name).
 function scheduleLocations() {
-  if (window.ProjectPeopleV2) return ProjectPeopleV2.locations();
-  var list = (loadContacts().locations || []).filter(function(l) { return !!l.name; });
-  list.sort(function(a, b) { return a.name.localeCompare(b.name); });
-  return list;
+  return window.ProjectPeopleV2 ? ProjectPeopleV2.locations() : [];
 }
 function getDayLoc(dayId) {
   var inp = document.getElementById(dayId+"_loc_id");
@@ -1467,21 +1387,18 @@ function addScheduleDay(data, insertAfterDayId) {
   addLocBtn.addEventListener("mousedown", function(e) { e.preventDefault(); });
   addLocBtn.onclick = function() {
     var typed = locInp.value.trim();
-    if (window.ProjectPeopleV2 && window.ContactsV2) {
-      locList.classList.remove("open");
-      // v2: a typed name that isn't a location yet opens a new location with
-      // that name; once it's created, this day links to it.
-      var known = typed ? getLocByName(typed) : null;
-      ContactsV2.open("locations", typed && !known ? { newLocation: { name: typed }, onCreated: function(row) {
-        if (!document.getElementById(dayId+"_loc_id")) return; // day was removed meanwhile
-        locInp.value = row.name;
-        locIdInp.value = String(row.id);
-        _applyLocSelection(row);
-        if (typeof autosaveTrigger === "function") autosaveTrigger();
-      } } : undefined);
-      return;
-    }
-    contactsTab = "locations"; openContacts();
+    if (!window.ContactsV2) return;
+    locList.classList.remove("open");
+    // A typed name that isn't a location yet opens a new location with that
+    // name; once it's created, this day links to it.
+    var known = typed ? getLocByName(typed) : null;
+    ContactsV2.open("locations", typed && !known ? { newLocation: { name: typed }, onCreated: function(row) {
+      if (!document.getElementById(dayId+"_loc_id")) return; // day was removed meanwhile
+      locInp.value = row.name;
+      locIdInp.value = String(row.id);
+      _applyLocSelection(row);
+      if (typeof autosaveTrigger === "function") autosaveTrigger();
+    } } : undefined);
   };
 
   const locSelRow = document.createElement("div"); locSelRow.className = "sday-loc-sel-row";
@@ -3396,154 +3313,15 @@ function wbDuplicateRow() {
   _wbSelectedId = null;
   wbRecalc(); wbRender(); wbSelectItem(newId); wbHideToolbar(); autosaveTrigger();
 }
-
-
-// ── Contact directory ─────────────────────────────────────────────────────────
-const CONTACTS_KEY = "slater_contacts";
-let contactsTab = "staff";
-
-function loadContacts() {
-  try { return JSON.parse(localStorage.getItem(CONTACTS_KEY)||"{}"); } catch(e) { return {}; }
-}
-function saveContactsData(data) {
-  localStorage.setItem(CONTACTS_KEY, JSON.stringify(data));
-  API.saveContacts(data);
-}
-
-// Merge contacts from a saved call sheet object.
-// Old Contacts only. With the new Contacts screens on (cutover switch), this
-// never runs: name-keyed copying is what brought deleted/renamed contacts
-// back (bug 3), and the server refuses old contacts saves anyway.
-function mergeContactsFromSheet(data) {
-  if (orgsV2On()) return;
-  const db = loadContacts();
-  if (!db.staff)     db.staff     = [];
-  if (!db.crew)      db.crew      = [];
-  if (!db.talent)    db.talent    = [];
-  if (!db.locations) db.locations = [];
-
-  function upsert(list, entry, keys) {
-    const key = (entry[keys[0]]||"").trim().toLowerCase();
-    if (!key) return;
-    const existing = list.find(x => (x[keys[0]]||"").trim().toLowerCase() === key);
-    if (existing) {
-      // Merge ALL fields from entry into existing (not just key fields)
-      Object.keys(entry).forEach(function(k) { if (entry[k]) existing[k] = entry[k]; });
-    }
-    else list.push(Object.assign({}, entry));
-  }
-
-  // Staff
-  [["ep","EP"],["prod","PROD"],["eic","EIC"],["mngprd","MNG PRD"]].forEach(([prefix, role]) => {
-    const name = data[prefix+"_name"], phone = data[prefix+"_phone"], email = data[prefix+"_email"];
-    if (name) upsert(db.staff, {name, phone:phone||"", email:email||"", role}, ["name"]);
-  });
-
-  // Crew
-  (data.crew||[]).forEach(c => {
-    if (c.name) upsert(db.crew, {name:c.name, phone:c.phone||"", email:c.email||"", position:c.position||""}, ["name"]);
-  });
-
-  // Talent
-  (data.talent||[]).forEach(t => {
-    if (t.name) upsert(db.talent, {name:t.name, phone:t.phone||"", email:t.email||"", title:t.title||""}, ["name"]);
-  });
-
-  saveContactsData(db);
-}
-
-// Autocomplete: attach to a name input, filling phone+email siblings
-function acAttach(nameEl, getPhoneEl, getEmailEl, bucket) {
-  if (!nameEl || nameEl._acAttached) return;
-  nameEl._acAttached = true;
-
-  // Wrap in ac-wrap div
-  const wrap = document.createElement("div");
-  wrap.className = "ac-wrap";
-  nameEl.parentNode.insertBefore(wrap, nameEl);
-  wrap.appendChild(nameEl);
-
-  const list = document.createElement("div");
-  list.className = "ac-list";
-  wrap.appendChild(list);
-
-  let activeIdx = -1;
-
-  function getMatches(q) {
-    if (q.length < 2) return [];
-    const db = loadContacts();
-    const entries = db[bucket] || [];
-    const ql = q.toLowerCase();
-    return entries.filter(e => (e.name||"").toLowerCase().includes(ql)).slice(0, 8);
-  }
-
-  function render(matches) {
-    list.innerHTML = "";
-    activeIdx = -1;
-    if (!matches.length) { list.classList.remove("open"); return; }
-    matches.forEach((m, i) => {
-      const item = document.createElement("div");
-      item.className = "ac-item";
-      item.innerHTML = `<strong>${m.name}</strong><span>${[m.position||m.role||m.title, m.phone, m.email].filter(Boolean).join(" · ")}</span>`;
-      item.addEventListener("mousedown", e => {
-        e.preventDefault();
-        pick(m);
-      });
-      list.appendChild(item);
-    });
-    list.classList.add("open");
-  }
-
-  function pick(m) {
-    // Temporarily make all OTHER inputs readonly to block browser cascade autofill
-    const others = document.querySelectorAll('input[autocomplete="new-password"]');
-    others.forEach(el => { if (el !== nameEl) el.setAttribute("readonly",""); });
-    nameEl.value = m.name;
-    const ph = getPhoneEl(); const em = getEmailEl();
-    if (ph && m.phone) ph.value = m.phone;
-    if (em && m.email) em.value = m.email;
-    list.classList.remove("open");
-    // Remove readonly after browser has had a chance to (not) autofill
-    setTimeout(() => others.forEach(el => el.removeAttribute("readonly")), 200);
-  }
-
-  nameEl.addEventListener("input", () => render(getMatches(nameEl.value)));
-  nameEl.addEventListener("keydown", e => {
-    const items = list.querySelectorAll(".ac-item");
-    if (e.key === "ArrowDown") { activeIdx = Math.min(activeIdx+1, items.length-1); items.forEach((el,i) => el.classList.toggle("active", i===activeIdx)); e.preventDefault(); }
-    else if (e.key === "ArrowUp") { activeIdx = Math.max(activeIdx-1, 0); items.forEach((el,i) => el.classList.toggle("active", i===activeIdx)); e.preventDefault(); }
-    else if (e.key === "Enter" && activeIdx >= 0) { const db = loadContacts(); const matches = getMatches(nameEl.value); if (matches[activeIdx]) pick(matches[activeIdx]); }
-    else if (e.key === "Escape") list.classList.remove("open");
-  });
-  nameEl.addEventListener("blur", () => setTimeout(() => list.classList.remove("open"), 150));
-}
-
-// Attach autocomplete to all relevant fields
-function acAttachKP(id) {
-  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
-  const nameEl = document.getElementById(id+"_name");
-  acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "staff");
-}
+// Crew / talent / key personnel name fields: the Contacts person picker
+// (project-people-v2.js).
+function acAttachKP(id)     { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); }
+function acAttachCrew(id)   { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); }
+function acAttachTalent(id) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); }
 function acAttachAll() {
-  // Key personnel cards
   kp.forEach(id => acAttachKP(id));
-  // Crew cards
   crew.forEach(id => acAttachCrew(id));
-  // Talent cards
   talent.forEach(id => acAttachTalent(id));
-  // Client company
-  acAttachCompany();
-}
-
-function acAttachCrew(id) {
-  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
-  const nameEl = document.getElementById(id+"_name");
-  acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "crew");
-}
-function acAttachTalent(id) {
-  if (orgsV2On()) { if (window.ProjectPeopleV2) ProjectPeopleV2.attach(id); return; } // v2 picker (project-people-v2.js)
-  const nameEl = document.getElementById(id+"_name");
-  acAttach(nameEl, () => document.getElementById(id+"_phone"), () => document.getElementById(id+"_email"), "talent");
 }
 
 // Data model rewrite (Session 5): crew / talent / key personnel cards can be
@@ -3566,131 +3344,9 @@ function setCardLinkFields(id, d) {
   });
 }
 
-// Contacts modal
-let contactsCurrent = null;
+// Contacts: People / Organizations / Locations / Roles (contacts-v2.js).
 function openContacts() {
-  // Data model rewrite: new Contacts screen, opt-in per browser (?contacts=v2) until cutover.
-  if (window.ContactsV2 && ContactsV2.enabled()) return ContactsV2.open();
-  function renderContacts(data) {
-    contactsCurrent = JSON.parse(JSON.stringify(data));
-    if (!contactsCurrent.staff)     contactsCurrent.staff     = [];
-    if (!contactsCurrent.crew)      contactsCurrent.crew      = [];
-    if (!contactsCurrent.talent)    contactsCurrent.talent    = [];
-    if (!contactsCurrent.locations) contactsCurrent.locations = [];
-    if (!contactsCurrent.companies) contactsCurrent.companies = [];
-    document.getElementById("contacts-modal").classList.add("open");
-    showContactsTab(contactsTab);
-  }
-  API.getContacts().then(function(serverData) {
-    if (serverData && Object.keys(serverData).length) {
-      var local = loadContacts();
-      var merged = Object.assign({}, local);
-      Object.keys(serverData).forEach(function(k) {
-        if ((serverData[k]||[]).length > 0) merged[k] = serverData[k];
-      });
-      localStorage.setItem(CONTACTS_KEY, JSON.stringify(merged));
-      renderContacts(merged);
-    } else {
-      renderContacts(loadContacts());
-    }
-  }).catch(function() {
-    renderContacts(loadContacts());
-  });
-}
-function closeContacts() {
-  document.getElementById("contacts-modal").classList.remove("open");
-}
-function showContactsTab(tab) {
-  contactsTab = tab;
-  document.querySelectorAll(".contacts-tab").forEach(t => t.classList.toggle("active", t.textContent.toLowerCase().includes(tab === "staff" ? "production" : tab)));
-  renderContactsBody();
-}
-function renderContactsBody() {
-  var body = document.getElementById("contacts-body");
-  var list = contactsCurrent[contactsTab] || [];
-  var isLoc = contactsTab === "locations";
-  var isCo  = contactsTab === "companies";
-
-  if (isCo) {
-    body.innerHTML = '<div class="contacts-hdr-co"><span></span><span>Company</span><span>Website</span><span>Notes</span><span></span></div>';
-    list.forEach(function(c, i) {
-      var row = document.createElement("div");
-      row.className = "contact-row-co";
-      var logoHtml;
-      if (c.logo) {
-        logoHtml = '<div class="co-logo-wrap" onclick="coLogoUpload(' + i + ')" title="Click to replace logo">' +
-          '<img src="' + c.logo + '">' +
-          '<button class="co-logo-badge rm" onclick="event.stopPropagation();coRemoveLogo(' + i + ')" title="Remove logo">&#x2715;</button>' +
-          '<button class="co-logo-badge cr" onclick="event.stopPropagation();coCropLogo(' + i + ')" title="Crop logo">&#9986;</button>' +
-          '</div>';
-      } else {
-        logoHtml = '<div class="co-logo-wrap" onclick="coLogoUpload(' + i + ')" title="Upload logo">' +
-          '<div class="co-logo-placeholder">Logo</div>' +
-          '</div>';
-      }
-      row.innerHTML = logoHtml +
-        '<input value="' + (c.name||'').replace(/"/g,'&quot;') + '" placeholder="Company name" oninput="contactsCurrent.companies[' + i + '].name=this.value">' +
-        '<input value="' + (c.website||'').replace(/"/g,'&quot;') + '" placeholder="Website (optional)" oninput="contactsCurrent.companies[' + i + '].website=this.value">' +
-        '<input value="' + (c.notes||'').replace(/"/g,'&quot;') + '" placeholder="Notes (optional)" oninput="contactsCurrent.companies[' + i + '].notes=this.value">' +
-        '<button class="rb" onclick="deleteContact(' + i + ')">&#x2715;</button>' +
-        '<input type="file" id="co-logo-file-' + i + '" accept="image/*" style="display:none" onchange="handleCoLogoUpload(this,' + i + ')">';
-      body.appendChild(row);
-    });
-  } else if (isLoc) {
-    body.innerHTML = '<div class="contacts-hdr-loc"><span>Name</span><span>Address</span><span>City</span><span>State</span><span>Zip</span><span></span></div>';
-    list.forEach(function(c, i) {
-      var row = document.createElement("div");
-      row.className = "contact-row-loc";
-      row.innerHTML = '<input value="' + (c.name||'') + '" placeholder="Location name" oninput="contactsCurrent[\'locations\'][' + i + '].name=this.value">' +
-        '<input value="' + (c.address||'') + '" placeholder="Address" oninput="contactsCurrent[\'locations\'][' + i + '].address=this.value">' +
-        '<input value="' + (c.city||'') + '" placeholder="City" oninput="contactsCurrent[\'locations\'][' + i + '].city=this.value">' +
-        '<input value="' + (c.state||'') + '" placeholder="ST" style="max-width:48px" oninput="contactsCurrent[\'locations\'][' + i + '].state=this.value">' +
-        '<input value="' + (c.zip||'') + '" placeholder="Zip" style="max-width:64px" oninput="contactsCurrent[\'locations\'][' + i + '].zip=this.value">' +
-        '<button class="rb" onclick="deleteContact(' + i + ')">&#x2715;</button>';
-      body.appendChild(row);
-    });
-  } else {
-    body.innerHTML = '<div class="contacts-hdr"><span>Name</span><span>Phone</span><span>Email</span><span></span></div>';
-    list.forEach(function(c, i) {
-      var row = document.createElement("div");
-      row.className = "contact-row";
-      row.innerHTML = '<input value="' + (c.name||'') + '" placeholder="Name" oninput="contactsCurrent[\'' + contactsTab + '\'][' + i + '].name=this.value">' +
-        '<input class="fmt-phone" value="' + (c.phone||'') + '" placeholder="Phone" oninput="contactsCurrent[\'' + contactsTab + '\'][' + i + '].phone=this.value">' +
-        '<input value="' + (c.email||'') + '" placeholder="Email" oninput="contactsCurrent[\'' + contactsTab + '\'][' + i + '].email=this.value">' +
-        '<button class="rb" onclick="deleteContact(' + i + ')">&#x2715;</button>';
-      body.appendChild(row);
-    });
-  }
-}
-function addContactRow() {
-  if (!contactsCurrent[contactsTab]) contactsCurrent[contactsTab] = [];
-  var blank = contactsTab === "companies"
-    ? {name:"",logo:"",website:"",notes:""}
-    : {name:"",phone:"",email:"",address:"",notes:""};
-  contactsCurrent[contactsTab].push(blank);
-  renderContactsBody();
-  var rows = document.getElementById("contacts-body").querySelectorAll(".contact-row, .contact-row-loc, .contact-row-co");
-  var last = rows[rows.length-1];
-  if (last) { var _lqr = last.querySelector("input"); if (_lqr) _lqr.focus(); }
-}
-function deleteContact(i) {
-  var _entry = (contactsCurrent[contactsTab]||[])[i]||{};
-  var _label = _entry.name || _entry.company || "this contact";
-  showModal("Remove contact", "Remove \""+_label+"\"? This cannot be undone.", function() {
-    contactsCurrent[contactsTab].splice(i, 1);
-    saveContactsData(contactsCurrent);
-    renderContactsBody();
-  });
-}
-function saveContacts() {
-  // Remove blank entries
-  Object.keys(contactsCurrent).forEach(k => {
-    contactsCurrent[k] = contactsCurrent[k].filter(c => (c.name||"").trim());
-  });
-  saveContactsData(contactsCurrent);
-  refreshSchedLocDropdowns();
-  closeContacts();
-  setStatus("Contacts saved.", "ok");
+  if (window.ContactsV2) ContactsV2.open();
 }
 
 
@@ -5307,7 +4963,6 @@ function loadSavedLogo() {
 (function migrateLocalStorage() {
   var keyMap = {
     "wt_callsheets":    "slater_callsheets",
-    "wt_contacts":      "slater_contacts",
     "wt_wb_templates":  "slater_wb_templates",
     "wt_wb_defaults":   "slater_wb_defaults",
   };
@@ -5403,26 +5058,19 @@ async function exportLibrary() {
     }
     projects[key] = data;
   }
-  // New Contacts screens: the export carries the new records (people,
-  // organizations, locations, your roles, archived ones too) as contacts_v2.
-  // The old-format list in this browser stopped updating at cutover, so it
-  // isn't exported then.
-  var contacts = orgsV2On() ? undefined : loadContacts();
+  // Contacts: people, organizations, locations, your roles (archived ones too).
   var contactsV2 = undefined;
-  if (orgsV2On()) {
-    try {
-      var rv = await fetch("/api/v2/sync?since=" + encodeURIComponent("1970-01-01T00:00:00.000000Z"), { credentials: "same-origin" });
-      if (rv.ok) { contactsV2 = await rv.json(); delete contactsV2.cursor; }
-    } catch (e) { /* export the projects anyway */ }
-    if (!contactsV2) setStatus("Contacts couldn't be included in this export (connection problem). Projects were exported.", "warn");
-  }
+  try {
+    var rv = await fetch("/api/v2/sync?since=" + encodeURIComponent("1970-01-01T00:00:00.000000Z"), { credentials: "same-origin" });
+    if (rv.ok) { contactsV2 = await rv.json(); delete contactsV2.cursor; }
+  } catch (e) { /* export the projects anyway */ }
+  if (!contactsV2) setStatus("Contacts couldn't be included in this export (connection problem). Projects were exported.", "warn");
   var templates = JSON.parse(localStorage.getItem("slater_wb_templates")||"[]");
   var defaults  = JSON.parse(localStorage.getItem("slater_wb_defaults")||"{}");
   var payload = {
     version: 1,
     exported: new Date().toISOString(),
     projects: projects,
-    contacts: contacts,
     contacts_v2: contactsV2,
     templates: templates,
     template_defaults: defaults,
@@ -5472,22 +5120,11 @@ function importLibrary(input) {
         }
       });
 
-      // Merge contacts (old Contacts only). With the new Contacts screens,
-      // contacts in a backup file are not imported: they're kept in Slater
-      // per record, and an old-format list would bring back deleted entries.
-      if (payload.contacts && orgsV2On()) {
+      // Old-format contacts in a backup file are not imported: contacts are
+      // kept in Slater per record, and a whole list would bring back deleted
+      // entries.
+      if (payload.contacts) {
         setTimeout(function() { setStatus("Contacts in the backup file were not imported. Your contacts in Slater are unchanged.", "warn"); }, 1500);
-      } else if (payload.contacts) {
-        var existingContacts = loadContacts();
-        ["staff","crew","talent","locations","companies"].forEach(function(bucket) {
-          if (!payload.contacts[bucket]) return;
-          if (!existingContacts[bucket]) existingContacts[bucket] = [];
-          payload.contacts[bucket].forEach(function(c) {
-            var exists = existingContacts[bucket].find(function(x) { return (x.name||"").toLowerCase() === (c.name||"").toLowerCase(); });
-            if (!exists) existingContacts[bucket].push(c);
-          });
-        });
-        saveContactsData(existingContacts);
       }
 
       // Merge templates
@@ -5519,66 +5156,16 @@ function importLibrary(input) {
 }
 
 
-// ── Agency Settings ───────────────────────────────────────────────────────────
-const AGENCY_KEY = "slater_agency";
+// ── Project organization links ──────────────────────────────────────────────
+// The project's agency and client are organizations from Contacts, held here
+// by id. public/project-orgs-v2.js draws the pickers and answers the doc
+// helpers below. The server copies the ids into projects.agency_org_id /
+// client_org_id (the source of truth). legacy_client = the Company text the
+// project was loaded with, linked to an organization by exact name when the
+// project has no client organization yet.
+var _orgLinks = { agency_org_id: null, client_org_id: null, legacy_client: "" };
 
-// ── Legacy localStorage agency (fallback) ────────────────────────────────────
-function loadAgencyData() {
-  try { return JSON.parse(localStorage.getItem(AGENCY_KEY)||"{}"); } catch(e) { return {}; }
-}
-
-function saveAgencyData(data) {
-  try {
-    localStorage.setItem(AGENCY_KEY, JSON.stringify(data));
-  } catch(e) {
-    try {
-      var slim = Object.assign({}, data, {logo: ""});
-      localStorage.setItem(AGENCY_KEY, JSON.stringify(slim));
-    } catch(e2) {}
-  }
-}
-
-// ── Loaded agencies cache ─────────────────────────────────────────────────────
-var _loadedAgencies = [];
-
-// ── Project organization links on v2 (data-model-rewrite, Session 4) ─────────
-// With the v2 contacts flag on (?contacts=v2), the project's agency and client
-// are organizations from Contacts, held here by id. public/project-orgs-v2.js
-// draws the pickers and answers the doc helpers below. The server copies the
-// ids into projects.agency_org_id / client_org_id (the source of truth).
-// Flag off: none of this runs and the old agency/company pickers are used.
-var _orgLinks = { agency_org_id: null, client_org_id: null, legacy_agency_id: null, legacy_client: "" };
-// The cutover switch decides (public/connection.js slaterContactsV2(): on =
-// everyone, off = nobody, test = the per-browser ?contacts=v2 toggle).
-function orgsV2On() {
-  return typeof window.slaterContactsV2 === "function" ? window.slaterContactsV2() : false;
-}
-function orgsV2() { return orgsV2On() && window.ProjectOrgsV2 ? window.ProjectOrgsV2 : null; }
-
-function refreshAgencySelector() {
-  if (orgsV2On()) { if (window.ProjectOrgsV2) ProjectOrgsV2.render(); return; }
-  var sel = document.getElementById("project_agency_id");
-  if (!sel) return;
-  var current = sel.value;
-  sel.innerHTML = '<option value="">— No agency —</option>';
-  _loadedAgencies.forEach(function(a) {
-    var opt = document.createElement("option");
-    opt.value = a.id;
-    opt.textContent = a.name || ("Agency " + a.id);
-    if (a.is_default) opt.textContent += " (default)";
-    sel.appendChild(opt);
-  });
-  if (current) sel.value = current;
-  // Apply default agency settings for new (unsaved) projects
-  if (!current && !currentSheetKey) {
-    var def = _loadedAgencies.find(function(a) { return a.is_default; }) || _loadedAgencies[0];
-    if (def) {
-      sel.value = def.id;
-      applyAgencyDefaults(def);
-    }
-  }
-}
-
+// New projects take the agency's default timezone and project type.
 function applyAgencyDefaults(agency) {
   if (!agency) return;
   if (agency.timezone && agency.timezone !== "none") {
@@ -5592,15 +5179,6 @@ function applyAgencyDefaults(agency) {
       updateVideoDueVisibility();
       rebuildScheduleDays();
     }
-  }
-  // Show agency logo in header
-  var agencyWrap = document.getElementById("agency-logo-wrap");
-  var agencyImg  = document.getElementById("agency-li");
-  if (agency.logo && agencyWrap && agencyImg) {
-    agencyImg.src = agency.logo;
-    agencyWrap.style.display = "";
-  } else if (agencyWrap) {
-    agencyWrap.style.display = "none";
   }
 }
 
@@ -5671,8 +5249,6 @@ function removeAvatar() {
   _refreshMyInfoAvatar(name, null);
 }
 
-// Keep openAgencySettings as alias so any other callers still work
-function openAgencySettings() { openMyInfo(); }
 
 function closeAgencySettings() {
   document.getElementById("agency-modal").classList.remove("open");
@@ -5697,239 +5273,10 @@ function saveMyInfo() {
   });
 }
 
-// Legacy stub — kept so old callers don't break
-function saveAgencySettings() { saveMyInfo(); }
 
-function applyAgencySettings(data) {
-  // Called on startup with legacy localStorage data for backwards compat
-  if (!data) data = loadAgencyData();
-  var agencyWrap = document.getElementById("agency-logo-wrap");
-  var agencyImg  = document.getElementById("agency-li");
-  if (data.logo && agencyWrap && agencyImg) {
-    agencyImg.src = data.logo;
-    agencyWrap.style.display = "";
-  } else if (agencyWrap) {
-    agencyWrap.style.display = "none";
-  }
-}
-
-// ── Agency Manager modal ──────────────────────────────────────────────────────
-var _agencyEditing = null; // null = list view, object = form view
-
+// Agencies are organizations: the sidebar's Agencies button opens Contacts > Organizations.
 function openAgencyManager() {
-  // v2: agencies are organizations; manage them in Contacts > Organizations.
-  if (orgsV2On() && window.ContactsV2) { ContactsV2.open("organizations"); return; }
-  _agencyEditing = null;
-  document.getElementById("agency-manager-modal").classList.add("open");
-  renderAgencyManager();
-}
-
-function closeAgencyManager() {
-  document.getElementById("agency-manager-modal").classList.remove("open");
-  _agencyEditing = null;
-}
-
-function renderAgencyManager() {
-  var body = document.getElementById("agency-manager-body");
-  var foot = document.getElementById("agency-manager-foot");
-  body.innerHTML = "";
-  foot.innerHTML = "";
-
-  if (_agencyEditing !== null) {
-    // ── Form view ──────────────────────────────────────────────────────────
-    var isNew = !_agencyEditing.id;
-    var f = _agencyEditing;
-
-    function inp(label, key, placeholder) {
-      var wrap = document.createElement("div"); wrap.className = "fl"; wrap.style.marginBottom = "10px";
-      var lbl = document.createElement("label"); lbl.textContent = label;
-      var el = document.createElement("input"); el.type = "text"; el.placeholder = placeholder||"";
-      var isPhone = key.indexOf('phone') !== -1;
-      el.value = isPhone ? formatPhone(f[key]||"") : (f[key]||"");
-      el.autocomplete = "new-password";
-      if (isPhone) el.classList.add("fmt-phone");
-      el.style.cssText = "padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%";
-      el.oninput = (function(k){ return function(){ f[k] = this.value; }; })(key);
-      wrap.appendChild(lbl); wrap.appendChild(el); return wrap;
-    }
-    function sel(label, key, opts) {
-      var wrap = document.createElement("div"); wrap.className = "fl"; wrap.style.marginBottom = "10px";
-      var lbl = document.createElement("label"); lbl.textContent = label;
-      var sw = document.createElement("div"); sw.className = "select-wrap";
-      var el = document.createElement("select");
-      el.style.cssText = "padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface);width:100%";
-      opts.forEach(function(o) {
-        var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1];
-        el.appendChild(opt);
-      });
-      el.value = f[key]||opts[0][0];
-      el.onchange = (function(k){ return function(){ f[k] = this.value; }; })(key);
-      sw.appendChild(el); wrap.appendChild(lbl); wrap.appendChild(sw); return wrap;
-    }
-    function textarea(label, key, placeholder, rows) {
-      var wrap = document.createElement("div"); wrap.className = "fl"; wrap.style.marginBottom = "10px";
-      var lbl = document.createElement("label"); lbl.textContent = label;
-      var el = document.createElement("textarea"); el.rows = rows||3; el.placeholder = placeholder||"";
-      el.style.cssText = "padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;width:100%;resize:vertical;line-height:1.5";
-      el.value = f[key]||"";
-      el.oninput = (function(k){ return function(){ f[k] = this.value; }; })(key);
-      wrap.appendChild(lbl); wrap.appendChild(el); return wrap;
-    }
-
-    body.appendChild(inp("Agency name", "name", "e.g. Worktank"));
-    body.appendChild(inp("Contact name", "contact_name", "Billing contact"));
-    body.appendChild(inp("Contact email", "contact_email", "billing@agency.com"));
-    body.appendChild(inp("Contact phone", "contact_phone", "206.000.0000"));
-    body.appendChild(inp("Address", "address", "123 Main St"));
-    var g3 = document.createElement("div"); g3.className = "g3"; g3.style.marginBottom = "10px";
-    g3.appendChild(inp("City", "city", "Seattle")); g3.appendChild(inp("State", "state", "WA")); g3.appendChild(inp("Zip", "zip", "98101"));
-    body.appendChild(g3);
-    body.appendChild(inp("Invoicing email", "invoicing_email", "invoices@agency.com"));
-    body.appendChild(textarea("Custom invoicing instructions", "invoicing_text", "Leave blank to use default.", 3));
-    body.appendChild(inp("Website", "website", "https://agency.com"));
-    body.appendChild(sel("Default project type", "default_project_type", [
-      ["location_shoot","Location Shoot"],["post_production","Post Production"],
-      ["live_broadcast_location","Live Broadcast: On Location"],
-      ["live_broadcast_studio","Live Broadcast: In Studio"],["webinar","Webinar"]
-    ]));
-    body.appendChild(sel("Timezone", "timezone", [
-      ["PT","Pacific Time"],["ET","Eastern Time"],["CT","Central Time"],
-      ["MT","Mountain Time"],["AKT","Alaska Time"],["HT","Hawaii Time"],
-      ["GMT","Greenwich Mean Time"],["CET","Central European Time"]
-    ]));
-
-    // Logo section
-    var logoSection = document.createElement("div"); logoSection.className = "fl"; logoSection.style.marginBottom = "10px";
-    var logoLabel = document.createElement("label"); logoLabel.textContent = "Agency logo";
-    var logoRow = document.createElement("div"); logoRow.style.cssText = "display:flex;align-items:center;gap:10px";
-    var logoPreview = document.createElement("img"); logoPreview.id = "agency-form-logo-preview";
-    logoPreview.style.cssText = "width:60px;height:60px;object-fit:contain;border-radius:6px;border:1px solid var(--border)";
-    logoPreview.style.display = f.logo ? "" : "none";
-    if (f.logo) logoPreview.src = f.logo;
-    var logoBtns = document.createElement("div"); logoBtns.style.cssText = "display:flex;flex-direction:column;gap:6px";
-    function applyAgencyLogo(cropped) {
-      f.logo = cropped;
-      logoPreview.src = cropped; logoPreview.style.display = "";
-      removeLogoBtn.style.display = ""; cropLogoBtn.style.display = "";
-    }
-    var uploadBtn = document.createElement("button"); uploadBtn.className = "lb"; uploadBtn.style.fontSize = "11px"; uploadBtn.textContent = "Upload logo";
-    uploadBtn.onclick = function() { document.getElementById("agency-form-logo-upload").click(); };
-    var cropLogoBtn = document.createElement("button"); cropLogoBtn.className = "lb"; cropLogoBtn.style.fontSize = "11px"; cropLogoBtn.textContent = "Crop";
-    cropLogoBtn.style.display = f.logo ? "" : "none";
-    cropLogoBtn.onclick = function() { if (f.logo) openCropModal(f.logo, applyAgencyLogo); };
-    var removeLogoBtn = document.createElement("button"); removeLogoBtn.className = "lb danger"; removeLogoBtn.style.fontSize = "11px"; removeLogoBtn.textContent = "Remove";
-    removeLogoBtn.style.display = f.logo ? "" : "none";
-    removeLogoBtn.onclick = function() { f.logo = ""; logoPreview.style.display = "none"; removeLogoBtn.style.display = "none"; cropLogoBtn.style.display = "none"; };
-    var logoFile = document.createElement("input"); logoFile.type = "file"; logoFile.id = "agency-form-logo-upload";
-    logoFile.accept = "image/*"; logoFile.style.display = "none";
-    logoFile.onchange = function() {
-      var file = this.files[0]; if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function(ev) { openCropModal(ev.target.result, applyAgencyLogo); };
-      reader.readAsDataURL(file);
-      this.value = "";
-    };
-    logoBtns.appendChild(uploadBtn); logoBtns.appendChild(cropLogoBtn); logoBtns.appendChild(removeLogoBtn);
-    logoRow.appendChild(logoPreview); logoRow.appendChild(logoBtns); logoRow.appendChild(logoFile);
-    logoSection.appendChild(logoLabel); logoSection.appendChild(logoRow);
-    body.appendChild(logoSection);
-
-    // Default checkbox
-    var defRow = document.createElement("div"); defRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:4px";
-    var defChk = document.createElement("input"); defChk.type = "checkbox"; defChk.id = "agency-form-default"; defChk.checked = !!f.is_default;
-    defChk.onchange = function() { f.is_default = this.checked; };
-    var defLbl = document.createElement("label"); defLbl.htmlFor = "agency-form-default"; defLbl.textContent = "Set as default agency"; defLbl.style.fontWeight = "600";
-    defRow.appendChild(defChk); defRow.appendChild(defLbl);
-    body.appendChild(defRow);
-
-    var cancelBtn = document.createElement("button"); cancelBtn.className = "lb"; cancelBtn.textContent = "Cancel";
-    cancelBtn.onclick = function() { _agencyEditing = null; renderAgencyManager(); };
-    var saveBtn = document.createElement("button"); saveBtn.className = "lb primary"; saveBtn.textContent = isNew ? "Create agency" : "Save changes";
-    saveBtn.onclick = function() { saveAgencyForm(); };
-    foot.appendChild(cancelBtn); foot.appendChild(saveBtn);
-    return;
-  }
-
-  // ── List view ──────────────────────────────────────────────────────────────
-  if (!_loadedAgencies.length) {
-    var empty = document.createElement("div");
-    empty.style.cssText = "color:#bbb;font-size:13px;font-style:italic;padding:8px 0";
-    empty.textContent = "No agencies yet. Add one to get started.";
-    body.appendChild(empty);
-  } else {
-    _loadedAgencies.forEach(function(agency) {
-      var row = document.createElement("div"); row.className = "tmpl-row";
-      var nameEl = document.createElement("div"); nameEl.className = "tmpl-row-name"; nameEl.textContent = agency.name || "Unnamed agency";
-      var meta = document.createElement("div"); meta.className = "tmpl-row-meta"; meta.textContent = [agency.city, agency.state].filter(Boolean).join(", ");
-      var defBadge = null;
-      if (agency.is_default) {
-        defBadge = document.createElement("div"); defBadge.className = "tmpl-row-badge"; defBadge.textContent = "Default";
-      }
-      var editBtn = document.createElement("button"); editBtn.className = "lb"; editBtn.style.fontSize = "11px"; editBtn.textContent = "Edit";
-      editBtn.onclick = (function(a) { return function() { _agencyEditing = JSON.parse(JSON.stringify(a)); renderAgencyManager(); }; })(agency);
-      var setDefBtn = document.createElement("button"); setDefBtn.className = "lb"; setDefBtn.style.fontSize = "11px"; setDefBtn.textContent = "Set default";
-      setDefBtn.style.display = agency.is_default ? "none" : "";
-      setDefBtn.onclick = (function(a) { return function() {
-        API.setDefaultAgency(a.id).then(function() {
-          return API.getAgencies();
-        }).then(function(list) {
-          _loadedAgencies = list || [];
-          refreshAgencySelector();
-          renderAgencyManager();
-          var newDef = _loadedAgencies.find(function(ag) { return ag.is_default; }) || _loadedAgencies[0];
-          var agencyWrap = document.getElementById("agency-logo-wrap");
-          var agencyImg  = document.getElementById("agency-li");
-          if (newDef && newDef.logo && agencyWrap && agencyImg) {
-            agencyImg.src = newDef.logo;
-            agencyWrap.style.display = "";
-          } else if (agencyWrap) {
-            agencyWrap.style.display = "none";
-          }
-        });
-      }; })(agency);
-      var delBtn = document.createElement("button"); delBtn.className = "lb danger"; delBtn.style.fontSize = "11px"; delBtn.textContent = "Delete";
-      delBtn.onclick = (function(a) { return function() {
-        if (!confirm("Delete agency \"" + a.name + "\"?")) return;
-        API.deleteAgency(a.id).then(function() {
-          return API.getAgencies();
-        }).then(function(list) {
-          _loadedAgencies = list || [];
-          refreshAgencySelector();
-          renderAgencyManager();
-        });
-      }; })(agency);
-      row.appendChild(nameEl); row.appendChild(meta);
-      if (defBadge) row.appendChild(defBadge);
-      row.appendChild(editBtn); row.appendChild(setDefBtn); row.appendChild(delBtn);
-      body.appendChild(row);
-    });
-  }
-
-  var addBtn = document.createElement("button"); addBtn.className = "lb primary"; addBtn.textContent = "+ Add agency";
-  addBtn.onclick = function() {
-    _agencyEditing = {id:null, name:"", contact_name:"", contact_email:"", contact_phone:"",
-      address:"", city:"", state:"", zip:"", invoicing_email:"", invoicing_text:"",
-      default_project_type:"location_shoot", website:"", timezone:"PT", logo:"", is_default:false};
-    renderAgencyManager();
-  };
-  var closeBtn = document.createElement("button"); closeBtn.className = "lb"; closeBtn.textContent = "Close";
-  closeBtn.onclick = closeAgencyManager;
-  foot.appendChild(addBtn); foot.appendChild(closeBtn);
-}
-
-function saveAgencyForm() {
-  var f = _agencyEditing;
-  if (!f.name || !f.name.trim()) { alert("Agency name is required."); return; }
-  var promise = f.id ? API.updateAgency(f.id, f) : API.createAgency(f);
-  promise.then(function() {
-    return API.getAgencies();
-  }).then(function(list) {
-    _loadedAgencies = list || [];
-    refreshAgencySelector();
-    _agencyEditing = null;
-    renderAgencyManager();
-    setStatus("Agency saved.", "ok");
-  });
+  if (window.ContactsV2) ContactsV2.open("organizations");
 }
 
 function getAgencyLogoB64() {
@@ -5938,57 +5285,16 @@ function getAgencyLogoB64() {
   return ag.logo.split(",")[1] || null;
 }
 
+// The project's agency organization (or the default agency), in the shape the
+// docs read. Always an object: {} when there's no agency organization at all.
 function getAgencyInfo() {
-  var _v2 = orgsV2();
-  if (_v2) { var _v2Info = _v2.agencyInfo(); if (_v2Info) return _v2Info; }
-  var agencyEl = document.getElementById("project_agency_id");
-  var agencyId = agencyEl ? agencyEl.value || null : null;
-  if (agencyId && _loadedAgencies.length) {
-    var agency = _loadedAgencies.find(function(a) { return String(a.id) === String(agencyId); });
-    if (agency) return {
-      name:            agency.name,
-      address:         agency.address,
-      city:            agency.city,
-      state:           agency.state,
-      zip:             agency.zip,
-      phone:           agency.contact_phone,
-      billing_contact: agency.contact_name,
-      billing_email:   agency.invoicing_email,
-      invoicing_text:  agency.invoicing_text,
-      logo:            agency.logo,
-      timezone:        agency.timezone,
-      project_type:    agency.default_project_type,
-    };
-  }
-  if (_loadedAgencies.length) {
-    var def = _loadedAgencies.find(function(a) { return a.is_default; }) || _loadedAgencies[0];
-    if (def) return {
-      name:            def.name,
-      address:         def.address,
-      city:            def.city,
-      state:           def.state,
-      zip:             def.zip,
-      phone:           def.contact_phone,
-      billing_contact: def.contact_name,
-      billing_email:   def.invoicing_email,
-      invoicing_text:  def.invoicing_text,
-      logo:            def.logo,
-      timezone:        def.timezone,
-      project_type:    def.default_project_type,
-    };
-  }
-  return loadAgencyData();
+  return (window.ProjectOrgsV2 && ProjectOrgsV2.agencyInfo()) || {};
 }
 
-// Client company record for branding: { name, logo } or null.
-// v2: the linked client organization (or an org with that exact name);
-// otherwise, and as a fallback before the migration, the old companies list.
+// Client company record for branding: the linked client organization (or an
+// organization with that exact name): { name, logo, ... } or null.
 function findClientCompany(companyName) {
-  var _v2 = orgsV2();
-  if (_v2) { var org = _v2.clientOrg(companyName); if (org) return org; }
-  if (!companyName || !companyName.trim()) return null;
-  var db = loadContacts();
-  return (db.companies||[]).find(function(c) { return (c.name||"").trim().toLowerCase() === companyName.trim().toLowerCase(); }) || null;
+  return window.ProjectOrgsV2 ? ProjectOrgsV2.clientOrg(companyName) || null : null;
 }
 
 function lookupCompanyLogo(companyName) {
@@ -6050,82 +5356,7 @@ function updateBrandingWarning() {
   }
 }
 
-function acAttachCompany() {
-  if (orgsV2On()) return; // v2: project-orgs-v2.js attaches the organization picker
-  var nameEl = document.getElementById("client_company");
-  if (!nameEl || nameEl._acCoAttached) return;
-  nameEl._acCoAttached = true;
-  var wrap = document.createElement("div"); wrap.className = "ac-wrap";
-  nameEl.parentNode.insertBefore(wrap, nameEl); wrap.appendChild(nameEl);
-  var list = document.createElement("div"); list.className = "ac-list"; wrap.appendChild(list);
-  var activeIdx = -1;
-  function getMatches(q) {
-    var db = loadContacts();
-    var entries = db.companies || [];
-    if (!q || q.length < 1) return entries.slice(0, 8);
-    var ql = q.toLowerCase();
-    return entries.filter(function(e) { return (e.name||"").toLowerCase().includes(ql); }).slice(0, 8);
-  }
-  function render(matches) {
-    list.innerHTML = ""; activeIdx = -1;
-    if (!matches.length) { list.classList.remove("open"); return; }
-    matches.forEach(function(m) {
-      var item = document.createElement("div"); item.className = "ac-item";
-      item.innerHTML = "<strong>" + (m.name||"") + "</strong>" + (m.website ? "<span>" + m.website + "</span>" : "");
-      item.addEventListener("mousedown", function(e) { e.preventDefault(); pick(m); });
-      list.appendChild(item);
-    });
-    list.classList.add("open");
-  }
-  function pick(m) {
-    nameEl.value = m.name || "";
-    list.classList.remove("open");
-    updateBrandingWarning();
-  }
-  nameEl.addEventListener("focus", function() { render(getMatches(nameEl.value)); });
-  nameEl.addEventListener("input", function() { render(getMatches(nameEl.value)); });
-  nameEl.addEventListener("keydown", function(e) {
-    var items = list.querySelectorAll(".ac-item");
-    if (e.key === "ArrowDown") { activeIdx = Math.min(activeIdx+1, items.length-1); items.forEach(function(el,i) { el.classList.toggle("active", i===activeIdx); }); e.preventDefault(); }
-    else if (e.key === "ArrowUp") { activeIdx = Math.max(activeIdx-1, 0); items.forEach(function(el,i) { el.classList.toggle("active", i===activeIdx); }); e.preventDefault(); }
-    else if (e.key === "Enter" && activeIdx >= 0) { var matches = getMatches(nameEl.value); if (matches[activeIdx]) pick(matches[activeIdx]); e.preventDefault(); }
-    else if (e.key === "Escape") list.classList.remove("open");
-  });
-  nameEl.addEventListener("blur", function() { setTimeout(function() { list.classList.remove("open"); }, 150); });
-}
 
-function coLogoUpload(i) {
-  var fi = document.getElementById("co-logo-file-" + i);
-  if (fi) fi.click();
-}
-
-function handleCoLogoUpload(input, i) {
-  if (!input.files || !input.files[0]) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var src = e.target.result;
-    openCropModal(src, function(cropped) {
-      contactsCurrent.companies[i].logo = cropped;
-      renderContactsBody();
-    });
-  };
-  reader.readAsDataURL(input.files[0]);
-  input.value = "";
-}
-
-function coCropLogo(i) {
-  var src = contactsCurrent.companies[i] && contactsCurrent.companies[i].logo;
-  if (!src) return;
-  openCropModal(src, function(cropped) {
-    contactsCurrent.companies[i].logo = cropped;
-    renderContactsBody();
-  });
-}
-
-function coRemoveLogo(i) {
-  if (contactsCurrent.companies[i]) contactsCurrent.companies[i].logo = "";
-  renderContactsBody();
-}
 
 
 // ── Logo crop ─────────────────────────────────────────────────────────────────
@@ -6372,7 +5603,6 @@ function autosaveNow(onlyIfChanged) {
   db[currentSheetKey] = data;
   libSaveAll(db);
   _allProjectsCache[currentSheetKey] = { label: data.label, data: data };
-  mergeContactsFromSheet(data);
   // Save to the server. "Autosaved" only shows once the server has it; a save
   // that doesn't get there is kept in the save queue below and sent later.
   var key = currentSheetKey;
@@ -7159,7 +6389,7 @@ async function generateExpenseDoc() {
 
     // ── Header — matches workback/call sheet style ────────────────────────────
     const _agencyLogo3 = getAgencyLogoB64();
-    const _agencyLogoData3 = loadAgencyData();
+    const _agencyLogoData3 = getAgencyInfo();
     const _isSvg3 = _agencyLogoData3.logo && _agencyLogoData3.logo.includes("image/svg");
     const _agencyB643 = (!_isSvg3 && _agencyLogo3) ? _agencyLogo3 : LB64;
     var _logoB643 = _agencyB643;
@@ -7643,7 +6873,6 @@ function doSave(data, label, key) {
   _formKey = k; // the form now holds exactly what was saved under k
   document.getElementById("lib-delete").style.display = "";
   document.getElementById("lib-duplicate").style.display = "";
-  mergeContactsFromSheet(data);
   localStorage.setItem("slater_last_project", k);
   setStatus("Saved: " + label, "ok");
   // Save to server first, then refresh dropdown so the server label is current
@@ -7702,12 +6931,8 @@ function modalCancel() {
 
 // ── Gather all form data ──────────────────────────────────────────────────
 function gather() {
-  var _v2Links = orgsV2On();
   var _d = {
     project_type:v("project_type")||"live_event",
-    // v2: the select holds organization ids; the server rewrites agency_id
-    // to the old-format agency for rollback, so send back what we loaded.
-    agency_id: _v2Links ? _orgLinks.legacy_agency_id : (function(){ var el=document.getElementById("project_agency_id"); return el?el.value||null:null; })(),
     doc_branding:(function(){ var el=document.querySelector('input[name="doc_branding"]:checked'); return el?el.value:"agency"; })(),
     project_title:v("project_title"), client:v("client_company"), client_company:v("client_company"), client_name:v("client_name"), billing_code:v("billing_code"),
     kp_cards: kp.map(function(id) { return Object.assign({_id:id, role:v(id+"_role")||"", name:v(id+"_name")||"", phone:v(id+"_phone")||"", email:v(id+"_email")||"", status:v(id+"_status")||"tbd"}, cardLinkFields(id)); }),
@@ -7737,11 +6962,9 @@ function gather() {
     urls: getUrls(),
     expenses: getExpenses(),
     notes: notesGetData(),
+    agency_org_id: _orgLinks.agency_org_id || null,
+    client_org_id: _orgLinks.client_org_id || null,
   };
-  if (_v2Links) {
-    _d.agency_org_id = _orgLinks.agency_org_id || null;
-    _d.client_org_id = _orgLinks.client_org_id || null;
-  }
   return _d;
 }
 
@@ -7753,18 +6976,12 @@ function loadFormData(data) {
   s("project_title", data.project_title);
   s("client_company", data.client_company||data.client||"");
   s("client_name", data.client_name||""); s("billing_code", data.billing_code);
-  if (orgsV2On()) {
-    _orgLinks = {
-      agency_org_id: data.agency_org_id || null,
-      client_org_id: data.client_org_id || null,
-      legacy_agency_id: data.agency_id || null,
-      legacy_client: data.client_company || data.client || "",
-    };
-    if (window.ProjectOrgsV2) ProjectOrgsV2.onProjectLoaded();
-  } else {
-    var agencySelEl = document.getElementById("project_agency_id");
-    if (agencySelEl && data.agency_id) agencySelEl.value = data.agency_id;
-  }
+  _orgLinks = {
+    agency_org_id: data.agency_org_id || null,
+    client_org_id: data.client_org_id || null,
+    legacy_client: data.client_company || data.client || "",
+  };
+  if (window.ProjectOrgsV2) ProjectOrgsV2.onProjectLoaded();
   var dbEl = document.querySelector('input[name="doc_branding"][value="' + (data.doc_branding||"agency") + '"]');
   if (dbEl) dbEl.checked = true;
   updateBrandingWarning();
@@ -7860,10 +7077,8 @@ function clearForm() {
    "hospital","breakfast","lunch","sunrise","sunset"
   ].forEach(function(id) { const e = document.getElementById(id); if(e) e.value = ""; });
   const ptReset = document.getElementById("project_type"); if(ptReset) ptReset.value = "location_shoot";
-  if (orgsV2On()) {
-    _orgLinks = { agency_org_id: null, client_org_id: null, legacy_agency_id: null, legacy_client: "" };
-    if (window.ProjectOrgsV2) ProjectOrgsV2.onProjectCleared();
-  }
+  _orgLinks = { agency_org_id: null, client_org_id: null, legacy_client: "" };
+  if (window.ProjectOrgsV2) ProjectOrgsV2.onProjectCleared();
   var dbReset = document.querySelector('input[name="doc_branding"][value="agency"]'); if(dbReset) dbReset.checked = true;
   updateBrandingWarning();
   const kdReset = document.getElementById("kickoff_date_iso"); if(kdReset) kdReset.value = "";
@@ -7972,7 +7187,7 @@ async function generateWorkback() {
     const nilsBot = {top:{style:BorderStyle.NIL},bottom:{style:BorderStyle.SINGLE,size:4,color:"AAAAAA"},left:{style:BorderStyle.NIL},right:{style:BorderStyle.NIL}};
     const CM   = {top:58,bottom:58,left:58,right:58};
     const _agencyLogoWb = getAgencyLogoB64();
-    const _agencyDataWb = loadAgencyData();
+    const _agencyDataWb = getAgencyInfo();
     const _isSvgWb = _agencyDataWb.logo && _agencyDataWb.logo.includes("image/svg");
     const _agencyB64Wb = (!_isSvgWb && _agencyLogoWb) ? _agencyLogoWb : LB64;
     var _logoB64Wb = _agencyB64Wb;
@@ -8592,7 +7807,7 @@ async function generateDoc() {
     const data = gather();
     const ag = getAgencyInfo();
     const _agencyLogo = getAgencyLogoB64();
-  const _agencyData = loadAgencyData();
+  const _agencyData = ag;
   const _isSvg = _agencyData.logo && _agencyData.logo.includes("image/svg");
   const _agencyB64 = (!_isSvg && _agencyLogo) ? _agencyLogo : LB64;
   var _logoB64 = _agencyB64;
@@ -8605,7 +7820,6 @@ async function generateDoc() {
       var locName = dayData.loc_name || dayData.loc_id || "";
       var found = window.ProjectPeopleV2 ? ProjectPeopleV2.location(dayData.location_id, locName) : null;
       if (!locName && !found) return {name:"", address:"", notes:""};
-      if (!window.ProjectPeopleV2) found = (loadContacts().locations || []).find(function(l) { return l.name === locName; });
       if (found) return {
         name: found.name||"",
         address: [found.address, found.city, [found.state, found.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
@@ -8990,18 +8204,11 @@ setTimeout(refreshWbDaySelector, 200);
 })();
 // Fetch all projects in the background to populate Rundown tabs
 setTimeout(fetchAllProjectsForRundown, 1000);
-// Backfill contacts from all existing saved call sheets (old Contacts only)
-(function() {
-  if (orgsV2On()) return;
-  try {
-    const sheets = JSON.parse(localStorage.getItem("slater_callsheets")||"{}");
-    const vals = Object.values(sheets);
-    console.log("Backfilling contacts from", vals.length, "saved sheets");
-    vals.forEach(sheet => mergeContactsFromSheet(sheet));
-    const db = loadContacts();
-    console.log("Contacts after backfill:", {staff:(db.staff && db.staff.length), crew:(db.crew && db.crew.length), talent:(db.talent && db.talent.length), locations:(db.locations && db.locations.length)});
-  } catch(e) { console.error("Backfill failed:", e); }
-})();
+// Old Contacts / agency copies kept in this browser before Contacts moved to
+// the server's records (2026-10-17). Nothing reads them any more.
+["slater_contacts", "slater_agency", "slater_contacts_v2", "wt_contacts"].forEach(function(k) {
+  try { localStorage.removeItem(k); } catch (e) {}
+});
 setTimeout(acAttachAll, 100);
 setTimeout(updateVideoDueVisibility, 100);
 setTimeout(initNoteEditorPaste, 200);
@@ -9021,36 +8228,14 @@ document.getElementById("notes-search-clear").addEventListener("click", function
   this.style.display = "none";
   notesSearchClear();
 });
-API.getAgencies().then(function(agencies) {
-  _loadedAgencies = agencies || [];
-  refreshAgencySelector();
-  if (orgsV2On()) return; // v2: project-orgs-v2.js applies the default organization
-  var def = _loadedAgencies.find(function(a) { return a.is_default; }) || _loadedAgencies[0];
-  if (def) applyAgencyDefaults(def);
-  else applyAgencySettings();
-});
-// Old Contacts only: merge this browser's copy with the server's and upload
-// the result. Off with the new Contacts screens (they sync per record).
-if (!orgsV2On()) API.getContacts().then(function(serverData) {
-  if (!serverData) return;
-  var local = loadContacts();
-  var merged = Object.assign({}, local);
-  Object.keys(serverData).forEach(function(k) {
-    if ((serverData[k]||[]).length > 0) merged[k] = serverData[k];
-  });
-  localStorage.setItem(CONTACTS_KEY, JSON.stringify(merged));
-  if (JSON.stringify(serverData) !== JSON.stringify(merged)) API.saveContacts(merged);
-  // Repopulate location dropdowns now that contacts are loaded from server
-  refreshSchedLocDropdowns();
-});
 
 // Wire autosave to all input/change events on the page
 document.addEventListener("input", function(e) {
-  if (e.target.closest(".contacts-modal") || e.target.closest("#agency-modal") || e.target.closest("#agency-manager-modal") || e.target.closest("#crop-modal")) return;
+  if (e.target.closest(".contacts-modal") || e.target.closest("#agency-modal") || e.target.closest("#crop-modal")) return;
   autosaveTrigger();
 });
 document.addEventListener("change", function(e) {
-  if (e.target.closest(".contacts-modal") || e.target.closest("#agency-modal") || e.target.closest("#agency-manager-modal") || e.target.closest("#crop-modal")) return;
+  if (e.target.closest(".contacts-modal") || e.target.closest("#agency-modal") || e.target.closest("#crop-modal")) return;
   autosaveTrigger();
 });
 

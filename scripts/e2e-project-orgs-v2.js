@@ -1,7 +1,7 @@
 // End-to-end browser test for the Project tab organization pickers
 // (data-model-rewrite, Session 4). LOCAL DATABASE ONLY.
 //
-// Drives real Chrome through the Project tab with ?contacts=v2 and checks the
+// Drives real Chrome through the Project tab and checks the
 // database (projects.agency_org_id / client_org_id + the bundle mirror) after
 // each step. Also downloads a call sheet and checks the agency block in it.
 // Creates two temporary users and deletes them afterwards.
@@ -51,7 +51,7 @@ async function main() {
   otherId = (await db.query(`INSERT INTO users (email, password_hash, name) VALUES ($1,$2,'PO2 Other') RETURNING id`, [OTHER, hash])).rows[0].id;
   const foreignOrg = (await db.query(`INSERT INTO organizations (owner_id, name, is_agency) VALUES ($1,'Not Yours Inc',true) RETURNING id`, [otherId])).rows[0].id;
 
-  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: 'test' }) /* per-browser ?contacts= toggle */, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT) }), stdio: ['ignore', 'pipe', 'pipe'] });
   let serverLog = ''; server.stdout.on('data', d => serverLog += d); server.stderr.on('data', d => serverLog += d);
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch (_) {} await sleep(250); }
 
@@ -104,30 +104,10 @@ async function main() {
     assert(d.status === 200, 'default ' + d.status);
   });
 
-  console.log('\nFlag off');
-  let keyOld;
-  await step('flag off: old pickers, save leaves the org columns empty', async () => {
-    await page.goto(BASE + '/?contacts=v1', { waitUntil: 'networkidle2' });
-    await page.evaluate(() => libNew());
-    await sleep(300);
-    const opts = await agencyOptions();
-    assert(!opts.some(o => o.t.includes('Alpha')), 'old dropdown must not list v2 orgs: ' + JSON.stringify(opts));
-    assert(!(await page.$('.po2-hint')), 'no v2 hint element');
-    await page.type('#project_title', 'Old Flag Project');
-    await page.type('#client_company', 'Contoso Client');
-    await page.evaluate(() => libSave());
-    await page.waitForFunction(() => !!currentSheetKey, { timeout: 5000 });
-    keyOld = await page.evaluate(() => currentSheetKey);
-    let row; for (let i = 0; i < 20 && !row; i++) { row = await proj(keyOld); if (!row) await sleep(250); }
-    assert(row, 'saved');
-    assert(row.agency_org_id === null && row.client_org_id === null, 'columns stay null: ' + row.agency_org_id + '/' + row.client_org_id);
-    assert(row.data.client_company === 'Contoso Client', 'old text saved');
-  });
-
-  console.log('\nFlag on');
+  console.log('\nPickers');
   let key;
   await step('new project: agency dropdown lists agencies only, default preselected + its defaults applied', async () => {
-    await page.goto(BASE + '/?contacts=v2', { waitUntil: 'networkidle2' });
+    await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
     await page.evaluate(() => localStorage.removeItem('slater_last_project'));
     await page.reload({ waitUntil: 'networkidle2' });
     await page.evaluate(() => libNew());
@@ -148,7 +128,7 @@ async function main() {
     let row; for (let i = 0; i < 20; i++) { row = await proj(key); if (row && row.agency_org_id) break; await sleep(250); }
     assert(row.agency_org_id === agA.id, 'column ' + row.agency_org_id);
     assert(row.data.agency_org_id === agA.id, 'mirror ' + row.data.agency_org_id);
-    assert(row.data.agency_id === null, 'rollback agency_id null for a v2-only org: ' + row.data.agency_id);
+    assert(!('agency_id' in row.data), 'no old agency_id in the bundle: ' + row.data.agency_id);
   });
 
   await step('client picker: type, pick from list -> linked, saved', async () => {
@@ -304,20 +284,17 @@ async function main() {
     }
   });
 
-  console.log('\nBefore the migration');
-  await step('old project links by old agency id + exact client name on load', async () => {
-    const legacyAgency = (await db.query(`INSERT INTO agencies (user_id, name) VALUES ($1,'Legacy Agency') RETURNING id`, [userId])).rows[0].id;
-    const org = (await db.query(`INSERT INTO organizations (owner_id, name, is_agency, legacy_agency_id, legacy_source) VALUES ($1,'Legacy Agency',true,$2,'agency') RETURNING id`, [userId, legacyAgency])).rows[0].id;
+  console.log('\nOn load');
+  await step('project with no client link links by exact client name; old agency_id dropped on save', async () => {
     const k = 'cs_po2legacy_' + STAMP;
     await db.query(`INSERT INTO projects (key, label, data, owner_id) VALUES ($1,'Legacy Project',$2,$3)`,
-      [k, JSON.stringify({ project_title: 'Legacy Project', project_type: 'location_shoot', agency_id: String(legacyAgency), client_company: 'contoso ltd' }), userId]);
+      [k, JSON.stringify({ project_title: 'Legacy Project', project_type: 'location_shoot', agency_id: '999', client_company: 'contoso ltd' }), userId]);
     await openProject(k);
-    assert(await page.$eval('#project_agency_id', e => e.value) === String(org), 'agency auto-linked');
     assert(await page.evaluate(() => _orgLinks.client_org_id) === cli.id, 'client auto-linked');
     await saveNow(k);
     const row = await proj(k);
-    assert(row.agency_org_id === org && row.client_org_id === cli.id, 'saved to columns');
-    assert(row.data.agency_id === String(legacyAgency), 'rollback agency_id = old agency id: ' + row.data.agency_id);
+    assert(row.client_org_id === cli.id, 'saved to the column');
+    assert(!('agency_id' in row.data), 'old agency_id dropped: ' + row.data.agency_id);
   });
 
   console.log('\nAgencies button');
@@ -344,7 +321,7 @@ main().catch(e => { fails.push('crash: ' + e.message); console.error(e); }).fina
   try { if (browser) await browser.close(); } catch (_) {}
   try { if (server) server.kill(); } catch (_) {}
   for (const id of [userId, otherId]) {
-    try { if (id) { await db.query('DELETE FROM projects WHERE owner_id=$1', [id]); await db.query('DELETE FROM agencies WHERE user_id=$1', [id]); await db.query('DELETE FROM users WHERE id=$1', [id]); } } catch (e) { console.log('cleanup error ' + e.message); }
+    try { if (id) { await db.query('DELETE FROM projects WHERE owner_id=$1', [id]); await db.query('DELETE FROM users WHERE id=$1', [id]); } } catch (e) { console.log('cleanup error ' + e.message); }
   }
   await db.end();
   const relevant = consoleErrors.filter(e => !/favicon|ERR_|404|409/.test(e));

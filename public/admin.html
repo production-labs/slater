@@ -607,7 +607,7 @@
     }
 
     async function deleteUser(id, email) {
-      if (!confirm('Permanently delete "' + email + '" and ALL their data (projects, agencies, receipts)?\n\nThis cannot be undone.')) return;
+      if (!confirm('Permanently delete "' + email + '" and ALL their data (projects, contacts, receipts)?\n\nThis cannot be undone.')) return;
       if (!confirm('Are you sure? This will delete everything for ' + email + '.')) return;
       try {
         var r = await fetch('/api/admin/users/' + id, { method: 'DELETE' });

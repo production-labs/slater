@@ -48,7 +48,7 @@ async function main() {
   const hash = await bcrypt.hash(PASS, 10);
   userId = (await db.query(`INSERT INTO users (email, password_hash, name) VALUES ($1,$2,'E2E Tester') RETURNING id`, [EMAIL, hash])).rows[0].id;
 
-  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: 'test' }) /* per-browser ?contacts= toggle */, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT) }), stdio: ['ignore', 'pipe', 'pipe'] });
   let serverLog = ''; server.stdout.on('data', d => serverLog += d); server.stderr.on('data', d => serverLog += d);
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch (_) {} await sleep(250); }
 
@@ -68,17 +68,10 @@ async function main() {
   const contact = async name => (await db.query(`SELECT * FROM contacts WHERE owner_id=$1 AND name=$2`, [userId, name])).rows[0];
   const shot = n => page.screenshot({ path: path.join(SHOTS, n + '.png') });
 
-  console.log('\nFlag');
-  await step('flag off: Contacts opens the OLD modal', async () => {
-    await page.goto(BASE + '/?contacts=v1', { waitUntil: 'networkidle2' });
-    await page.evaluate(() => openContacts());
-    await sleep(400);
-    const st = await page.evaluate(() => ({ old: document.getElementById('contacts-modal').classList.contains('open'), v2: !!document.querySelector('#contacts-v2-modal.open') }));
-    assert(st.old && !st.v2, JSON.stringify(st));
-    await page.evaluate(() => closeContacts());
-  });
-  await step('flag on (?contacts=v2): Contacts opens the NEW screen, empty state', async () => {
-    await page.goto(BASE + '/?contacts=v2', { waitUntil: 'networkidle2' });
+  console.log('\nOpen');
+  await step('Contacts opens the Contacts screen, empty state (old modal is gone)', async () => {
+    await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
+    assert(await page.evaluate(() => !document.getElementById('contacts-modal') && !document.getElementById('agency-manager-modal')), 'old modals still in the page');
     await page.evaluate(() => openContacts());
     await T('#contacts-v2-modal.open .cv2-empty');
     const txt = await page.$eval('#cv2-list', e => e.textContent);

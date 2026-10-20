@@ -1,9 +1,5 @@
 // Project people + schedule locations on v2 (data-model-rewrite, Session 5)
 //
-// Only active with the v2 contacts flag (?contacts=v2). Flag off: this file
-// does nothing and the old name autocomplete (contacts blob buckets) and the
-// old location list are used.
-//
 // Crew, talent and key personnel cards (app.js addCrew / addTalent / addKP):
 //   - Name field: searches ALL v2 contacts; people with a role in the card's
 //     category (crew / talent / staff for key personnel) are listed first.
@@ -34,7 +30,6 @@
 
 (function () {
   'use strict';
-  if (typeof orgsV2On !== 'function' || !orgsV2On()) return;
 
   var CV2 = window.ContactsV2;
   if (!CV2) { console.warn('project-people-v2: ContactsV2 missing'); return; }

@@ -45,14 +45,14 @@ async function until(fn, what, ms = 15000) {
 }
 const title = async () => (await db.query('SELECT data->>\'project_title\' t FROM projects WHERE key=$1', [KEY])).rows[0].t;
 
-async function newPage(flagV2) {
+async function newPage() {
   const p = await browser.newPage();
   await p.setViewport({ width: 1400, height: 900 });
   p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR_INTERNET_DISCONNECTED|Failed to fetch/.test(m.text())) consoleErrors.push(m.text()); });
   p.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
   p.on('dialog', d => { p.__dialogs = (p.__dialogs || []).concat(d.type()); d.dismiss().catch(() => {}); });
   await p.evaluate(() => 0).catch(() => {});
-  await p.goto(BASE + '/' + (flagV2 ? '?contacts=v2' : '?contacts=v1'), { waitUntil: 'networkidle2' });
+  await p.goto(BASE + '/', { waitUntil: 'networkidle2' });
   return p;
 }
 async function openProject(p) {
@@ -80,7 +80,7 @@ async function main() {
     crew: [], talent: [], kp_cards: [], schedule_days: [{ date_iso: '2026-12-01', label: 'Day 1' }],
   }), userId]);
 
-  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT), CONTACTS_V2_CUTOVER: 'test' }) /* per-browser ?contacts= toggle */, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn('node', ['server.js'], { cwd: APP, env: Object.assign({}, process.env, { PORT: String(PORT) }), stdio: ['ignore', 'pipe', 'pipe'] });
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch (_) {} await sleep(250); }
   browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-first-run'] });
   page = await browser.newPage();
@@ -88,7 +88,7 @@ async function main() {
   const login = await page.evaluate(async (e, pw) => (await fetch('/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e, password: pw }) })).status, EMAIL, PASS);
   assert(login === 200, 'login failed ' + login);
   await page.close();
-  page = await newPage(false);
+  page = await newPage();
 
   console.log('\nProjects');
   await step('online: no bar; a normal autosave reaches the server and says "Autosaved"', async () => {
@@ -139,7 +139,7 @@ async function main() {
   await step('tab closed while offline: the change is sent before the project loads next time', async () => {
     await page.close({ runBeforeUnload: false });
     assert(await title() === 'Offline edit 1', 'server still has the older copy');
-    page = await newPage(false); // same browser profile: same localStorage
+    page = await newPage(); // same browser profile: same localStorage
     await openProject(page);
     await until(async () => await title() === 'Offline edit 2', 'server got the edit from the closed tab');
     assert(await page.$eval('#project_title', e => e.value) === 'Offline edit 2', 'form shows the offline edit, not the older server copy');
@@ -174,7 +174,7 @@ async function main() {
       localStorage.setItem('slater_last_project', k);
     }, KEY, cur, t1, t2);
     await setup.close();
-    page = await newPage(false);
+    page = await newPage();
     await page.waitForFunction(k => typeof _formKey !== 'undefined' && _formKey === k, { timeout: 10000 }, KEY);
     try { await until(async () => await title() === 'Later mine', 'later copy sent'); }
     catch (e) { throw new Error(e.message + ' | ' + JSON.stringify(await page.evaluate(() => ({ q: localStorage.getItem('slater_pending_saves'), bar: (document.getElementById('conn-bar') || {}).textContent, online: SlaterConn.online, form: document.getElementById('project_title').value })))); }
@@ -216,7 +216,7 @@ async function main() {
   });
 
   await step('two real tabs: "Use my version", then reloading the other tab keeps mine', async () => {
-    const b = await newPage(false);
+    const b = await newPage();
     await openProject(b);
     await page.setOfflineMode(true);
     await until(async () => /You're offline/.test(await barText(page)), 'offline bar in tab A');
@@ -321,7 +321,7 @@ async function main() {
   });
 
   await step('logging out in ANOTHER tab: this tab still tries its save, says "logged out", keeps the change', async () => {
-    const b = await newPage(false);
+    const b = await newPage();
     await b.waitForFunction(() => typeof logout === 'function');
     await Promise.all([b.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}), b.evaluate(() => logout())]);
     assert(/login/.test(b.url()), 'tab B went to the login page: ' + b.url());
@@ -372,7 +372,7 @@ async function main() {
   const contactsOpen = () => page.evaluate(() => { const r = document.querySelector('.cv2-head-actions'); return !!(r && r.offsetParent); });
   await step('Save while offline: kept on this device, Contacts can be closed with no discard prompt, saved once when back', async () => {
     await page.close({ runBeforeUnload: false });
-    page = await newPage(true);
+    page = await newPage();
     await page.waitForFunction(() => window.ContactsV2 && ContactsV2.store.loaded, { timeout: 10000 });
     await page.evaluate(() => openContacts());
     await page.waitForSelector('[data-act="new"]', { visible: true });
@@ -415,7 +415,7 @@ async function main() {
     assert((await queue())[0].op === 'update', 'queued as an update');
     // Close the whole tab while still offline; come back online in a new one.
     await page.close({ runBeforeUnload: false });
-    page = await newPage(true);
+    page = await newPage();
     await until(async () => (await db.query(`SELECT phone FROM contacts WHERE id=$1`, [id])).rows[0].phone.replace(/\D/g, '') === '2065550199', 'edit applied on the next visit (phone field formats the number)');
     await until(async () => (await queue()).length === 0, 'queue empty');
     await page.waitForFunction(() => window.ContactsV2 && ContactsV2.store.loaded, { timeout: 10000 });

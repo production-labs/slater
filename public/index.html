@@ -558,40 +558,6 @@
   </div>
 </div>
 
-<!-- Agency Manager modal -->
-<div class="contacts-modal" id="agency-manager-modal">
-  <div class="contacts-box" style="width:640px;max-height:85vh">
-    <div class="contacts-head">
-      <h3>Agencies</h3>
-      <button class="rb" onclick="closeAgencyManager()" style="font-size:18px">&#x2715;</button>
-    </div>
-    <div class="contacts-body" id="agency-manager-body" style="padding:16px 20px"></div>
-    <div class="contacts-foot" id="agency-manager-foot"></div>
-  </div>
-</div>
-
-<div class="contacts-modal" id="contacts-modal">
-  <div class="contacts-box">
-    <div class="contacts-head">
-      <h3>Contact Directory</h3>
-      <button class="rb" onclick="closeContacts()" style="font-size:18px">&#x2715;</button>
-    </div>
-    <div class="contacts-tabs">
-      <div class="contacts-tab active" onclick="showContactsTab('staff')">Production Staff</div>
-      <div class="contacts-tab" onclick="showContactsTab('crew')">Crew</div>
-      <div class="contacts-tab" onclick="showContactsTab('talent')">Talent</div>
-      <div class="contacts-tab" onclick="showContactsTab('locations')">Locations</div>
-      <div class="contacts-tab" onclick="showContactsTab('companies')">Companies</div>
-    </div>
-    <div class="contacts-body" id="contacts-body"></div>
-    <div class="contacts-foot">
-      <button class="lb" onclick="addContactRow()">+ Add</button>
-      <button class="lb primary" onclick="saveContacts()">Save contacts</button>
-      <button class="lb" onclick="closeContacts()">Close</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <h3 id="modal-title">Confirm</h3>
@@ -698,7 +664,6 @@
   <a href="https://www.termsfeed.com/live/f6bd045b-eeec-46a6-ad94-b735341faf6c" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Refund Policy</a>
 </div>
 
-<script src="/slater-config.js"></script>
 <script src="/connection.js"></script>
 <script src="/lib/lucide.min.js"></script>
 <script src="/lib/vendors.js"></script>
