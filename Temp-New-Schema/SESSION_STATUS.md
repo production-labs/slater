@@ -1,10 +1,10 @@
 # Data Model Rewrite: Session Status
 
-Last updated: 2026-10-17
+Last updated: 2026-10-20
 
 ## Where we are
 
-**PICK UP HERE (2026-10-17, evening): CUTOVER DONE. v2 Contacts is LIVE in production.**
+**PICK UP HERE (2026-10-20): Cutover + role re-add DONE. Only later cleanup + phone backlog remain.**
 
 ### Cutover, 2026-10-17 (times PDT)
 - 15:46 merged `data-model-rewrite` to main (`5a53461`), deployed with the switch unset (off).
@@ -16,8 +16,8 @@ Last updated: 2026-10-17
 - Re-running `verify-data-model-migration.js` on prod AFTER cutover reports 1 FAIL: "Test for Data Migration" has `agency_org_id` null (legacy `data.agency_id` 1, expected org 15). Expected, not a bug: it was created before the switch flipped, and its only later save was the stale tab's queued edit. `matchLegacy()` links it on next open and the link is saved with the next edit. The verifier only knows migrated data, so projects created after cutover may trip it. John can just delete that project.
 
 ### Remaining
-1. Step 12: John re-adds custom roles (Contacts > Roles > + New): Content, Stream Tech, V-Cam Op, Managing Producer (Kiko Toledo), Producer / TD (Michael Ganyo), MP Prod (Alex Altebef), Client Services (kp), Graphic Designer (Michelle Poole, optional); then reassigns per the migration report. Same for Jen's account.
-2. Delete "Test for Data Migration".
+1. DONE (2026-10-20, John): custom roles re-added (Content, Stream Tech, V-Cam Op, Managing Producer, Producer/TD, MP Prod, Client Services, Graphic Designer) and reassigned. Same for Jen's account.
+2. DONE (2026-10-20, John): "Test for Data Migration" deleted.
 3. Later cleanup (once rollback is no longer wanted): remove the old Contacts modal / Agency Manager code and drop the old columns (users.contacts, agencies table, data.agency_id mirrors).
 4. Backlog: phone UI issues (John to list specifics).
 

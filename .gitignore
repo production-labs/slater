@@ -1,8 +1,10 @@
 node_modules/
 .env
+.claude/
 .DS_Store
 **/.DS_Store
 public/20*.html
+public/archive/
 public/index-dnu.html
 Scratch Pad
 Business Setup.pages
