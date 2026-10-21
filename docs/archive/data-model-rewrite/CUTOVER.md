@@ -1,5 +1,7 @@
 # Cutover: moving contacts and agencies to the new data model
 
+> **ARCHIVED (2026-10-21). Do not follow this runbook.** The cutover ran on 2026-10-17. The old tables/columns it relies on were dropped on 2026-10-21, and the scripts it calls (`migrate-contacts-data.js`, `verify-data-model-migration.js`) were retired (still in git history, before the commit that archived this file). Kept for the record only. Full history: `SESSION_STATUS.md` in this folder.
+
 > **This changes production.** Every user's contacts, companies, locations and agencies are copied into new tables and their projects are linked to them. The old data is never changed or deleted, and every step before "Flip the switch" can be walked away from with nothing lost. Read the whole page before starting.
 
 This is the procedure agreed in John's answers #11 (SESSION_STATUS.md): a short maintenance window, a fresh backup, the migration, the verification, a smoke test, and only then turning off the old way of saving contacts.

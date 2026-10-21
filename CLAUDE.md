@@ -40,26 +40,34 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 ├── package.json           # start script: node server.js
 ├── CLAUDE.md              # This file
 ├── public/
-│   ├── index.html         # The entire Slater frontend (~1.4MB single HTML file)
+│   ├── index.html         # App shell (markup only; logic lives in app.js)
+│   ├── app.js             # Main frontend logic (vanilla JS)
+│   ├── styles.css         # Main styles
+│   ├── connection.js      # Offline/connection-drop handling, save queues (loaded first)
+│   ├── contacts-v2.js/.css # Contacts screen (People / Organizations / Locations)
+│   ├── project-orgs-v2.js # Project tab agency + client pickers
+│   ├── project-people-v2.js # Crew/Talent/KP contact + role pickers
 │   ├── login.html         # Login page with forgot password flow
 │   ├── reset-password.html # Password reset page
 │   ├── admin.html         # Admin dashboard
 │   └── admin-login.html   # Admin login page
-└── routes/
-    ├── projects.js        # CRUD for projects (filtered by owner_id)
-    ├── receipts.js        # Receipt image storage (filtered by owner_id)
-    ├── ocr.js             # Receipt OCR via Anthropic API
-    ├── users.js           # Auth, registration, password reset
-    ├── agencies.js        # Agency profile CRUD
-    ├── contacts.js        # Contacts JSONB storage per user
-    └── licenses.js        # License key validation and device management
+├── routes/
+│   ├── projects.js        # CRUD for projects (filtered by owner_id)
+│   ├── receipts.js        # Receipt image storage (filtered by owner_id)
+│   ├── ocr.js             # Receipt OCR via Anthropic API
+│   ├── users.js           # Auth, registration, password reset
+│   ├── licenses.js        # License key validation and device management
+│   ├── adminBackups.js    # Admin: list/download nightly backups (R2)
+│   └── v2/                # Contacts, organizations, locations, roles, sync
+├── scripts/               # Tests (test-v2-api, e2e-*), doc-snapshot, migrate-data-model (schema + built-in roles)
+└── docs/                  # RESTORE.md; archive/data-model-rewrite/ (finished 2026-10-21)
 ```
 
 ---
 
 ## Tech Stack
 
-- **Frontend:** Single HTML file (`public/index.html`) — vanilla JS, no framework
+- **Frontend:** Vanilla JS, no framework (`public/index.html` shell + `app.js` and the `*-v2.js` modules)
 - **Backend:** Node.js + Express
 - **Database:** PostgreSQL (local: `slater_dev`, production: Railway)
 - **Auth:** express-session + connect-pg-simple
@@ -90,15 +98,27 @@ DATABASE_URL=...
 ## Database Schema
 
 ```sql
-users (id, email, password_hash, name, dba, phone, timezone, logo, contacts JSONB, license_id, license_key, created_at, updated_at)
-agencies (id, user_id, name, contact_name, contact_email, contact_phone, address, city, state, zip, invoicing_email, invoicing_text, default_project_type, website, timezone, logo, is_default)
-projects (id, key, label, data JSONB, owner_id, agency_id, created_at, updated_at)
+users (id, email, password_hash, name, dba, phone, timezone, logo, license_id, license_key, created_at, updated_at, is_suspended, default_organization_id, default_country)
+projects (id, key, label, data JSONB, owner_id, created_at, updated_at, agency_org_id, client_org_id)
 receipts (id, project_key, expense_index, image_data, owner_id, created_at)
 sessions (sid, sess, expire)
 licenses (id, key, email, plan, max_devices, activated_at, expires_at, created_at)
 license_devices (id, license_id, device_fingerprint, user_agent, last_seen, created_at)
 password_reset_tokens (id, user_id, token, expires_at, used_at, created_at)
+
+-- Contacts data model (v2, live since 2026-10-17). Definitions: scripts/data-model/schema.sql
+organizations (id, owner_id, name, is_agency, logo, website, phone, address, city, state, zip, country, notes, contact_name, contact_email, contact_phone, invoicing_email, invoicing_text, default_project_type, timezone, client_uid, archived_at, created_at, updated_at)
+contacts (id, owner_id, organization_id, name, sort_last_name, email, phone, address, city, state, zip, country, title, union_status, gear_kit, travel_availability, notes, client_uid, archived_at, created_at, updated_at)
+roles (id, owner_id, name, abbreviation, category, department, sort_order, archived_at, created_at, updated_at)   -- owner_id NULL = built-in
+contact_roles (contact_id, role_id, sort_order)
+locations (id, owner_id, name, address, city, state, zip, country, hospital, notes, client_uid, archived_at, created_at, updated_at)
+deleted_records (id, owner_id, table_name, record_id, deleted_at)   -- tombstones for sync
 ```
+
+- Agencies and client companies are both `organizations` (`is_agency` marks agencies). A project's agency/client link is `projects.agency_org_id` / `client_org_id`. The default agency is `users.default_organization_id`.
+- Crew/talent/KP entries stay inside `projects.data` and carry `contact_id` + `role_id` alongside their snapshot fields.
+- The old v1 storage (`users.contacts` JSONB, the `agencies` table, `projects.agency_id`, `data.agency_id`) was removed: code on 2026-10-20, database on 2026-10-21.
+- Schema changes go through `scripts/migrate-data-model.js` (applies schema.sql + built-in roles; local only unless `--allow-remote`). Take a backup first (docs/RESTORE.md).
 
 ---
 
@@ -108,17 +128,19 @@ password_reset_tokens (id, user_id, token, expires_at, used_at, created_at)
 - `/api/projects` — CRUD, filtered by owner_id (requireAuth)
 - `/api/receipts/:projectKey` — save/load/delete (requireAuth)
 - `/api/ocr` — POST image → {vendor, date, amount, category} (requireAuth)
-- `/api/agencies` — CRUD + set-default (requireAuth)
-- `/api/contacts` — GET/PUT contacts JSONB per user (requireAuth)
+- `/api/v2/contacts`, `/organizations`, `/locations` — GET (`?since=`), GET/:id, POST, PATCH/:id (needs `base_updated_at`, 409 on conflict), DELETE/:id (archive), POST/:id/restore (requireAuth)
+- `/api/v2/roles` — built-in (read-only) + custom roles; delete refused while in use (requireAuth)
+- `/api/v2/sync?since=` — everything changed since a cursor, one snapshot; `/api/v2/settings`, `/api/v2/default-organization` (requireAuth)
 - `/api/licenses` — validate, generate-beta, devices CRUD
 - `/admin` — admin dashboard (requireAdmin session)
 - `/admin/login` — admin login
-- `/api/admin/*` — stats, users, licenses (requireAdmin)
+- `/api/admin/*` — stats, users, licenses, backups (requireAdmin)
+- `/health` — health check
 - `/reset-password` — password reset page
 
 ---
 
-## Frontend Architecture (index.html)
+## Frontend Architecture (app.js)
 
 ### Key Global Variables
 - `currentSheetKey` — key of currently loaded project
@@ -126,7 +148,6 @@ password_reset_tokens (id, user_id, token, expires_at, used_at, created_at)
 - `crew` — array of crew card IDs
 - `talent` — array of talent card IDs
 - `expenses` — array of expense card IDs
-- `_loadedAgencies` — populated on startup from API.getAgencies()
 - `window._allProjectsCache` — cache of all project data for Rundown sidebar
 
 ### Server API Client
@@ -209,10 +230,12 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - "Open Project" navigates on first click (race condition fixed with navigation flag)
 
 ### Contacts
-- Buckets: Staff, Crew, Talent, Locations, Companies
-- Companies: name, logo (square crop), website, notes
-- Stored in PostgreSQL contacts JSONB + localStorage
-- Company autocomplete on Project tab for client branding
+- Tabs: People, Organizations, Locations (`contacts-v2.js`)
+- People: no buckets; category (Staff / Crew / Talent / Uncategorized) comes from their roles (multiple role pills per person); union status, gear/kit, travel, notes
+- Roles: built-in list plus per-user custom roles
+- Organizations: agencies and client companies in one list (`is_agency` flag); logo (512px square crop), website, billing contact, invoicing defaults
+- Stored in PostgreSQL tables (see Database Schema), synced per record (`/api/v2/sync`); soft delete via archive
+- Project tab agency + client pickers read Organizations; default agency per user
 
 ### Client Branding
 - Per-project doc_branding: Agency or Client

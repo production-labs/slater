@@ -8,9 +8,14 @@
 -- startup until John says to merge.
 --
 -- Everything here is additive: no existing table or column is
--- dropped or altered in a destructive way. users.contacts,
--- agencies, projects.agency_id and projects.data.client_company
--- all stay as rollback.
+-- dropped or altered in a destructive way.
+--
+-- The old v1 storage (users.contacts, the agencies table,
+-- projects.agency_id, data.agency_id) and the migration
+-- bookkeeping columns (organizations.legacy_agency_id /
+-- legacy_source, contacts.legacy_bucket) were dropped on
+-- 2026-10-21 by scripts/drop-legacy-contacts-columns.js
+-- (cleanup Stage 2). They are no longer defined here.
 --
 -- Written idempotently (IF NOT EXISTS) so the script can be
 -- re-run during rehearsal against a restored prod dump.
@@ -127,11 +132,6 @@ CREATE TABLE IF NOT EXISTS organizations (
   default_project_type TEXT,
   timezone             TEXT,
 
-  -- Migration bookkeeping only. Lets verification and rollback map
-  -- old ids to new rows. Safe to drop after cutover is confirmed.
-  legacy_agency_id     INTEGER,                 -- agencies.id, if migrated from there
-  legacy_source        TEXT,                    -- 'agency' | 'contacts.companies' | 'project.client_company'
-
   -- Offline-create idempotency: the client stamps a UUID on records
   -- it creates; a retried POST with the same client_uid returns the
   -- existing row instead of creating a duplicate.
@@ -200,11 +200,6 @@ CREATE TABLE IF NOT EXISTS contacts (
   notes               TEXT,
 
   -- Explicitly NOT here: day rate, W-9 (answer #7).
-
-  -- Migration bookkeeping only. Old bucket the record came from
-  -- ('staff' | 'crew' | 'talent') so row-count verification can
-  -- compare per bucket exactly. Safe to drop after cutover.
-  legacy_bucket       TEXT,
 
   client_uid          TEXT,                     -- offline-create idempotency (see organizations)
 
@@ -360,8 +355,6 @@ ALTER TABLE users
 
 -- Replaces agencies.is_default. One default per user, enforced by
 -- structure. The picker should only offer is_agency orgs here.
--- users.contacts (JSONB) is NOT dropped: rollback for at least a
--- week after cutover.
 
 
 -- ------------------------------------------------------------
@@ -379,19 +372,10 @@ CREATE INDEX IF NOT EXISTS projects_client_org_idx ON projects (client_org_id);
 -- Renamed from v1's organization_id / client_organization_id so
 -- neither name is ambiguous.
 --
--- Migration sources (corrected from v1, verified in app.js):
---   agency_org_id <- projects.data->>'agency_id' (the LIVE link),
---                    mapped via organizations.legacy_agency_id.
---                    NOT projects.agency_id: that column exists but
---                    nothing reads or writes it.
---   client_org_id <- projects.data->>'client_company', falling back
---                    to data->>'client' on older projects. Match per
---                    user by trim+lowercase against orgs; unmatched
---                    values create ONE org per distinct value, plus
---                    a report for John. No fuzzy auto-merge.
---
--- Kept for rollback, not dropped: projects.agency_id,
--- data.agency_id, data.client_company, data.client.
+-- Filled at cutover (2026-10-17) from the old data.agency_id and
+-- data.client_company / data.client. data.client_company and
+-- data.client are still kept in the bundle (the client name as
+-- typed); the old agency links are gone (Stage 2, 2026-10-21).
 
 
 -- ------------------------------------------------------------

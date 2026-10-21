@@ -10,8 +10,8 @@
 // if any step or verification check fails, nothing is changed.
 // Safe to re-run: tables use IF NOT EXISTS, roles are upserted.
 //
-// NOT called from server.js. Do not wire into startup until John says to merge.
-// This does NOT migrate any contacts/agencies data yet (that is Session 6).
+// NOT called from server.js. Still the way to apply schema.sql and update the
+// built-in role list (global-roles.js) on a database.
 
 require('dotenv').config({ quiet: true });
 const fs = require('fs');
@@ -26,10 +26,11 @@ const ALLOW_REMOTE = args.has('--allow-remote');
 const SCHEMA_SQL = fs.readFileSync(path.join(__dirname, 'data-model', 'schema.sql'), 'utf8');
 
 // Existing tables whose contents must be byte-for-byte unchanged by this script.
+// (users.contacts and the agencies table were fingerprinted here until they were
+// dropped in cleanup Stage 2, 2026-10-21.)
 const FINGERPRINTS = {
-  users:    `SELECT COUNT(*)::int AS n, md5(COALESCE(string_agg(id || ':' || COALESCE(contacts::text,''), ',' ORDER BY id), '')) AS h FROM users`,
+  users:    `SELECT COUNT(*)::int AS n, md5(COALESCE(string_agg(id || ':' || email || ':' || COALESCE(name,'') || ':' || COALESCE(password_hash,''), ',' ORDER BY id), '')) AS h FROM users`,
   projects: `SELECT COUNT(*)::int AS n, md5(COALESCE(string_agg(id || ':' || COALESCE(data::text,''), ',' ORDER BY id), '')) AS h FROM projects`,
-  agencies: `SELECT COUNT(*)::int AS n, md5(COALESCE(string_agg(a::text, ',' ORDER BY a.id), '')) AS h FROM agencies a`,
   receipts: `SELECT COUNT(*)::int AS n, '' AS h FROM receipts`,
   licenses: `SELECT COUNT(*)::int AS n, md5(COALESCE(string_agg(l::text, ',' ORDER BY l.id), '')) AS h FROM licenses l`,
 };
