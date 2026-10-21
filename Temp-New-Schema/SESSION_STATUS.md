@@ -4,12 +4,14 @@ Last updated: 2026-10-20
 
 ## Where we are
 
-**PICK UP HERE (2026-10-20): v1 removal STAGE 1 on branch `cleanup/remove-v1-contacts` (d035f8c), waiting on John's hands-on test, then merge to main.**
+**PICK UP HERE (2026-10-20): v1 removal STAGE 1 merged to main (b04ac21) and pushed, Railway deploying. NEXT: wait a day or two, then John's OK + fresh backup + dry run to start STAGE 2 (DB column/table drops).**
 - Stage 1 (code only, no DB changes): old Contacts modal + Agency Manager, /api/contacts, /api/agencies, /api/users/me/agency + /me/contacts, the merge/backfill, CONTACTS_V2_CUTOVER switch (routes/cutover.js, /slater-config.js, X-Slater-Contacts header, reload-required bar), data.agency_id rollback write (server now strips data.agency_id on save), legacy agency auto-link (organizations.legacy_agency_id no longer read anywhere), server-boot ALTER that re-created users.contacts. Browsers drop slater_contacts / slater_agency / slater_contacts_v2 / wt_contacts on load. Deleted e2e-cutover.js, dev-copy-contacts-to-v2.js, migrate-agencies.js. doc-snapshot.js is now `doc-snapshot.js <label> [email]` (single mode).
 - Tests 2026-10-20 after: API 31, Contacts 21, orgs 19, people 35, connection 21 (connection steps used to run on v1 screens; now on the only screens). Baseline before: 31/22/20/35/21 + cutover 12.
 - Docs: all 48 (16 projects x 3) IDENTICAL main vs branch on a scratch copy of dev with the 8 never-migrated dev projects linked like prod. Plain dev DB differs ONLY because those 8 local projects (agency_org_id null, data.agency_id 3) were linked on load by the removed legacy auto-link: they now print the default agency. Prod checked read-only: 19 projects, 0 without an agency link, 0 relying on data.agency_id.
-- After merge + deploy: delete Railway variable CONTACTS_V2_CUTOVER (unused now). Local .env line already removed.
+- John's hands-on test, 2026-10-20: PASS on everything except mobile (not tested; known separate backlog item, not introduced by this branch -- deferred, John doesn't want to address it now). Covered: normal login/use, Contacts People/Orgs/Locations CRUD, Project tab org/client pickers + save/reopen, call sheet + workback + expense doc generation on a real project, admin dashboard, stale-tab hard refresh (no broken reload banner).
+- Merged `cleanup/remove-v1-contacts` -> `main` (fast-forward, b04ac21) and pushed to origin 2026-10-20. Railway variable `CONTACTS_V2_CUTOVER` deleted from the `slater` service (production) same day; local `.env` line already removed.
 - STAGE 2 (a day or two after Stage 1 is live, John's OK + fresh backup + dry run): drop agencies table, users.contacts, projects.agency_id, users.agency_* (12 flat columns), organizations.legacy_agency_id / legacy_source, contacts.legacy_bucket; strip data->agency_id from bundles. Then archive docs/CUTOVER.md + Temp-New-Schema/, retire migrate-contacts-data.js + verify-data-model-migration.js, refresh CLAUDE.md schema/API sections (still lists agencies + projects.agency_id, no v2 tables).
+- Backlog (unchanged, not part of this branch's critical path): mobile phone UI issues, flagged again 2026-10-20 as real/non-trivial work. John to list specifics when ready to tackle it.
 
 ### Cutover, 2026-10-17 (times PDT)
 - 15:46 merged `data-model-rewrite` to main (`5a53461`), deployed with the switch unset (off).
