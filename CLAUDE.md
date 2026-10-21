@@ -308,5 +308,9 @@ Mockup: `/mnt/user-data/outputs/Slater_Client_Portal_Mockup.html`
 
 Features: unique URL per project, password protection, workback view, schedule view, producer updates, approvals, file delivery, client branding, mobile friendly.
 
+Scheduled alongside V1.5 (not part of the client portal spec itself, just built in the same push):
+- **Crew double-booking warning** (requested 2026-10-20, scheduled alongside V1.5 2026-10-21): detect when the same crew member is assigned to more than one project with overlapping dates, and surface a clear notification/call-out. Needs: cross-project date-overlap check against crew assignments (likely keyed by `contact_id` now that Crew entries carry it post-v2-cutover), and a UI treatment that actually gets noticed (not just a quiet badge) when booking crew on the Crew tab or Schedule tab.
+- **Project Overview page** (requested 2026-10-21, added to V1.5 2026-10-21): a dashboard-style summary across all upcoming projects, scannable at a glance. Per project: Due Date / Event Date, next milestone, next task, a graphical workback timeline, crew booking status, talent booking status, total expense, reimbursable expense. Likely lives near the Rundown sidebar's existing cross-project data loading (`window._allProjectsCache`), since that's the only place today that already pulls every project's data on login.
+
 ## V2.0 — Team Tier (Premium)
 Project sharing, shared contacts/configs/templates, Microsoft Entra SSO, Azure migration.
