@@ -48,7 +48,12 @@ router.post('/validate', async (req, res) => {
 // Generate beta keys (admin only)
 router.post('/generate-beta', async (req, res) => {
   const { count = 1, expires_at, secret } = req.body;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Unauthorized' });
+  // Refused when ADMIN_SECRET isn't set (an unset value used to match a
+  // request with no secret). Constant-time compare.
+  const want = process.env.ADMIN_SECRET;
+  const ok = !!want && typeof secret === 'string' && !!secret &&
+    crypto.timingSafeEqual(crypto.createHash('sha256').update(secret).digest(), crypto.createHash('sha256').update(want).digest());
+  if (!ok) return res.status(403).json({ error: 'Unauthorized' });
   try {
     const keys = [];
     for (let i = 0; i < Math.min(count, 50); i++) {

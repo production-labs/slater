@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
@@ -78,8 +79,20 @@ app.get('/admin/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
 
+// Admin password check. Refuses everything when ADMIN_SECRET isn't set:
+// comparing against an unset value let a request with no password in
+// (undefined === undefined). Constant-time compare so timing can't leak it.
+function adminSecretOk(given) {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret || typeof given !== 'string' || !given) return false;
+  const a = crypto.createHash('sha256').update(given).digest();
+  const b = crypto.createHash('sha256').update(secret).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+if (!process.env.ADMIN_SECRET) console.warn('ADMIN_SECRET is not set: admin login is disabled.');
+
 app.post('/admin/login', (req, res) => {
-  if (req.body.secret === process.env.ADMIN_SECRET) {
+  if (adminSecretOk(req.body && req.body.secret)) {
     req.session.isAdmin = true;
     res.json({ success: true });
   } else {
