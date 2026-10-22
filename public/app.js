@@ -150,6 +150,7 @@ function st(n) {
   });
   if (n === "workback") refreshWbDaySelector();
   if (n === "notes") setTimeout(initNoteEditorPaste, 50);
+  if (window.BookingConflicts) BookingConflicts.changed();
   // Autosave on tab switch
   if (currentSheetKey) autosaveNow();
 }
@@ -547,6 +548,7 @@ function updateCrewStatusPill(id, val) {
 function handleCrewStatusChange(id, newVal) {
   var sel = document.getElementById(id+"_status");
   var prevVal = sel ? (sel.getAttribute("data-prev") || "tbd") : "tbd";
+  _checkDoubleBooking(id, newVal, prevVal, handleCrewStatusChange);
   if (newVal === "contacted" && prevVal !== "contacted") {
     var f = document.getElementById(id+"_contacted_at");
     if (f) f.value = new Date().toISOString();
@@ -560,6 +562,7 @@ function handleCrewStatusChange(id, newVal) {
 function handleTalentStatusChange(id, newVal) {
   var sel = document.getElementById(id+"_status");
   var prevVal = sel ? (sel.getAttribute("data-prev") || "tbd") : "tbd";
+  _checkDoubleBooking(id, newVal, prevVal, handleTalentStatusChange);
   if (newVal === "contacted" && prevVal !== "contacted") {
     var f = document.getElementById(id+"_contacted_at");
     if (f) f.value = new Date().toISOString();
@@ -569,6 +572,27 @@ function handleTalentStatusChange(id, newVal) {
   updateContactedAgo(id);
   updateTalentStatusBar();
   updateDeclinedSection("talent");
+}
+function handleKPStatusChange(id, newVal) {
+  var sel = document.getElementById(id+"_status");
+  var prevVal = sel ? (sel.getAttribute("data-prev") || "tbd") : "tbd";
+  _checkDoubleBooking(id, newVal, prevVal, handleKPStatusChange);
+  if (sel) sel.setAttribute("data-prev", newVal);
+  updateCrewStatusPill(id, newVal);
+}
+// Booking someone already booked on another project asks first
+// (booking-conflicts.js). Cancel puts the old status back.
+var _revertingStatus = false;
+function _checkDoubleBooking(id, newVal, prevVal, handler) {
+  if (_revertingStatus || !window.BookingConflicts) return;
+  BookingConflicts.confirmStatus(id, newVal, prevVal, function(oldVal) {
+    var sel = document.getElementById(id+"_status");
+    if (!sel) return;
+    sel.value = oldVal;
+    _revertingStatus = true;
+    try { handler(id, oldVal); } finally { _revertingStatus = false; }
+    autosaveTrigger();
+  });
 }
 function _formatContactedAgo(contactedAt) {
   var diff = Date.now() - new Date(contactedAt).getTime();
@@ -808,7 +832,7 @@ function addKP(cardData) {
   cardData = cardData || {};
   var id = "kp_"+(++_uid);
   var d = document.createElement("div"); d.className="card"; d.id=id;
-  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role">'+icon('pencil','pencil-icon')+'</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" onchange="updateCrewStatusPill(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>'+
+  d.innerHTML = '<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><input type="text" id="'+id+'_role" class="contact-card-role-input" placeholder="Role" autocomplete="off" oninput="autosaveTrigger()"><span class="contact-card-pencil" onclick="document.getElementById(\''+id+'_role\').focus()" title="Edit role">'+icon('pencil','pencil-icon')+'</span></div><div style="display:flex;align-items:center;gap:6px"><span class="crew-status-pill" id="'+id+'_status_pill"></span><button class="contact-card-delete" id="'+id+'_del" title="Remove">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="'+id+'_name" autocomplete="new-password" placeholder="Full name"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="'+id+'_phone" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="'+id+'_email" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="'+id+'_status" data-prev="tbd" onchange="handleKPStatusChange(\''+id+'\', this.value);autosaveTrigger()"><option value="tbd">TBD</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option></select></div></div>'+
     '<input type="hidden" id="'+id+'_contact_id"><input type="hidden" id="'+id+'_role_id"><input type="hidden" id="'+id+'_contact_ack">';
   kp.push(id);
   document.getElementById("kp-list").appendChild(d);
@@ -818,6 +842,7 @@ function addKP(cardData) {
   sv(id+"_phone", cardData.phone||"");
   sv(id+"_email", cardData.email||"");
   sv(id+"_status", cardData.status||"tbd");
+  var _kpSel = document.getElementById(id+"_status"); if (_kpSel) _kpSel.setAttribute("data-prev", cardData.status||"tbd");
   setCardLinkFields(id, cardData);
   updateCrewStatusPill(id, cardData.status||"tbd");
   (function(cardId) {
@@ -5528,6 +5553,7 @@ function _applyLoadedProject(key, data) {
   loadFormData(data);
   _formKey = key;
   _formSnap[key] = _snapNow();
+  if (window.BookingConflicts) BookingConflicts.loaded();
   return true;
 }
 // What the form holds right now, for "has this tab changed anything?".
@@ -5566,6 +5592,7 @@ function _localProjectData(key) {
 }
 
 function autosaveTrigger() {
+  if (window.BookingConflicts) BookingConflicts.changed(); // re-check double bookings
   if (_navigating) return;
   if (!currentSheetKey) return; // only autosave existing projects
   if (_formKey !== currentSheetKey) return; // project still loading
@@ -6800,6 +6827,7 @@ function fetchAllProjectsForRundown() {
     }, Promise.resolve());
   }).then(function() {
     if (sidebarOpen && dailyTab !== "crew") refreshSidebar();
+    if (window.BookingConflicts) BookingConflicts.loaded(); // every project now known: check double bookings
   });
 }
 
@@ -7100,6 +7128,7 @@ function clearForm() {
   notesLoadData([]);
   const ne = document.getElementById("note-editor"); if(ne) ne.innerHTML = "";
   updateNoteDraftIndicator("");
+  if (window.BookingConflicts) BookingConflicts.loaded();
 }
 
 

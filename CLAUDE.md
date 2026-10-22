@@ -47,6 +47,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── contacts-v2.js/.css # Contacts screen (People / Organizations / Locations)
 │   ├── project-orgs-v2.js # Project tab agency + client pickers
 │   ├── project-people-v2.js # Crew/Talent/KP contact + role pickers
+│   ├── booking-conflicts.js # Double-booking warnings across projects
 │   ├── login.html         # Login page with forgot password flow
 │   ├── reset-password.html # Password reset page
 │   ├── admin.html         # Admin dashboard
@@ -329,7 +330,7 @@ Mockup: `/mnt/user-data/outputs/Slater_Client_Portal_Mockup.html`
 Features: unique URL per project, password protection, workback view, schedule view, producer updates, approvals, file delivery, client branding, mobile friendly.
 
 Scheduled alongside V1.5 (not part of the client portal spec itself, just built in the same push):
-- **Crew double-booking warning** (requested 2026-10-20, scheduled alongside V1.5 2026-10-21): detect when the same crew member is assigned to more than one project with overlapping dates, and surface a clear notification/call-out. Needs: cross-project date-overlap check against crew assignments (likely keyed by `contact_id` now that Crew entries carry it post-v2-cutover), and a UI treatment that actually gets noticed (not just a quiet badge) when booking crew on the Crew tab or Schedule tab.
+- **Crew / talent / KP double-booking warning**: BUILT 2026-10-21 (`public/booking-conflicts.js`, test `scripts/e2e-booking-conflicts.js`). Matches by `contact_id` across `window._allProjectsCache` on overlapping upcoming schedule days (minus per-day exclusions; deadline days skipped; exclude-from-call-sheet days still count). Open project: anyone but Declined. Other project: Pencil/Hold/Confirmed = warning (red if Hold/Confirmed on both, else amber); TBD/Contacted = quiet gray note on the card only. Pop-up on adding someone booked elsewhere and on setting a booked status (Book anyway / Cancel); notice when a date or day change creates one; card strips, nav counts (per person), Schedule day lines. Same person in two roles counts once. Still to do: "Conflicts" group in the Rundown Crew tab.
 - **Project Overview page** (requested 2026-10-21, added to V1.5 2026-10-21): a dashboard-style summary across all upcoming projects, scannable at a glance. Per project: Due Date / Event Date, next milestone, next task, a graphical workback timeline, crew booking status, talent booking status, total expense, reimbursable expense. Likely lives near the Rundown sidebar's existing cross-project data loading (`window._allProjectsCache`), since that's the only place today that already pulls every project's data on login.
 
 ## V2.0 — Team Tier (Premium)

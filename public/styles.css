@@ -694,3 +694,25 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
   #daily-sidebar{width:100%!important;max-width:100%!important;height:auto!important;position:relative;border-left:none;border-top:1px solid var(--border);transition:none}
   #daily-sidebar.hidden{width:0!important;border-top-width:0}
 }
+
+/* ── Double-booking warnings (booking-conflicts.js) ── */
+.bc-strip{margin:0 0 10px;padding:8px 10px;border-radius:6px;border-left:3px solid;font-size:12px;line-height:1.5}
+.bc-strip .bc-head{font-weight:600;font-size:12px;margin-bottom:2px}
+.bc-strip .bc-line{display:flex;flex-wrap:wrap;gap:0 12px;align-items:baseline;justify-content:space-between}
+.bc-strip .bc-open{color:inherit;text-decoration:underline;cursor:pointer;font-weight:500;white-space:nowrap}
+.bc-strip.bc-red{background:rgba(217,75,67,.14);color:#F0A49E;border-color:#D94B43}
+.bc-strip.bc-amber{background:rgba(232,184,75,.12);color:#EBCB82;border-color:#E8B84B}
+.bc-strip strong{font-weight:600}
+.bc-modal{max-width:480px}
+.bc-modal .bc-intro{font-size:14px;color:var(--text-muted);margin-bottom:.75rem;line-height:1.5}
+.bc-modal .bc-strip{font-size:13px}
+.bc-modal .modal-btns{margin-top:1rem}
+.bc-nav-badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;font-weight:600;line-height:18px;text-align:center;color:#fff}
+.bc-nav-badge.bc-red{background:#D94B43}
+.bc-nav-badge.bc-amber{background:#E8B84B;color:#222222}
+.bc-day-marker{margin-top:4px;font-size:12px;font-weight:600}
+.bc-day-marker.bc-red{color:#D94B43}
+.bc-day-marker.bc-amber{color:#A07A1C}
+.bc-strip.bc-note{background:rgba(157,157,153,.10);color:#B9B9B4;border-color:#9D9D99;font-weight:400}
+.bc-strip .bc-subnote{margin-top:6px;padding-top:6px;border-top:1px solid rgba(157,157,153,.25);color:#B9B9B4}
+.bc-strip .bc-subhead{font-size:11px;font-weight:500;margin-bottom:2px}
