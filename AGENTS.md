@@ -279,10 +279,7 @@ git push
 
 ## Known Issues / In Progress
 
-- Open Project from Rundown requires two clicks (autosave race condition — fix in progress)
-- Mobile bottom nav bar (in progress)
-- Post production projects: blank Day 1 card auto-created (fix in progress)
-- Workback anchor date sometimes changes on its own (multiple causes, fix in progress)
+- Mobile bottom nav bar: built 2026-08-17 but untested; all mobile work is on hold for now
 
 ---
 
