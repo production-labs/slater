@@ -403,6 +403,99 @@
     openProject(a.getAttribute('data-key'));
   });
 
+  // ── Rundown: every double booking across all projects ──────────────────
+  // projects: [{ key, label, data }]. Same rules as on a card: a pair of
+  // projects warns when the person is on both (not Declined) on the same
+  // upcoming day and booked (Pencil+) on at least one. Two TBD / Contacted
+  // listings are left out, like the quiet note. Someone on one project twice
+  // counts once there, with their strongest status.
+  // Returns [{ contactId, name, severity, firstDate, pairs: [{ a, b, dates, severity }] }]
+  function allConflicts(projects) {
+    var byPerson = {}; // contactId -> { name, onProject: { key: { key, project, status, dates } } }
+    projects.forEach(function (p) {
+      if (!p || !p.data) return;
+      var name = projectName({ label: p.label, data: p.data });
+      bookings(p.data, true).forEach(function (b) {
+        var person = byPerson[b.contactId] || (byPerson[b.contactId] = { name: b.name, onProject: {} });
+        if (!person.name) person.name = b.name;
+        var on = person.onProject[p.key];
+        if (!on) { person.onProject[p.key] = { key: p.key, project: name, status: b.status, dates: Object.assign({}, b.dates) }; return; }
+        Object.keys(b.dates).forEach(function (d) { on.dates[d] = true; });
+        if ((RANK[b.status] || 0) > (RANK[on.status] || 0)) on.status = b.status;
+      });
+    });
+    var out = [];
+    Object.keys(byPerson).forEach(function (cid) {
+      var person = byPerson[cid];
+      var list = Object.keys(person.onProject).map(function (k) { return person.onProject[k]; });
+      var pairs = [];
+      for (var i = 0; i < list.length; i++) {
+        for (var j = i + 1; j < list.length; j++) {
+          var a = list[i], b = list[j];
+          if (!BOOKED[a.status] && !BOOKED[b.status]) continue;
+          var shared = Object.keys(a.dates).filter(function (d) { return b.dates[d]; }).sort();
+          if (!shared.length) continue;
+          // Earlier first date on the left, so lines read in order.
+          var first = Object.keys(a.dates).sort()[0] <= Object.keys(b.dates).sort()[0];
+          pairs.push({ a: first ? a : b, b: first ? b : a, dates: shared, severity: (FIRM[a.status] && FIRM[b.status]) ? 'red' : 'amber' });
+        }
+      }
+      if (!pairs.length) return;
+      pairs.sort(function (x, y) { return x.dates[0] < y.dates[0] ? -1 : x.dates[0] > y.dates[0] ? 1 : 0; });
+      out.push({ contactId: Number(cid), name: person.name || 'Unnamed', severity: worst(pairs), firstDate: pairs[0].dates[0], pairs: pairs });
+    });
+    out.sort(function (x, y) {
+      if (x.severity !== y.severity) return x.severity === 'red' ? -1 : 1;
+      if (x.firstDate !== y.firstDate) return x.firstDate < y.firstDate ? -1 : 1;
+      return x.name.localeCompare(y.name);
+    });
+    return out;
+  }
+
+  // Draws the "Conflicts" group into container (the Rundown Crew tab).
+  // onOpen(key) opens a project. Returns how many people are listed.
+  function renderRundown(container, projects, onOpen) {
+    var people = allConflicts(projects);
+    if (!people.length) return 0;
+    var wrap = document.createElement('div');
+    wrap.className = 'bc-rundown';
+    var head = document.createElement('div');
+    head.className = 'bc-rundown-head';
+    head.textContent = 'Conflicts (' + people.length + ')';
+    wrap.appendChild(head);
+    people.forEach(function (person) {
+      var box = document.createElement('div');
+      box.className = 'bc-strip bc-' + person.severity + ' bc-rundown-person';
+      var nm = document.createElement('div');
+      nm.className = 'bc-head';
+      nm.textContent = person.name;
+      box.appendChild(nm);
+      person.pairs.forEach(function (pair) {
+        var line = document.createElement('div');
+        line.className = 'bc-rundown-line';
+        var when = document.createElement('div');
+        when.className = 'bc-rundown-when';
+        when.textContent = fmtDates(pair.dates) + (pair.severity === 'red' ? '' : ' (possible)');
+        line.appendChild(when);
+        [pair.a, pair.b].forEach(function (side) {
+          var row = document.createElement('div');
+          row.className = 'bc-rundown-proj';
+          var a = document.createElement('a');
+          a.textContent = side.project;
+          a.title = 'Open ' + side.project;
+          a.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); onOpen(side.key); });
+          row.appendChild(a);
+          row.appendChild(document.createTextNode(' (' + (STATUS_LABEL[side.status] || side.status) + ')'));
+          line.appendChild(row);
+        });
+        box.appendChild(line);
+      });
+      wrap.appendChild(box);
+    });
+    container.appendChild(wrap);
+    return people.length;
+  }
+
   // A project was loaded into the form, or the Rundown copy changed: show
   // what's there, don't announce it.
   function loaded() { quietNext = true; schedule(); }
@@ -410,6 +503,8 @@
   window.BookingConflicts = {
     changed: schedule,
     loaded: loaded,
+    renderRundown: renderRundown,
+    _allConflicts: allConflicts,
     refresh: refresh,
     confirmStatus: confirmStatus,
     // For tests / the console.

@@ -716,3 +716,11 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .bc-strip.bc-note{background:rgba(157,157,153,.10);color:#B9B9B4;border-color:#9D9D99;font-weight:400}
 .bc-strip .bc-subnote{margin-top:6px;padding-top:6px;border-top:1px solid rgba(157,157,153,.25);color:#B9B9B4}
 .bc-strip .bc-subhead{font-size:11px;font-weight:500;margin-bottom:2px}
+.bc-rundown{margin-bottom:14px}
+.bc-rundown-head{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#D94B43;margin:2px 0 8px}
+.bc-rundown-person{margin-bottom:8px}
+.bc-rundown-line{margin-top:6px}
+.bc-rundown-line + .bc-rundown-line{padding-top:6px;border-top:1px solid rgba(157,157,153,.2)}
+.bc-rundown-when{font-weight:500}
+.bc-rundown-proj{padding-left:8px}
+.bc-rundown-proj a{color:inherit;font-weight:600;text-decoration:underline;cursor:pointer}

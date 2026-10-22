@@ -287,6 +287,29 @@ async function main() {
     assert(/Bravo Launch/.test(c), 'strip on Alpha points back at Bravo: ' + c);
   });
 
+  await step('Rundown Crew tab lists every conflict across projects', async () => {
+    await page.evaluate(() => { if (!sidebarOpen) toggleSidebar(); switchDailyTab('crew'); });
+    await page.waitForSelector('#daily-body .bc-rundown', { timeout: 8000 });
+    const r = await page.evaluate(() => ({
+      head: document.querySelector('.bc-rundown-head').textContent,
+      people: [...document.querySelectorAll('.bc-rundown-person')].map(e => ({ cls: e.className, text: e.textContent })),
+    }));
+    // Maria: Confirmed on both (red). Pat: Confirmed vs Pencil, Ken: TBD vs Pencil (amber).
+    // Tess is Declined on Bravo; Quinn is only TBD / Contacted on both: left out.
+    assert(r.head === 'Conflicts (3)', 'head: ' + r.head + ' ' + JSON.stringify(r.people.map(p => p.text)));
+    assert(/^Maria Lopez/.test(r.people[0].text) && /bc-red/.test(r.people[0].cls), 'red first: ' + r.people[0].text);
+    assert(/Alpha Summit/.test(r.people[0].text) && /Bravo Launch/.test(r.people[0].text), 'both projects named');
+    const names = r.people.map(p => p.text).join(' | ');
+    assert(/Pat Grip/.test(names) && /Ken Staff/.test(names) && !/Quinn|Tess/.test(names), 'who is listed: ' + names);
+    assert((names.match(/Maria Lopez/g) || []).length === 1, 'Maria (two roles on Bravo) listed once');
+    await shot('rundown');
+    await page.evaluate(() => [...document.querySelectorAll('.bc-rundown-proj a')].find(a => a.textContent === 'Bravo Launch').click());
+    await sleep(300);
+    // The app's usual "Unsaved Changes" prompt when switching projects.
+    await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'Save & Open' && x.offsetParent); if (b) b.click(); });
+    await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, keyB);
+  });
+
   if (/Error/.test(serverLog)) console.log('\nServer log (errors):\n' + serverLog.split('\n').filter(l => /Error/i.test(l)).join('\n'));
 }
 

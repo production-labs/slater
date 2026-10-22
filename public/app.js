@@ -4162,9 +4162,14 @@ function renderSidebarCrew() {
     }
 
     // Fetch all active projects in parallel
+    var fetched = []; // every fetched project, for the Conflicts group
     Promise.all(active.map(function(p) {
       return API.getProject(p.key).then(function(result) {
         if (!result || !result.data) return null;
+        // The open project: this tab's copy if it's newer than the server's
+        var mine = p.key === currentSheetKey && _allProjectsCache[p.key];
+        var fresh = (mine && mine.data && (mine.data.savedAt || 0) > (result.data.savedAt || 0)) ? mine.data : result.data;
+        fetched.push({ key: p.key, label: p.label, data: fresh });
         var summary = result.data.crew_summary;
         // crew_summary only exists after a save post-feature-launch; fall back to crew array
         if (!summary || !summary.total) {
@@ -4183,9 +4188,13 @@ function renderSidebarCrew() {
       });
     })).then(function(results) {
       var cards = results.filter(Boolean);
+      body.innerHTML = "";
+
+      // Double bookings across all projects, above the per-project cards
+      if (window.BookingConflicts) BookingConflicts.renderRundown(body, fetched, loadProjectAndGoToCrew);
 
       if (!cards.length) {
-        body.innerHTML = '<div style="color:#bbb;font-size:13px;padding:20px 0;text-align:center;font-style:italic">No active projects with crew yet.</div>';
+        body.insertAdjacentHTML("beforeend", '<div style="color:#bbb;font-size:13px;padding:20px 0;text-align:center;font-style:italic">No active projects with crew yet.</div>');
         return;
       }
 
@@ -4195,8 +4204,6 @@ function renderSidebarCrew() {
         var bt = b.date ? b.date.getTime() : Infinity;
         return at - bt;
       });
-
-      body.innerHTML = "";
 
       var STATUS_ORDER = [
         {key:"confirmed", label:"Confirmed", color:"#4A9E6B"},
