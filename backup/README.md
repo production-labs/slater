@@ -49,7 +49,7 @@ their scheduled time. To run it now:
 3. Set the schedule back to `0 9 * * *`.
 
 If you only need a one-off copy of production (not a test of the job
-itself), step 4a of `docs/RESTORE.md` is quicker.
+itself), step 4b of `docs/RESTORE.md` is quicker.
 
 ## Restoring a backup
 

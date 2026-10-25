@@ -92,12 +92,18 @@ async function sendEmail({ subject, html }) {
     return;
   }
   const resend = new Resend(process.env.RESEND_API_KEY);
-  await resend.emails.send({
+  // The Resend SDK reports API errors (e.g. a revoked key) in the return value
+  // instead of throwing, so check it. Without this, a failed send looked like
+  // a success ("Weekly summary email sent." after a 401, 2026-10-25).
+  const { error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL,
     to: NOTIFY_EMAIL,
     subject,
     html,
   });
+  if (error) {
+    throw new Error(`Resend rejected the email: ${error.message || JSON.stringify(error)}`);
+  }
 }
 
 function brandedEmail(title, bodyHtml) {
@@ -311,22 +317,30 @@ async function main() {
     log(`BACKUP SUCCESS: ${key} - ${(uploadedBytes / 1024 / 1024).toFixed(2)} MB uploaded, ${deletedCount} old object(s) pruned, ${elapsedSec}s total.`);
 
     if (now.getUTCDay() === WEEKLY_SUMMARY_DAY) {
-      await sendEmail({
-        subject: 'Slater backup weekly summary (all good)',
-        html: brandedEmail(
-          'Weekly backup summary',
-          `
-            <p style="color:#222222;font-size:14px">The scheduled backup is running normally.</p>
-            <ul style="color:#222222;font-size:14px;padding-left:18px">
-              <li>Latest backup: <code>${escapeHtml(key)}</code></li>
-              <li>Size: ${(uploadedBytes / 1024 / 1024).toFixed(2)} MB</li>
-              <li>Retention: ${RETENTION_DAYS} days (${deletedCount} old object(s) pruned this run)</li>
-            </ul>
-            <p style="color:#9D9D99;font-size:12px">You'll only hear from this job otherwise if a backup fails.</p>
-          `
-        ),
-      });
-      log('Weekly summary email sent.');
+      // Own try/catch: the backup itself succeeded, so a failed summary email
+      // must not trigger a "backup FAILED" email. Exit non-zero so the run
+      // shows as failed in Railway and someone notices email is broken.
+      try {
+        await sendEmail({
+          subject: 'Slater backup weekly summary (all good)',
+          html: brandedEmail(
+            'Weekly backup summary',
+            `
+              <p style="color:#222222;font-size:14px">The scheduled backup is running normally.</p>
+              <ul style="color:#222222;font-size:14px;padding-left:18px">
+                <li>Latest backup: <code>${escapeHtml(key)}</code></li>
+                <li>Size: ${(uploadedBytes / 1024 / 1024).toFixed(2)} MB</li>
+                <li>Retention: ${RETENTION_DAYS} days (${deletedCount} old object(s) pruned this run)</li>
+              </ul>
+              <p style="color:#9D9D99;font-size:12px">You'll only hear from this job otherwise if a backup fails.</p>
+            `
+          ),
+        });
+        log('Weekly summary email sent.');
+      } catch (emailErr) {
+        log(`ERROR: weekly summary email failed: ${emailErr && emailErr.message ? emailErr.message : emailErr}`);
+        process.exitCode = 1;
+      }
     }
   } catch (err) {
     await notifyFailure('backup', err);
