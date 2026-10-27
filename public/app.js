@@ -2010,6 +2010,11 @@ function loadScheduleDays(days, legacyData) {
 // ── Workback ──────────────────────────────────────────────────────────────────
 let wbItems = [];
 var _wbData = {};
+// Milestone/schedule-pin "internal only" flags, keyed by "pin_"+milestoneId.
+// Persisted server-side in project data (see gather()/loadFormData()) rather than
+// localStorage, so it's consistent across devices and visible to anything server-side
+// that needs to filter internal-only items (e.g. a future client-facing view).
+var _wbPinInternal = {};
 var _wbView = localStorage.getItem('slater_wb_view') || 'table';
 var _wbSelectedId = null;
 var _wbEditingCell = null;
@@ -2587,7 +2592,7 @@ function wbGetItemsForDoc() {
   let prevDue = getKickoffIso();
   const milestones = getSchedMilestones();
   const pinItems = milestones.map(function(m) {
-    var pinInternal = currentSheetKey && localStorage.getItem("slater_pin_"+currentSheetKey+"_pin_"+m.id) === "1";
+    var pinInternal = !!_wbPinInternal["pin_"+m.id];
     return {item:m.label, owner:"", due:m.date_iso,
       dueFmt:wbFmtDate(m.date_iso)+(m.time?" · "+m.time:""),
       status:"", isPin:true, internal:pinInternal,
@@ -3009,7 +3014,7 @@ function wbRenderEditPanelPin(pinId, panel) {
   var nextId = allIdx < allIds.length-1 ? allIds[allIdx+1] : null;
   var navHtml = (prevId ? '<button class="nav-btn" onclick="wbSelectItem(\'' + prevId + '\')">&#8593;</button>' : '') +
     (nextId ? '<button class="nav-btn" onclick="wbSelectItem(\'' + nextId + '\')">&#8595;</button>' : '');
-  var isInternal = (currentSheetKey && localStorage.getItem("slater_pin_"+currentSheetKey+"_"+pinId) === "1") || false;
+  var isInternal = !!_wbPinInternal[pinId];
   panel.innerHTML = '<div class="ep-hdr"><div class="ep-hdr-left"><div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:3px;background:rgba(217,75,67,.1);border:1px solid rgba(217,75,67,.2);font-size:10px;font-weight:600;color:var(--accent);margin-bottom:6px">&#128204; Milestone</div><div class="ep-name">' + m.label + '</div><div class="ep-breadcrumb">' + wbFmtDateFull(m.date_iso) + '</div></div><div class="nav-btns">' + navHtml + '</div></div>' +
     '<div class="ep-body"><div class="ep-sec"><div class="due-card" id="wb-ep-due-card"><div><div class="ep-lbl">Date</div><div class="due-card-date">' + (m.date_iso ? wbFmtDate(m.date_iso) : "--") + '</div><div class="due-card-full">' + wbFmtDateFull(m.date_iso) + '</div></div><div class="due-card-days" style="color:' + dcol + '">' + dlbl + '</div></div></div>' +
     '<div class="ep-sec"><div class="ep-lbl">Status</div><div class="status-row"><button class="status-btn">Info only — set per item</button></div></div>' +
@@ -3018,9 +3023,8 @@ function wbRenderEditPanelPin(pinId, panel) {
 }
 
 function wbPinSetInternal(pinId, val) {
-  if (!currentSheetKey) return;
-  if (val) localStorage.setItem("slater_pin_"+currentSheetKey+"_"+pinId, "1");
-  else localStorage.removeItem("slater_pin_"+currentSheetKey+"_"+pinId);
+  if (val) _wbPinInternal[pinId] = true;
+  else delete _wbPinInternal[pinId];
   autosaveTrigger();
 }
 
@@ -3060,7 +3064,7 @@ function wbBuildTvPinRow(m) {
     '<td><div class="t-cell" style="color:var(--text-muted)">--</div></td>' +
     '<td><div class="t-due-cell"><span class="t-due ' + dc + '">' + (m.date_iso ? wbFmtDate(m.date_iso) : "--") + '</span></div></td>' +
     '<td><div class="t-status-cell"><span style="font-size:11px;color:var(--text-muted)">--</span></div></td>' +
-    '<td><div class="t-int-cell"><input type="checkbox"' + ((currentSheetKey && localStorage.getItem("slater_pin_"+currentSheetKey+"_"+pinId)==="1") ? " checked" : "") + ' onchange="wbPinSetInternal(\'' + pinId + '\',this.checked)" onclick="event.stopPropagation()"></div></td>';
+    '<td><div class="t-int-cell"><input type="checkbox"' + (_wbPinInternal[pinId] ? " checked" : "") + ' onchange="wbPinSetInternal(\'' + pinId + '\',this.checked)" onclick="event.stopPropagation()"></div></td>';
   return tr;
 }
 
@@ -6994,6 +6998,7 @@ function gather() {
     wb_day_select: (document.getElementById("wb_day_select")||{value:"2"}).value,
     wb_items: wbGetItems(),
     wb_items_for_doc: wbGetItemsForDoc(),
+    internal_pins: Object.assign({}, _wbPinInternal),
     urls: getUrls(),
     expenses: getExpenses(),
     notes: notesGetData(),
@@ -7086,6 +7091,24 @@ function loadFormData(data) {
   setTimeout(updateVideoDueVisibility, 50);
   loadScheduleDays(data.schedule_days||[], data);
 
+  // Pin internal-only flags. Before 2026-10-27 these lived only in this browser's
+  // localStorage; if the project has never saved them server-side, adopt any
+  // legacy local flags once so the next autosave persists them.
+  if (data.internal_pins && typeof data.internal_pins === "object") {
+    _wbPinInternal = Object.assign({}, data.internal_pins);
+  } else {
+    _wbPinInternal = {};
+    if (currentSheetKey) {
+      var _legacyPrefix = "slater_pin_" + currentSheetKey + "_";
+      for (var _li = 0; _li < localStorage.length; _li++) {
+        var _lk = localStorage.key(_li);
+        if (_lk && _lk.indexOf(_legacyPrefix) === 0 && localStorage.getItem(_lk) === "1") {
+          _wbPinInternal[_lk.slice(_legacyPrefix.length)] = true;
+        }
+      }
+    }
+  }
+
   refreshWbDaySelector();
   const wbDayEl = document.getElementById("wb_day_select");
   if (wbDayEl && data.wb_day_select) wbDayEl.value = data.wb_day_select;
@@ -7129,6 +7152,7 @@ function clearForm() {
   document.getElementById("talent-list").innerHTML = ""; talent = []; updateTalentStatusBar(); updateDeclinedSection("talent");
   loadScheduleDays([]);
   const wbDayEl = document.getElementById("wb_day_select"); if(wbDayEl) wbDayEl.value = "last";
+  _wbPinInternal = {};
   wbLoadItems([]);
   loadUrls([]);
   loadExpenses([]);
