@@ -309,11 +309,12 @@ git push
 
 ## V1.0 Remaining
 
-- Default workback templates (5 project types) — waiting on John's spreadsheet
-- Legal pages via TermsFeed (Privacy Policy, Terms of Service, Cookie Policy)
-- Update Slater footer with real legal page URLs
-- Stripe setup (needs Chase bank account activation)
-- Copyright registration at copyright.gov
+- Default workback templates (5 project types) — on hold for now
+- Stripe setup (needs Chase bank account activation) — deferred, later
+- Copyright registration: claim filed with the US Copyright Office 2026-10-27, Case #1-15258616171, "Slater, Version 1.0" (Literary Work). Application + fee + deposit all received ("claim submission completed, no further action required"); now awaiting examiner review (electronic filings typically take a few months). Effective date of registration is the 2026-10-27 submission date, not the eventual certificate date. TODO: confirm the claimant on the application is Production Labs LLC, not John personally — fixable later but easier to correct now if wrong. Deposit PDF (`Slater_v1.0_copyright_deposit.pdf`, via `scripts/make_copyright_deposit.js`) is a pre-rewrite snapshot (file list still references `routes/agencies.js`/`routes/contacts.js`/`migrate-agencies.js`, deleted 2026-10-20) — fine as a defensible v1.0 freeze point, just note it doesn't match current tree if anyone needs to regenerate it.
+
+Done:
+- Legal pages via TermsFeed (Privacy Policy, Terms of Service, Cookie Policy, Refund Policy) — live, linked in `public/index.html` footer
 
 ## Legal Review Required (before EU/international users)
 - International data transfer framework (SCCs vs Binding Corporate Rules)
