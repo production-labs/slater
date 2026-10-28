@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/contacts-v2.css">
+<link rel="stylesheet" href="/projects-overview.css">
 </head>
 <body>
 <div id="toast" class="toast"></div>
@@ -27,6 +28,8 @@
       </div>
     </div>
     <nav class="app-nav">
+      <button class="app-nav-item" id="nav-overview" onclick="ProjectsOverview.open()"><i data-lucide="layout-dashboard" class="lucide nav-icon"></i> Overview</button>
+      <div class="app-nav-separator"></div>
       <button class="app-nav-item active" data-tab="project" onclick="st('project')"><i data-lucide="clapperboard" class="lucide nav-icon"></i> Project</button>
       <button class="app-nav-item" data-tab="schedule" onclick="st('schedule')"><i data-lucide="calendar" class="lucide nav-icon"></i> Schedule</button>
       <button class="app-nav-item" data-tab="workback" onclick="st('workback')"><i data-lucide="list-checks" class="lucide nav-icon"></i> Workback</button>
@@ -673,5 +676,6 @@
 <script src="/project-orgs-v2.js"></script>
 <script src="/project-people-v2.js"></script>
 <script src="/booking-conflicts.js"></script>
+<script src="/projects-overview.js"></script>
 </body>
 </html>

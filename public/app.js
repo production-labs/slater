@@ -2015,6 +2015,12 @@ var _wbData = {};
 // localStorage, so it's consistent across devices and visible to anything server-side
 // that needs to filter internal-only items (e.g. a future client-facing view).
 var _wbPinInternal = {};
+// Project closeout checklist (V1.5, Projects Overview "Past" tab), saved as
+// data.closeout. Manual flags only: deliverables_sent, invoices_in,
+// expense_report_sent, reimbursed. "Workback complete" is derived, not stored;
+// "reimbursed" is N/A when the project has no reimbursable expenses.
+var _closeout = {};
+var CLOSEOUT_FIELDS = ["deliverables_sent", "invoices_in", "expense_report_sent", "reimbursed"];
 var _wbView = localStorage.getItem('slater_wb_view') || 'table';
 var _wbSelectedId = null;
 var _wbEditingCell = null;
@@ -3655,6 +3661,75 @@ function persistRundownStatusChange(sheetKey) {
   });
 }
 
+// Due dates for one saved project's workback items, plus its date pins
+// (kickoff, schedule days, project due date). Shared by the Rundown and the
+// Projects Overview so both always agree. items: every named item with
+// { item, owner, due, status, uuid }; Complete / N/A items get a due date but
+// don't move the sequential chain (same as the Rundown always did).
+function projectWorkbackDates(sheet) {
+  var wbDayVal = sheet.wb_day_select || "last";
+  var schedDays = sheet.schedule_days || [];
+  var eventIso = "";
+  if (schedDays.length) {
+    if (wbDayVal === "first") eventIso = schedDays[0].date_iso||"";
+    else if (wbDayVal === "kickoff") eventIso = sheet.kickoff_date_iso||"";
+    else {
+      var matched = schedDays.find(function(d) { return (d.id||"") === wbDayVal; });
+      eventIso = matched ? matched.date_iso||"" : schedDays[schedDays.length-1].date_iso||"";
+    }
+  }
+  var kickoffIso = sheet.kickoff_date_iso||"";
+  var prevDue = kickoffIso;
+  var items = [];
+  (sheet.wb_items||[]).forEach(function(item) {
+    if (!item.item) return;
+    // Use pre-calculated due date if available (most reliable)
+    var due = item.due || "";
+    if (!due) {
+      var mode = item.mode || "anchor";
+      var dir = sheet.wb_direction || "back";
+      if (mode === "manual") {
+        due = item.manual_date||"";
+      } else if (mode === "sequential") {
+        var base = prevDue || kickoffIso || eventIso;
+        due = wbBusinessDaysAfter(base, item.seq_days||0);
+      } else {
+        var days = item.days||0;
+        due = dir === "forward" ? wbBusinessDaysAfter(eventIso, days) : wbBusinessDaysBefore(eventIso, days);
+      }
+    }
+    var done = item.status === "Complete" || item.status === "N/A";
+    if (due && !done) prevDue = due;
+    items.push({item:item.item, owner:item.owner||"", due:due||"", status:item.status||"Not Started", uuid:item.uuid||"", internal:!!item.internal});
+  });
+  var pins = [];
+  if (kickoffIso) pins.push({id:"kickoff", label:"Client Kickoff", date_iso:kickoffIso, call_time:sheet.kickoff_time||""});
+  schedDays.forEach(function(day, i) {
+    if (!day.date_iso) return;
+    pins.push({id:day.id||"day_"+i, label:day.label||"Day "+(i+1), date_iso:day.date_iso, call_time:day.call_time||""});
+  });
+  if (sheet.video_due_date_iso) pins.push({id:"video_due", label:"Project Due Date", date_iso:sheet.video_due_date_iso, call_time:sheet.video_due_time||""});
+  return { eventIso: eventIso, kickoffIso: kickoffIso, items: items, pins: pins };
+}
+
+// Sets one closeout flag on any project. The open project goes through the
+// form state + autosave (so gather() can't overwrite it); any other project is
+// saved straight from _allProjectsCache.
+function setProjectCloseout(sheetKey, field, value) {
+  if (CLOSEOUT_FIELDS.indexOf(field) === -1) return;
+  if (sheetKey === currentSheetKey) {
+    if (value) _closeout[field] = true; else delete _closeout[field];
+    autosaveTrigger();
+    return;
+  }
+  var entry = _allProjectsCache[sheetKey];
+  if (!entry || !entry.data) return;
+  var co = Object.assign({}, entry.data.closeout || {});
+  if (value) co[field] = true; else delete co[field];
+  entry.data.closeout = co;
+  persistRundownStatusChange(sheetKey);
+}
+
 function toggleSidebar() {
   sidebarOpen = !sidebarOpen;
   document.getElementById("daily-sidebar").classList.toggle("hidden", !sidebarOpen);
@@ -3697,44 +3772,13 @@ function refreshSidebar() {
   Object.keys(db).forEach(function(sheetKey) {
     var sheet = db[sheetKey];
     var project = sheet.project_title || sheet.label || "Untitled";
-    // Get anchor date from new schedule_days format
-    var wbDayVal = sheet.wb_day_select || "last";
-    var schedDays = sheet.schedule_days || [];
-    var eventIso = "";
-    if (schedDays.length) {
-      if (wbDayVal === "first") eventIso = schedDays[0].date_iso||"";
-      else if (wbDayVal === "kickoff") eventIso = sheet.kickoff_date_iso||"";
-      else {
-        var matched = schedDays.find(function(d) { return (d.id||"") === wbDayVal; });
-        eventIso = matched ? matched.date_iso||"" : schedDays[schedDays.length-1].date_iso||"";
-      }
-    }
-    var kickoffIso = sheet.kickoff_date_iso||"";
-    var prevDue = kickoffIso;
+    var wb = projectWorkbackDates(sheet);
 
-    (sheet.wb_items||[]).forEach(function(item) {
-      if (!item.item) return;
-      if (item.status === "N/A") return;
-      if (item.status === "Complete") return;
-      // Calculate due date based on mode
-      // Use pre-calculated due date if available (most reliable)
-      var due = item.due || "";
-      if (!due) {
-        var mode = item.mode || "anchor";
-        var dir = sheet.wb_direction || "back";
-        if (mode === "manual") {
-          due = item.manual_date||"";
-        } else if (mode === "sequential") {
-          var base = prevDue || kickoffIso || eventIso;
-          due = wbBusinessDaysAfter(base, item.seq_days||0);
-        } else {
-          var days = item.days||0;
-          due = dir === "forward" ? wbBusinessDaysAfter(eventIso, days) : wbBusinessDaysBefore(eventIso, days);
-        }
-      }
-      if (due) prevDue = due;
+    wb.items.forEach(function(item) {
+      if (item.status === "N/A" || item.status === "Complete") return;
+      var due = item.due;
       if (!due) return;
-      var entry = {project:project, item:item.item, owner:item.owner||"", due:due, status:item.status||"Not Started", sheetKey:sheetKey, itemName:item.item, itemUuid:item.uuid||""};
+      var entry = {project:project, item:item.item, owner:item.owner, due:due, status:item.status, sheetKey:sheetKey, itemName:item.item, itemUuid:item.uuid};
       if (due < today) overdue.push(entry);
       else if (due === today) dueToday.push(entry);
       else if (due === tomorrow) dueTomorrow.push(entry);
@@ -3743,18 +3787,7 @@ function refreshSidebar() {
     });
 
     // Add schedule pins (all pins, including internal-only, since Rundown is a personal producer view)
-    var pinMilestones = [];
-    if (sheet.kickoff_date_iso) {
-      pinMilestones.push({id:"kickoff", label:"Client Kickoff", date_iso:sheet.kickoff_date_iso, call_time:sheet.kickoff_time||""});
-    }
-    (sheet.schedule_days||[]).forEach(function(day, i) {
-      if (!day.date_iso) return;
-      pinMilestones.push({id:day.id||"day_"+i, label:day.label||"Day "+(i+1), date_iso:day.date_iso, call_time:day.call_time||""});
-    });
-    if (sheet.video_due_date_iso) {
-      pinMilestones.push({id:"video_due", label:"Project Due Date", date_iso:sheet.video_due_date_iso, call_time:sheet.video_due_time||""});
-    }
-    pinMilestones.forEach(function(pin) {
+    wb.pins.forEach(function(pin) {
       var pinDue = pin.date_iso;
       if (!pinDue) return;
       if (pinDue < today) return; // Past pins auto-complete — shown in Completed tab, never Overdue
@@ -6839,6 +6872,7 @@ function fetchAllProjectsForRundown() {
   }).then(function() {
     if (sidebarOpen && dailyTab !== "crew") refreshSidebar();
     if (window.BookingConflicts) BookingConflicts.loaded(); // every project now known: check double bookings
+    if (window.ProjectsOverview) ProjectsOverview.refresh(); // fill in the Overview if it opened early
   });
 }
 
@@ -6999,6 +7033,7 @@ function gather() {
     wb_items: wbGetItems(),
     wb_items_for_doc: wbGetItemsForDoc(),
     internal_pins: Object.assign({}, _wbPinInternal),
+    closeout: Object.assign({}, _closeout),
     urls: getUrls(),
     expenses: getExpenses(),
     notes: notesGetData(),
@@ -7109,6 +7144,8 @@ function loadFormData(data) {
     }
   }
 
+  _closeout = (data.closeout && typeof data.closeout === "object") ? Object.assign({}, data.closeout) : {};
+
   refreshWbDaySelector();
   const wbDayEl = document.getElementById("wb_day_select");
   if (wbDayEl && data.wb_day_select) wbDayEl.value = data.wb_day_select;
@@ -7153,6 +7190,7 @@ function clearForm() {
   loadScheduleDays([]);
   const wbDayEl = document.getElementById("wb_day_select"); if(wbDayEl) wbDayEl.value = "last";
   _wbPinInternal = {};
+  _closeout = {};
   wbLoadItems([]);
   loadUrls([]);
   loadExpenses([]);

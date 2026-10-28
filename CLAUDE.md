@@ -48,6 +48,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── project-orgs-v2.js # Project tab agency + client pickers
 │   ├── project-people-v2.js # Crew/Talent/KP contact + role pickers
 │   ├── booking-conflicts.js # Double-booking warnings across projects
+│   ├── projects-overview.js/.css # V1.5 Projects Overview dashboard + closeout checklist
 │   ├── login.html         # Login page with forgot password flow
 │   ├── reset-password.html # Password reset page
 │   ├── admin.html         # Admin dashboard
