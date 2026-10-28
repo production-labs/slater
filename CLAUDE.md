@@ -325,8 +325,9 @@ Done:
 ---
 
 ## V1.5 — Client Portal
-Full spec: `/mnt/user-data/outputs/Slater_V1.5_Client_Portal_Spec.docx`
-Mockup: `/mnt/user-data/outputs/Slater_Client_Portal_Mockup.html`
+**Working plan + current status: `docs/v1.5-client-portal-plan.md` (read its PICK UP HERE section first).**
+Scope (John, 2026-10-27): Client Portal + Project Overview only. Crew portal mockup is tabled, may never be built.
+Mockups: `~/Documents/Production Labs LLC/Slater/Mock-slater_client_portal.html` and `Mock-slater_projects_overview.html`. (The original spec docx at `/mnt/user-data/outputs/...` was a past session's sandbox file and is not on this machine.)
 
 Features: unique URL per project, password protection, workback view, schedule view, producer updates, approvals, file delivery, client branding, mobile friendly.
 
