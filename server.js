@@ -46,7 +46,9 @@ pool.query('SELECT 1').then(async () => {
 });
 
 app.use((req, res, next) => {
-  console.log(req.method, req.path);
+  // Client portal links are the password for portals without one: keep the
+  // token out of the logs.
+  console.log(req.method, req.path.replace(/(\/portal\/)[^/]+/, '$1[token]'));
   next();
 });
 
@@ -63,6 +65,9 @@ app.use('/api/ocr', requireAuth, require('./routes/ocr'));
 app.use('/api/licenses', require('./routes/licenses'));
 // Contacts: people, organizations, locations, roles (routes/v2).
 app.use('/api/v2', requireAuth, require('./routes/v2'));
+// Client portal, PUBLIC (no requireAuth): access is by link token + optional
+// password. See routes/portal.js before changing anything here.
+app.use('/api/portal', require('./routes/portal'));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', version: '0.1.0' });
@@ -241,6 +246,25 @@ app.get('/login', (req, res) => {
 
 app.get('/reset-password', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
+});
+
+// Client portal page (public). A static shell: no project data in it, so it's
+// served for any token and the page asks /api/portal/:token. Locked down: no
+// inline scripts, no third-party code, never framed, and the link (which
+// carries the token) is never sent on to sites the client clicks through to.
+app.get('/portal/:token', (req, res) => {
+  res.set({
+    'Content-Security-Policy': [
+      "default-src 'none'", "script-src 'self'", "connect-src 'self'",
+      "style-src 'self' https://fonts.googleapis.com", "font-src https://fonts.gstatic.com",
+      "img-src 'self' data:", "base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'",
+    ].join('; '),
+    'Referrer-Policy': 'no-referrer',
+    'X-Robots-Tag': 'noindex, nofollow',
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'no-store',
+  });
+  res.sendFile(path.join(__dirname, 'public', 'portal.html'));
 });
 
 app.get('/', (req, res, next) => {
