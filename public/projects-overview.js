@@ -55,7 +55,8 @@
 
   // ── per-project summary ───────────────────────────────────────────────────
   // Everything the cards, KPIs and timeline need, worked out once per render.
-  function summarize(key, label, data, today) {
+  // conflicts (optional): this project's double bookings from conflictsByProject().
+  function summarize(key, label, data, today, conflicts) {
     var wb = projectWorkbackDates(data);
     var client = data.client_company || data.client || '';
     var dates = [];
@@ -106,7 +107,9 @@
     var daysOut = keyDate ? daysBetween(today, keyDate) : null;
     var soon = daysOut !== null && daysOut >= 0 && daysOut <= 7;
     var unconfirmedSoon = soon ? (crew.total - crew.c) + (talent.total - talent.c) : 0;
-    var status = overdue.length ? 'red' : unconfirmedSoon ? 'yellow' : 'green';
+    var dbl = conflicts || { red: [], amber: [] };
+    var status = (overdue.length || dbl.red.length) ? 'red'
+      : (unconfirmedSoon || dbl.amber.length) ? 'yellow' : 'green';
 
     // Closeout: four saved flags plus derived "Workback complete".
     // null = not applicable (no pill), true = done, false = still open.
@@ -129,7 +132,7 @@
       items: wb.items, pins: wb.pins,
       pct: wb.items.length ? Math.round(doneCount / wb.items.length * 100) : null,
       overdue: overdue.length, waiting: waiting.length, nextTask: nextTask, nextPin: nextPin,
-      crew: crew, talent: talent, unconfirmedSoon: unconfirmedSoon, status: status,
+      crew: crew, talent: talent, unconfirmedSoon: unconfirmedSoon, conflicts: dbl, status: status,
       expense: expense, reimb: reimb, savedAt: data.savedAt || 0,
       closeout: closeout, loose: loose
     };
@@ -143,13 +146,43 @@
     // currentSheetKey is a top-level `let` in app.js: global, but not on window.
     var cur = (typeof currentSheetKey !== 'undefined') ? currentSheetKey : null;
     if (cur && keys.indexOf(cur) === -1) keys.push(cur);
+    var projects = [];
     keys.forEach(function (k) {
       var entry = cache[k];
       var data = (k === cur && window._formKey === cur) ? gather() : (entry && entry.data);
       if (!data) return;
-      out.push(summarize(k, (entry && entry.label) || data.label || '', data, today));
+      projects.push({ key: k, label: (entry && entry.label) || data.label || '', data: data });
+    });
+    var dbl = conflictsByProject(projects);
+    projects.forEach(function (p) {
+      out.push(summarize(p.key, p.label, p.data, today, dbl[p.key]));
     });
     return { today: today, list: out };
+  }
+
+  // Double bookings (crew, talent, key personnel), same rules as the Rundown's
+  // Conflicts group (booking-conflicts.js). Per project, one entry per person:
+  // { key: { red: [{ name, lines }], amber: [...] } }. A person goes under red
+  // if any of their clashes on this project is red (Hold/Confirmed on both).
+  function conflictsByProject(projects) {
+    var out = {};
+    if (!window.BookingConflicts || !BookingConflicts._allConflicts) return out;
+    BookingConflicts._allConflicts(projects).forEach(function (person) {
+      var mine = {}; // project key -> { red, lines }
+      person.pairs.forEach(function (pair) {
+        [[pair.a, pair.b], [pair.b, pair.a]].forEach(function (ab) {
+          var m = mine[ab[0].key] || (mine[ab[0].key] = { red: false, lines: [] });
+          if (pair.severity === 'red') m.red = true;
+          m.lines.push(BookingConflicts._fmtDates(pair.dates) + ' on ' + ab[1].project +
+            ' (' + (pair.severity === 'red' ? 'booked' : 'possible') + ')');
+        });
+      });
+      Object.keys(mine).forEach(function (k) {
+        var p = out[k] || (out[k] = { red: [], amber: [] });
+        p[mine[k].red ? 'red' : 'amber'].push({ name: person.name, lines: mine[k].lines });
+      });
+    });
+    return out;
   }
 
   // ── shell ─────────────────────────────────────────────────────────────────
@@ -354,6 +387,14 @@
     var dTxt = dt === null ? 'No date set' : dt === 0 ? 'Today' : dt === 1 ? 'Tomorrow' : 'In ' + dt + ' days';
 
     var flags = [];
+    function dblFlag(people, cls, word) {
+      if (!people.length) return;
+      var tip = people.map(function (x) { return x.name + ': ' + x.lines.join('; '); }).join('\n');
+      flags.push('<span class="po-flag ' + cls + '" title="' + esc(tip) + '">' + ic('users') +
+        people.length + ' ' + word + (people.length === 1 || word === 'double-booked' ? '' : 's') + '</span>');
+    }
+    dblFlag(p.conflicts.red, 'red', 'double-booked');
+    dblFlag(p.conflicts.amber, 'yellow', 'possible double booking');
     if (p.overdue) flags.push('<span class="po-flag red">' + ic('alert-circle') + p.overdue + ' overdue</span>');
     if (p.unconfirmedSoon) flags.push('<span class="po-flag yellow">' + ic('user-x') + p.unconfirmedSoon + ' unconfirmed, date soon</span>');
     if (p.waiting) flags.push('<span class="po-flag yellow">' + ic('hourglass') + p.waiting + ' waiting on client</span>');
@@ -541,5 +582,5 @@
   // fills in if it was opened before that.
   function refresh() { if (isOpen()) render(); }
 
-  window.ProjectsOverview = { open: open, close: close, refresh: refresh, isOpen: isOpen, _summarize: summarize };
+  window.ProjectsOverview = { open: open, close: close, refresh: refresh, isOpen: isOpen, _summarize: summarize, _conflictsByProject: conflictsByProject };
 })();

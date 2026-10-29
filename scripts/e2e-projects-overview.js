@@ -138,6 +138,52 @@ async function main() {
     await page.click('#po-root [data-chip="range"][data-val="6w"]');
   });
 
+  await step('double bookings show on the cards and count as needing attention', async () => {
+    // Injected into the in-page cache only (not the database), so the counts
+    // the other steps check stay as they are. Removed again at the end.
+    const X = { a: 'cs_po_dblA_' + STAMP, b: 'cs_po_dblB_' + STAMP, c: 'cs_po_dblC_' + STAMP, d: 'cs_po_dblD_' + STAMP };
+    const day = [{ id: 'sday_1', date_iso: rel(10), label: 'Shoot', category: 'shoot_day' }];
+    const inject = {
+      // 9001: Confirmed here, 1st Hold on B -> red. 9002: Pencil here (KP), Confirmed on C -> possible.
+      [X.a]: { project_title: 'Dbl Alpha', schedule_days: day,
+        crew: [{ id: 'c1', position: 'DP', name: 'Dana Dbl', contact_id: 9001, status: 'confirmed' }],
+        kp_cards: [{ _id: 'k1', role: 'Producer', name: 'Kim Dbl', contact_id: 9002, status: 'pencil' }] },
+      [X.b]: { project_title: 'Dbl Bravo', schedule_days: day,
+        crew: [{ id: 'c1', position: 'DP', name: 'Dana Dbl', contact_id: 9001, status: 'hold' }] },
+      [X.c]: { project_title: 'Dbl Charlie', schedule_days: day,
+        talent: [{ id: 't1', title: 'Host', name: 'Kim Dbl', contact_id: 9002, status: 'confirmed' }] },
+      // 9003 is only on this project: no clash.
+      [X.d]: { project_title: 'Dbl Delta', schedule_days: day,
+        crew: [{ id: 'c1', position: 'PA', name: 'Tess Dbl', contact_id: 9003, status: 'tbd' }] },
+    };
+    await page.evaluate(inj => {
+      Object.keys(inj).forEach(k => { _allProjectsCache[k] = { label: inj[k].project_title, data: inj[k] }; });
+      ProjectsOverview.refresh();
+    }, inject);
+    try {
+      const edge = k => page.$eval('#po-root .po-pc[data-open="' + k + '"] .po-edge', el => el.className);
+      const a = await card(X.a), b = await card(X.b), c = await card(X.c), d = await card(X.d);
+      assert(/1 double-booked/.test(a) && /1 possible double booking/.test(a), 'alpha flags: ' + a);
+      assert(/red/.test(await edge(X.a)), 'alpha edge ' + (await edge(X.a)));
+      assert(/1 double-booked/.test(b) && !/possible/.test(b), 'bravo flags: ' + b);
+      assert(/red/.test(await edge(X.b)), 'bravo edge ' + (await edge(X.b)));
+      assert(/1 possible double booking/.test(c) && !/double-booked/.test(c), 'charlie flags: ' + c);
+      assert(/yellow/.test(await edge(X.c)), 'charlie edge ' + (await edge(X.c)));
+      assert(/On track/.test(d) && !/double/.test(d), 'delta has no clash: ' + d);
+      const tip = await page.$eval('#po-root .po-pc[data-open="' + X.a + '"] .po-flag.red', el => el.title);
+      assert(/Dana Dbl/.test(tip) && /Dbl Bravo/.test(tip), 'tooltip names who and where: ' + tip);
+
+      await page.click('#po-root [data-chip="filter"][data-val="attention"]');
+      const shown = await page.$$eval('#po-root .po-list .po-pc', els => els.map(e => e.dataset.open));
+      [X.a, X.b, X.c, K.shoot].forEach(k => assert(shown.includes(k), 'needs attention missing ' + k + ': ' + shown));
+      [X.d, K.post].forEach(k => assert(!shown.includes(k), 'needs attention should not show ' + k));
+      await page.screenshot({ path: SHOTS + '/po-double-bookings.png' });
+    } finally {
+      await page.evaluate(keys => { keys.forEach(k => { delete _allProjectsCache[k]; }); }, Object.values(X));
+      await page.click('#po-root [data-chip="filter"][data-val="all"]');
+    }
+  });
+
   await step('search filters cards', async () => {
     await page.type('#po-q', 'csa');
     const n = await page.$$eval('#po-root .po-list .po-pc', els => els.length);
