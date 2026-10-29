@@ -4,6 +4,12 @@
    updates. Each action saves straight to /api/portal-admin (not part of the
    project autosave). Which URLs the client sees is a checkbox on each URL card
    (app.js, urls[].visible_to_client).
+   Client responses (step 5c): when a client presses Approve / Request changes
+   on the portal, it shows here (Project tab panel), as a tag + box on the
+   workback item, and as a "Client responses" group at the top of the
+   Rundown (all projects, polled every minute). Approving never completes the
+   item by itself: "Mark complete" does, then the response is confirmed.
+   Client-typed text (name, note) is always escaped.
    Public side: routes/portal.js. Plan: docs/v1.5-client-portal-plan.md */
 (function () {
   'use strict';
@@ -14,6 +20,10 @@
   var busy = false;
   var showPw = false;     // password form open
   var draft = '';         // unposted update text, survives re-renders
+  var pendingAll = [];    // unconfirmed responses across all projects (Rundown)
+  var pendingSig = '';
+  var lastPoll = 0;
+  var selectAfterLoad = null; // { key, uuid } from the Rundown's Open link
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -31,6 +41,177 @@
   function sharedLinkCount() {
     try { return getUrls().filter(function (u) { return u.visible_to_client === true; }).length; }
     catch (e) { return 0; }
+  }
+
+  // ── client responses ──────────────────────────────────────────────────────
+  function wbIdForUuid(uuid) {
+    try {
+      for (var i = 0; i < wbItems.length; i++) {
+        var d = _wbData[wbItems[i]];
+        if (d && d.uuid === uuid) return wbItems[i];
+      }
+    } catch (e) {}
+    return null;
+  }
+  function openResponses() {
+    return (state && forKey === key() && !state.error && state.responses) ? state.responses : [];
+  }
+  function responseFor(uuid) {
+    var list = openResponses();
+    for (var i = 0; i < list.length; i++) if (list[i].wb_item_uuid === uuid) return list[i];
+    return null;
+  }
+  function kindLabel(k) { return k === 'approved' ? 'Client approved' : 'Changes requested'; }
+
+  // One response as HTML. where: 'panel' | 'item'. Client text escaped.
+  function responseHtml(r, where) {
+    var wid = wbIdForUuid(r.wb_item_uuid);
+    var d = wid ? _wbData[wid] : null;
+    var done = d && d.status === 'Complete';
+    var h = '<div class="pa-resp ' + (r.kind === 'approved' ? 'ok' : 'chg') + '">';
+    h += '<div class="pa-resp-head"><span class="pa-resp-kind">' + kindLabel(r.kind) + '</span>';
+    if (where === 'panel') h += '<span class="pa-resp-item">' + (d ? esc(d.item || '(untitled)') : '<em>Item no longer in the workback</em>') + '</span>';
+    h += '</div>';
+    h += '<div class="pa-resp-meta">' + esc(r.responder_name || 'Client') + ' &middot; ' + esc(when(r.created_at)) + '</div>';
+    if (r.note) h += '<div class="pa-resp-note">' + esc(r.note) + '</div>';
+    h += '<div class="pa-resp-btns">';
+    if (r.kind === 'approved' && d && !done) {
+      h += '<button class="lb primary" data-pa-resp="confirm" data-id="' + r.id + '">Mark complete</button>';
+      h += '<button class="lb" data-pa-resp="dismiss" data-id="' + r.id + '">Dismiss</button>';
+    } else {
+      h += '<button class="lb" data-pa-resp="dismiss" data-id="' + r.id + '">' + (r.kind === 'approved' ? 'OK' : 'Got it') + '</button>';
+    }
+    if (where === 'panel' && wid) h += '<button class="lb" data-pa-resp="show" data-uuid="' + esc(r.wb_item_uuid) + '">Show in workback</button>';
+    h += '</div></div>';
+    return h;
+  }
+
+  function responsesBlock() {
+    var list = openResponses();
+    if (!list.length) return '';
+    return '<div class="pa-block pa-resps"><div class="pa-label">Client responses (' + list.length + ')</div>' +
+      list.map(function (r) { return responseHtml(r, 'panel'); }).join('') + '</div>';
+  }
+
+  function refreshWorkback() {
+    try {
+      if (typeof wbRender === 'function') wbRender();
+      if (typeof _wbSelectedId !== 'undefined' && _wbSelectedId && typeof wbRenderEditPanel === 'function') wbRenderEditPanel(_wbSelectedId);
+    } catch (e) {}
+  }
+  function refreshRundown() {
+    try { if (typeof sidebarOpen !== 'undefined' && sidebarOpen && dailyTab === 'pending') refreshSidebar(); } catch (e) {}
+  }
+
+  async function ackResponse(id, completeItem) {
+    var r = openResponses().filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!r) return;
+    if (completeItem) {
+      var wid = wbIdForUuid(r.wb_item_uuid);
+      if (wid && _wbData[wid]) {
+        _wbData[wid].status = 'Complete';
+        try { wbRefreshDates(); wbUpdateStats(); } catch (e) {}
+        if (typeof autosaveNow === 'function') autosaveNow();
+      }
+    }
+    var j = await act('POST', '/responses/' + encodeURIComponent(id) + '/ack', undefined, completeItem ? 'Marked complete.' : null);
+    if (j && !j.error) {
+      pendingAll = pendingAll.filter(function (x) { return String(x.id) !== String(id); });
+      pendingSig = sig(pendingAll);
+    }
+    refreshWorkback();
+    refreshRundown();
+  }
+
+  // The workback tag, clicked: a confirm box (table view has no edit panel).
+  // showModal puts text in with textContent, so client text stays text.
+  function reviewPrompt(uuid) {
+    var r = responseFor(uuid);
+    if (!r) return;
+    var wid = wbIdForUuid(uuid);
+    var d = wid ? _wbData[wid] : null;
+    var item = d ? (d.item || '(untitled)') : 'this item';
+    var who = r.responder_name || 'Your client';
+    var canComplete = r.kind === 'approved' && d && d.status !== 'Complete';
+    var msg = (r.kind === 'approved' ? who + ' approved "' + item + '"' : who + ' asked for changes to "' + item + '"') +
+      ' (' + when(r.created_at) + ').' + (r.note ? '\n\n"' + r.note + '"' : '') +
+      (canComplete ? '\n\nMark the item complete?' : '');
+    showModal(kindLabel(r.kind), msg, function () { ackResponse(r.id, canComplete); });
+    var ok = document.getElementById('modal-ok');
+    if (ok) ok.textContent = canComplete ? 'Mark complete' : 'Got it';
+    var cancel = document.querySelector('.modal-btns .lb:first-child');
+    if (cancel) cancel.textContent = canComplete ? 'Not yet' : 'Close';
+  }
+
+  function showInWorkback(uuid) {
+    var wid = wbIdForUuid(uuid);
+    if (!wid) return;
+    st('workback');
+    setTimeout(function () { try { wbSelectItem(wid); } catch (e) {} }, 50);
+  }
+
+  // Delegated so the buttons work in the panel, the workback edit panel and the Rundown.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pa-resp]');
+    if (!b || b.disabled) return;
+    var a = b.getAttribute('data-pa-resp');
+    if (a === 'confirm') ackResponse(b.getAttribute('data-id'), true);
+    else if (a === 'dismiss') ackResponse(b.getAttribute('data-id'), false);
+    else if (a === 'show') showInWorkback(b.getAttribute('data-uuid'));
+    else if (a === 'badge') { e.stopPropagation(); reviewPrompt(b.getAttribute('data-uuid')); }
+    else if (a === 'open') openFromRundown(b.getAttribute('data-key'), b.getAttribute('data-uuid'));
+  });
+
+  // ── all projects (Rundown) ────────────────────────────────────────────────
+  function sig(list) { return list.map(function (r) { return r.id; }).join(','); }
+
+  async function pollAll(force) {
+    if (!force && Date.now() - lastPoll < 30000) return;
+    lastPoll = Date.now();
+    var list;
+    try {
+      var r = await fetch('/api/portal-admin/responses/pending', { cache: 'no-store' });
+      if (!r.ok) return;
+      list = await r.json();
+    } catch (e) { return; }
+    if (!Array.isArray(list)) return;
+    var s2 = sig(list);
+    var changed = s2 !== pendingSig;
+    pendingAll = list; pendingSig = s2;
+    if (!changed) return;
+    // The open project got a new response: reload its panel + workback tags.
+    var k = key();
+    if (k && state && forKey === k && !state.error) {
+      var mine = sig(list.filter(function (x) { return x.project_key === k; }));
+      if (mine !== sig(openResponses())) load();
+    }
+    refreshRundown();
+  }
+
+  function rundownGroup() {
+    if (!pendingAll.length) return null;
+    var sec = document.createElement('div');
+    sec.className = 'daily-section pa-rundown';
+    var h = '<div class="daily-section-title client-resp">Client responses (' + pendingAll.length + ')</div>';
+    pendingAll.forEach(function (r) {
+      var gone = !r.item;
+      h += '<div class="daily-item"><div class="daily-item-body">' +
+        '<div class="daily-item-name">' + (gone ? '<em>Removed item</em>' : esc(r.item)) + '</div>' +
+        '<div class="pa-rd-kind ' + (r.kind === 'approved' ? 'ok' : 'chg') + '">' + kindLabel(r.kind) + ' &middot; ' + esc(r.responder_name || 'Client') + '</div>' +
+        (r.note ? '<div class="pa-rd-note">' + esc(r.note) + '</div>' : '') +
+        '<div class="daily-item-meta">' + esc(r.project_title || '') + '</div>' +
+        '<div class="daily-item-meta"><span class="daily-item-link" data-pa-resp="open" data-key="' + esc(r.project_key) + '" data-uuid="' + esc(r.wb_item_uuid) + '">Open project &rarr;</span></div>' +
+        '</div></div>';
+    });
+    sec.innerHTML = h;
+    return sec;
+  }
+
+  function openFromRundown(projectKey, uuid) {
+    if (projectKey === key()) { showInWorkback(uuid); return; }
+    selectAfterLoad = { key: projectKey, uuid: uuid };
+    var r = pendingAll.filter(function (x) { return x.project_key === projectKey && x.wb_item_uuid === uuid; })[0];
+    openSheetFromSidebar(projectKey, r ? r.item : '');
   }
 
   async function call(method, path, body) {
@@ -86,7 +267,8 @@
       root.innerHTML =
         '<p class="pa-note">Give your client a private page for this project: key dates, items waiting on them, your updates, and any links you choose to share. Crew, talent, call times, expenses, notes and internal-only items are never shown.</p>' +
         '<button class="lb primary" data-pa="enable"' + dis + '>Turn on client portal</button>' +
-        (state.updates.length ? '<p class="pa-note pa-small">Your ' + state.updates.length + ' earlier update' + (state.updates.length === 1 ? ' is' : 's are') + ' kept and will show again.</p>' : '');
+        (state.updates.length ? '<p class="pa-note pa-small">Your ' + state.updates.length + ' earlier update' + (state.updates.length === 1 ? ' is' : 's are') + ' kept and will show again.</p>' : '') +
+        responsesBlock();
       return;
     }
     var n = sharedLinkCount();
@@ -95,6 +277,7 @@
     h += '<div class="pa-link-row"><input type="text" id="pa-link" class="pa-link" readonly value="' + esc(link()) + '">' +
       '<button class="lb" data-pa="copy"' + dis + '>Copy link</button>' +
       '<button class="lb" data-pa="open"' + dis + '>Open</button></div>';
+    h += responsesBlock();
 
     // Password
     h += '<div class="pa-block"><div class="pa-label">Password</div>';
@@ -212,6 +395,11 @@
     if (k !== key()) return; // switched projects meanwhile
     if (j && j.error) { state = j; forKey = k; }
     render();
+    refreshWorkback();
+    if (selectAfterLoad && selectAfterLoad.key === k) {
+      var u = selectAfterLoad.uuid; selectAfterLoad = null;
+      setTimeout(function () { showInWorkback(u); }, 250);
+    }
   }
 
   function init() {
@@ -223,12 +411,27 @@
       if (e.target.id === 'pa-pw' && e.key === 'Enter') { e.preventDefault(); var s = root.querySelector('[data-pa="pw-save"]'); if (s) s.click(); }
     });
     load();
+    pollAll(true);
+    setInterval(function () { if (!document.hidden) pollAll(); }, 60000);
   }
 
   window.PortalAdmin = {
     onProjectLoaded: function () { load(); },
     // URL checkbox ticked/unticked: refresh the shared count.
     urlsChanged: function () { if (state && state.enabled && forKey === key()) render(); },
+    // Workback list/table: tag for an item with an unconfirmed client response.
+    badgeHtml: function (uuid) {
+      var r = uuid && responseFor(uuid);
+      return r ? '<button type="button" class="pa-badge ' + (r.kind === 'approved' ? 'ok' : 'chg') + '" data-pa-resp="badge" data-uuid="' + esc(uuid) + '" title="Client response: click to review">' + kindLabel(r.kind) + '</button>' : '';
+    },
+    // Workback edit panel: the response box with its buttons.
+    editPanelHtml: function (uuid) {
+      var r = uuid && responseFor(uuid);
+      return r ? '<div class="ep-sec">' + responseHtml(r, 'item') + '</div>' : '';
+    },
+    // Rundown Pending tab: the cross-project group (or null), and a nudge to re-check.
+    rundownGroup: rundownGroup,
+    poll: function (force) { pollAll(!!force); },
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

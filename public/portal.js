@@ -163,15 +163,81 @@
       el('div', { class: 'action-head' },
         el('div', { class: 'action-title' }, 'Waiting on you'),
         el('div', { class: 'action-sub' }, list.length + (list.length === 1 ? ' item' : ' items'))),
-      el('div', { class: 'action-list' }, list.map(function (w) {
-        var due = dueLabel(w.due, today);
-        var note = w.response
-          ? el('div', { class: 'action-note sent' }, (w.response.kind === 'approved' ? 'Approved ' : 'Changes requested ') + ago(w.response.at) + '. Your producer will confirm.')
-          : el('div', { class: 'action-note' }, 'Due ' + fmtY(w.due));
-        return el('div', { class: 'action-row' },
-          el('div', { class: 'action-due ' + due.cls }, due.text),
-          el('div', { class: 'action-body' }, el('div', { class: 'action-name' }, w.item), note));
-      })))));
+      el('div', { class: 'action-list' }, list.map(function (w) { return actionRow(w, today); })))));
+  }
+
+  // One "Waiting on you" row: Approve / Request changes, or what was sent.
+  function actionRow(w, today) {
+    var due = dueLabel(w.due, today);
+    var row = el('div', { class: 'action-item' });
+    var main = el('div', { class: 'action-row' });
+    var formSlot = el('div');
+    function closeForm() { formSlot.textContent = ''; btns.style.display = ''; }
+    function openForm(kind) {
+      btns.style.display = 'none';
+      formSlot.textContent = '';
+      var f = responseForm(w, kind, closeForm);
+      add(formSlot, f);
+      f._firstField.focus();
+    }
+    var btns = el('div', { class: 'action-btns' },
+      el('button', { type: 'button', class: 'action-btn primary', onclick: function () { openForm('approved'); } }, 'Approve'),
+      el('button', { type: 'button', class: 'action-btn', onclick: function () { openForm('changes_requested'); } }, 'Request changes'));
+    var note;
+    if (w.response) {
+      btns.style.display = 'none';
+      note = el('div', { class: 'action-note sent' },
+        (w.response.kind === 'approved' ? 'You approved this ' : 'You asked for changes ') + ago(w.response.at) + '. Your producer will confirm. ',
+        el('button', { type: 'button', class: 'action-link', onclick: function () { note.remove(); btns.style.display = ''; } }, 'Change your answer'));
+    } else {
+      note = el('div', { class: 'action-note' }, 'Due ' + fmtY(w.due));
+    }
+    add(main, [
+      el('div', { class: 'action-due ' + due.cls }, due.text),
+      el('div', { class: 'action-body' }, el('div', { class: 'action-name' }, w.item), note),
+      btns]);
+    add(row, [main, formSlot]);
+    return row;
+  }
+
+  function savedName() { try { return localStorage.getItem('slater_portal_name') || ''; } catch (_) { return ''; } }
+  function saveName(n) { try { localStorage.setItem('slater_portal_name', n); } catch (_) {} }
+
+  function responseForm(w, kind, onCancel) {
+    var approving = kind === 'approved';
+    var name = el('input', { type: 'text', maxlength: '200', placeholder: 'Your name', autocomplete: 'name', 'aria-label': 'Your name' });
+    name.value = savedName();
+    var note = el('textarea', { rows: '3', maxlength: '5000',
+      placeholder: approving ? 'Note for your producer (optional)' : 'What needs to change?',
+      'aria-label': approving ? 'Note (optional)' : 'What needs to change' });
+    var err = el('div', { class: 'err', role: 'alert' });
+    var send = el('button', { type: 'submit', class: 'action-btn primary' }, approving ? 'Send approval' : 'Send request');
+    var form = el('form', { class: 'action-form', onsubmit: function (e) {
+      e.preventDefault();
+      var n = name.value.trim(), t = note.value.trim();
+      err.textContent = '';
+      if (!n) { err.textContent = 'Please add your name.'; name.focus(); return; }
+      if (!approving && !t) { err.textContent = 'Please say what needs to change.'; note.focus(); return; }
+      send.disabled = true;
+      fetch(API + '/respond', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uuid: w.uuid, kind: kind, name: n, note: t }),
+      }).then(function (r) {
+        send.disabled = false;
+        if (r.ok) { saveName(n); return load(); }
+        if (r.status === 401 || r.status === 404) return load();
+        if (r.status === 409) { err.textContent = 'This item has changed. Reloading...'; setTimeout(load, 1200); return; }
+        if (r.status === 429) { err.textContent = 'Too many tries. Please wait a few minutes.'; return; }
+        err.textContent = 'That didn\'t send. Please try again.';
+      }).catch(function () { send.disabled = false; err.textContent = 'Can\'t connect. Try again.'; });
+    } },
+      el('div', { class: 'action-form-title' }, approving ? 'Approve "' + w.item + '"' : 'Request changes to "' + w.item + '"'),
+      name, note, err,
+      el('div', { class: 'action-form-btns' },
+        el('button', { type: 'button', class: 'action-btn', onclick: onCancel }, 'Cancel'), send));
+    form._firstField = name.value ? note : name;
+    return form;
   }
 
   function timelineSection(nodes, today) {

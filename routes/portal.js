@@ -15,8 +15,11 @@
 //     links not opted in (urls[].visible_to_client), non-http(s) links.
 //   - Responses are no-store, no-referrer, noindex.
 //
-// Producer-side controls (turn on/off, password, regenerate, visibility,
-// updates) are step 5b and live behind requireAuth elsewhere.
+// Clients can answer a "Waiting on you" item (step 5c): POST /:token/respond
+// with Approve or Request changes. That only ever adds a portal_responses
+// row; it never touches projects.data. The producer confirms in the app.
+//
+// Producer-side controls live in routes/portalAdmin.js (requireAuth).
 // Plan: docs/v1.5-client-portal-plan.md (Part A).
 
 const express = require('express');
@@ -56,6 +59,14 @@ const unlockLimiter = rateLimit({
   standardHeaders: true, legacyHeaders: false,
   keyGenerator: (req) => ipKeyGenerator(req.ip) + '|' + req.params.token,
   message: { error: 'too_many_attempts' },
+});
+
+// Client responses: per address AND portal. Generous for real use, stops floods.
+const respondLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, limit: 20,
+  standardHeaders: true, legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip) + '|' + req.params.token,
+  message: { error: 'too_many_requests' },
 });
 
 router.use((req, res, next) => {
@@ -314,6 +325,53 @@ router.post('/:token/unlock', unlockLimiter, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('Portal unlock failed:', err.message);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Approve / Request changes on a "Waiting on you" item. The item must be one
+// the client can see right now (checked against the same allowlist the page
+// is built from). A newer answer replaces an older unconfirmed one for the
+// same item, so the producer only sees the latest.
+const NAME_MAX = 200, NOTE_MAX = 5000;
+router.post('/:token/respond', respondLimiter, async (req, res) => {
+  try {
+    const portal = await findPortal(req.params.token);
+    if (!portal) return res.status(404).json({ error: 'not_found' });
+    if (!isUnlocked(req, portal)) return res.status(401).json({ error: 'locked' });
+    const b = req.body || {};
+    const kind = b.kind === 'approved' || b.kind === 'changes_requested' ? b.kind : null;
+    const uuid = typeof b.uuid === 'string' ? b.uuid : '';
+    const name = typeof b.name === 'string' ? b.name.trim() : '';
+    const note = typeof b.note === 'string' ? b.note.trim() : '';
+    if (!kind) return res.status(400).json({ error: 'bad_kind' });
+    if (!name || name.length > NAME_MAX) return res.status(400).json({ error: 'bad_name' });
+    if (note.length > NOTE_MAX) return res.status(400).json({ error: 'bad_note' });
+    if (kind === 'changes_requested' && !note) return res.status(400).json({ error: 'note_required' });
+    const waiting = buildPayload(portal, {}).waiting;
+    if (!uuid || !waiting.some(w => w.uuid === uuid)) return res.status(409).json({ error: 'not_waiting' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE portal_responses SET acknowledged_at = NOW()
+          WHERE project_id = $1 AND wb_item_uuid = $2 AND acknowledged_at IS NULL`,
+        [portal.project_id, uuid]);
+      await client.query(
+        `INSERT INTO portal_responses (project_id, owner_id, wb_item_uuid, kind, responder_name, note)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [portal.project_id, portal.owner_id, uuid, kind, name, note || null]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Portal respond failed:', err.message);
     res.status(500).json({ error: 'server_error' });
   }
 });

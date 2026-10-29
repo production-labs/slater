@@ -2890,13 +2890,16 @@ function wbBuildLvTaskItem(id) {
   icon.className = "li-icon"; icon.style.background = color; icon.style.borderRadius = "50%";
   var info = document.createElement("div"); info.className = "li-info";
   var name = document.createElement("div"); name.className = "li-name"; name.textContent = d.item || "(untitled)";
+  var _paBadge = window.PortalAdmin ? PortalAdmin.badgeHtml(d.uuid) : "";
   var meta = document.createElement("div"); meta.className = "li-meta";
   if (d.owner) {
     var dot = document.createElement("div");
     dot.style.cssText = "width:6px;height:6px;border-radius:50%;flex-shrink:0;background:" + color;
     meta.appendChild(dot); meta.appendChild(document.createTextNode(d.owner));
   }
-  info.appendChild(name); info.appendChild(meta);
+  info.appendChild(name);
+  if (_paBadge) { var _pb = document.createElement("div"); _pb.innerHTML = _paBadge; info.appendChild(_pb); } // client response (portal-admin.js)
+  info.appendChild(meta);
   var right = document.createElement("div"); right.className = "li-right";
   var dueEl = document.createElement("div");
   dueEl.className = "li-due " + dc; dueEl.id = "wb-li-due-" + id;
@@ -2967,6 +2970,7 @@ function wbRenderEditPanel(id) {
 
   panel.innerHTML = '<div class="ep-hdr"><div class="ep-hdr-left"><div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block;flex-shrink:0"></span><span style="font-size:11px;color:' + color + ';font-weight:500">' + (d.owner||"No owner") + '</span></div><div class="ep-name">' + (d.item||"(untitled)") + '</div><div class="ep-breadcrumb">' + (d.mode) + ' mode</div></div><div class="nav-btns">' + navHtml + '</div></div>' +
     '<div class="ep-body">' +
+    (window.PortalAdmin ? PortalAdmin.editPanelHtml(d.uuid) : '') +
     '<div class="ep-sec"><div class="ep-lbl">Item name</div><input class="ep-inp" value="' + (d.item||"").replace(/"/g,"&quot;") + '" oninput="_wbData[\'' + id + '\'].item=this.value;var n=document.querySelector(\'#wb-li-' + id + ' .li-name\');if(n)n.textContent=this.value"></div>' +
     '<div class="ep-grid"><div class="ep-sec" style="margin:0"><div class="ep-lbl">Owner</div><input class="ep-inp" value="' + (d.owner||"").replace(/"/g,"&quot;") + '" oninput="_wbData[\'' + id + '\'].owner=this.value;wbBuildListView();wbSelectItem(\'' + id + '\')"></div>' +
     '<div class="ep-sec" style="margin:0"><div class="ep-lbl">Status</div><select class="ep-sel" onchange="wbEpSetStatus(\'' + id + '\',this.value)">' +
@@ -3097,7 +3101,7 @@ function wbBuildTvTaskRow(id, num) {
   tr.onclick = function(e) { if (!e.target.closest("input,select,button")) wbSelectItem(id); };
   tr.innerHTML = '<td><div class="t-drag">&#10783;</div></td>' +
     '<td><div class="t-num">' + num + '</div></td>' +
-    '<td ondblclick="wbTvEditLabel(\'' + id + '\',this)"><div class="t-cell"><span class="tv-val-label">' + (d.item||"").replace(/</g,"&lt;") + '</span></div></td>' +
+    '<td ondblclick="wbTvEditLabel(\'' + id + '\',this)"><div class="t-cell"><span class="tv-val-label">' + (d.item||"").replace(/</g,"&lt;") + '</span>' + (window.PortalAdmin ? PortalAdmin.badgeHtml(d.uuid) : '') + '</div></td>' +
     '<td ondblclick="wbTvEditOwner(\'' + id + '\',this)"><div class="t-owner"><div class="t-owner-dot" style="background:' + color + '"></div><span class="t-owner-name">' + (d.owner||"--") + '</span></div></td>' +
     '<td ondblclick="wbTvEditMode(\'' + id + '\',this)"><div class="t-cell"><span class="t-mode ' + d.mode + '">' + d.mode + '</span></div></td>' +
     '<td ondblclick="wbTvEditDays(\'' + id + '\',this)"><div class="t-days tv-val-days">' + (d.mode==="sequential"?d.seq_days:d.mode==="manual"?"--":d.days) + '</div></td>' +
@@ -3902,12 +3906,16 @@ function refreshSidebar() {
     body.appendChild(sec);
   }
 
+  // Client portal responses, all projects (portal-admin.js)
+  var _paGroup = window.PortalAdmin ? PortalAdmin.rundownGroup() : null;
+  if (_paGroup) body.appendChild(_paGroup);
+  if (window.PortalAdmin) PortalAdmin.poll();
   renderSection("Overdue", overdue, "overdue");
   renderSection("Due Today", dueToday, "today");
   renderSection("Due Tomorrow", dueTomorrow, "tomorrow");
   renderSection("This Week", thisWeek, "this-week");
   renderSection("Next Week", nextWeek, "next-week");
-  if (!overdue.length && !dueToday.length && !dueTomorrow.length && !thisWeek.length && !nextWeek.length) {
+  if (!_paGroup && !overdue.length && !dueToday.length && !dueTomorrow.length && !thisWeek.length && !nextWeek.length) {
     var emptyAll = document.createElement("div");
     emptyAll.style.cssText = "color:#bbb;font-size:13px;padding:20px 0;text-align:center;font-style:italic";
     emptyAll.textContent = "Nothing due soon.";

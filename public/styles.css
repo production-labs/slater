@@ -746,3 +746,22 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .portal-admin .lb[disabled]{opacity:.5;cursor:default}
 .url-portal{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer}
 @media (max-width:768px){.portal-admin .pa-link-row{flex-wrap:wrap}}
+
+/* Client responses from the portal (V1.5 step 5c, portal-admin.js) */
+.pa-resp{border:1px solid var(--border);border-left:3px solid #3a9a5b;border-radius:8px;padding:9px 11px;margin-top:8px;background:var(--surface);font-size:13px}
+.pa-resp.chg{border-left-color:#E0A030}
+.pa-resp-head{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.pa-resp-kind{font-weight:700;font-size:12px;color:#3a9a5b}
+.pa-resp.chg .pa-resp-kind{color:#E0A030}
+.pa-resp-item{font-weight:600;color:var(--text-primary)}
+.pa-resp-meta{font-size:12px;color:var(--text-muted);margin-top:2px}
+.pa-resp-note{white-space:pre-wrap;margin-top:6px;line-height:1.5;color:var(--text-primary)}
+.pa-resp-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pa-badge{display:inline-block;font:inherit;font-size:10px;font-weight:700;padding:1px 6px;border:none;cursor:pointer;border-radius:9px;margin-top:3px;background:rgba(58,154,91,.15);color:#3a9a5b;white-space:nowrap}
+.tv-val-label + .pa-badge{margin:0 0 0 6px}
+.pa-badge.chg{background:rgba(224,160,48,.15);color:#E0A030}
+.daily-section-title.client-resp{color:#3a9a5b}
+.pa-rd-kind{font-size:11px;font-weight:600;color:#3a9a5b;margin-top:1px}
+.pa-rd-kind.chg{color:#E0A030}
+.pa-rd-note{font-size:12px;color:var(--text-primary);white-space:pre-wrap;margin-top:2px;max-height:4.5em;overflow:hidden}
+#modal-msg{white-space:pre-line}
