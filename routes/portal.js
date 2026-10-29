@@ -219,6 +219,15 @@ function buildPayload(row, extra) {
   const respByUuid = new Map();
   (extra.responses || []).forEach(r => { if (!respByUuid.has(r.wb_item_uuid)) respByUuid.set(r.wb_item_uuid, r); });
 
+  // Shared links (opted in per URL card). wb_item_uuid is used here only, to
+  // put a review link beside its workback item; it isn't sent in `links`.
+  const sharedLinks = (Array.isArray(data.urls) ? data.urls : [])
+    .filter(u => u && u.visible_to_client === true)
+    .map(u => ({ name: str(u.name, 200), url: safeUrl(u.url), notes: str(u.notes, 300), wb: str(u.wb_item_uuid, 100) }))
+    .filter(u => u.url)
+    .map(u => Object.assign(u, { name: u.name || new URL(u.url).hostname }));
+  const links = sharedLinks.map(u => ({ name: u.name, url: u.url, notes: u.notes }));
+
   const waiting = items
     .filter(i => i.client && !i.done)
     .sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : 0)
@@ -226,6 +235,7 @@ function buildPayload(row, extra) {
       const r = respByUuid.get(i.uuid);
       return {
         uuid: i.uuid, item: i.item, due: i.due,
+        links: i.uuid ? sharedLinks.filter(u => u.wb === i.uuid).map(u => ({ name: u.name, url: u.url })) : [],
         response: r && !r.acknowledged_at ? { kind: r.kind, at: r.created_at } : null,
       };
     });
@@ -242,12 +252,6 @@ function buildPayload(row, extra) {
       email: safeEmail(k.email),
       phone: str(k.phone, 40).replace(/[^0-9+()\-. ]/g, ''),
     }));
-
-  const links = (Array.isArray(data.urls) ? data.urls : [])
-    .filter(u => u && u.visible_to_client === true)
-    .map(u => ({ name: str(u.name, 200), url: safeUrl(u.url), notes: str(u.notes, 300) }))
-    .filter(u => u.url)
-    .map(u => Object.assign(u, { name: u.name || new URL(u.url).hostname }));
 
   const producer = str(agencyOrg && agencyOrg.name, 200) || str(row.user_dba, 200) || str(row.user_name, 200);
 

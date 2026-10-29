@@ -3586,9 +3586,46 @@ function addUrl(data) {
       '<input type="text" id="' + id + '_name" placeholder="Name" value="' + (data.name||'') + '" autocomplete="new-password" oninput="updateUrlBtn(\'' + id + '\')">' +
       '<input type="url" id="' + id + '_url" placeholder="https://..." value="' + (data.url||'') + '" autocomplete="new-password">' +
       '<input type="text" id="' + id + '_notes" placeholder="Notes" value="' + (data.notes||'') + '" autocomplete="new-password">' +
-      '<label class="url-portal"><input type="checkbox" id="' + id + '_portal"' + (data.visible_to_client === true ? ' checked' : '') + ' onchange="if(window.PortalAdmin)PortalAdmin.urlsChanged()"> Show on client portal</label>' +
+      '<label class="url-portal"><input type="checkbox" id="' + id + '_portal"' + (data.visible_to_client === true ? ' checked' : '') + ' onchange="urlPortalToggled(\'' + id + '\')"> Show on client portal</label>' +
+      '<label class="url-wb-row" id="' + id + '_wbrow"' + (data.visible_to_client === true ? '' : ' style="display:none"') + '>Show beside workback item ' +
+        '<span class="select-wrap"><select id="' + id + '_wb" onfocus="urlWbFill(\'' + id + '\')" onmousedown="urlWbFill(\'' + id + '\')" onchange="if(window.PortalAdmin)PortalAdmin.urlsChanged()"></select></span></label>' +
     '</div>';
   document.getElementById("url-list").appendChild(el);
+  urlWbFill(id, typeof data.wb_item_uuid === "string" ? data.wb_item_uuid : "");
+}
+
+function urlPortalToggled(id) {
+  const on = !!(document.getElementById(id+"_portal")||{}).checked;
+  const row = document.getElementById(id+"_wbrow");
+  if (row) row.style.display = on ? "" : "none";
+  if (window.PortalAdmin) PortalAdmin.urlsChanged();
+}
+
+// Review links (V1.5 step 6, 2026-10-29): a shared link can sit beside one
+// workback item on the client portal (e.g. "Rough cut v2" -> Frame.io link).
+// Options are the items the portal can show (not internal, not N/A). Refilled
+// on focus so it follows workback edits. A saved item that's no longer
+// eligible stays selected (so nothing is lost) but is labelled as hidden.
+function urlWbFill(id, keep) {
+  const sel = document.getElementById(id+"_wb");
+  if (!sel) return;
+  const cur = keep !== undefined ? keep : sel.value;
+  const opts = [["", "None (Links list only)"]];
+  let found = !cur;
+  wbItems.forEach(function(wid) {
+    const d = _wbData[wid];
+    if (!d || !d.uuid || !(d.item||"").trim() || d.internal || d.status === "N/A") return;
+    opts.push([d.uuid, d.item.trim()]);
+    if (d.uuid === cur) found = true;
+  });
+  if (!found) opts.push([cur, "(item not on portal: internal, N/A or removed)"]);
+  sel.textContent = "";
+  opts.forEach(function(o) {
+    const op = document.createElement("option");
+    op.value = o[0]; op.textContent = o[1];
+    sel.appendChild(op);
+  });
+  sel.value = cur;
 }
 
 function toggleUrl(id) {
@@ -3632,6 +3669,7 @@ function getUrls() {
       notes:    ((document.getElementById(id+"_notes")||{}).value||"").trim(),
       collapsed: fields ? fields.classList.contains("collapsed") : false,
       visible_to_client: !!(document.getElementById(id+"_portal")||{}).checked,
+      wb_item_uuid: ((document.getElementById(id+"_wb")||{}).value||""),
     };
   }).filter(function(u) { return u.url || u.name; });
 }

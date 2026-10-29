@@ -73,8 +73,9 @@ async function main() {
     expenses: [{ vendor: 'SECRET_EXPENSE', amount: 999 }],
     notes: 'SECRET_NOTES',
     urls: [
-      { name: 'Script V2', url: 'https://example.com/script', notes: 'SharePoint', visible_to_client: true },
-      { name: 'SECRET_HIDDEN_LINK', url: 'https://example.com/budget' },
+      { name: 'Script V2', url: 'https://example.com/script', notes: 'SharePoint', visible_to_client: true, wb_item_uuid: 'w-client' },
+      { name: 'SECRET_HIDDEN_LINK', url: 'https://example.com/budget', wb_item_uuid: 'w-client' },
+      { name: 'Rough cut', url: 'https://f.io/abc', visible_to_client: true, wb_item_uuid: 'w-internal' },
       { name: 'SECRET_JS_LINK', url: 'javascript:alert(1)', visible_to_client: true },
     ],
   };
@@ -132,7 +133,9 @@ async function main() {
     const live = p.schedule.find(s => s.label === 'Live Event');
     assert(live && live.time === '9:00 AM PT' && live.location === 'Smith Tower' && live.end_date === rel(9), 'live day ' + JSON.stringify(live));
     assert(p.venues.length === 1 && p.venues[0].city_line === 'Seattle, WA 98104', 'venue ' + JSON.stringify(p.venues));
-    assert(p.links.length === 1 && p.links[0].url === 'https://example.com/script', 'links ' + JSON.stringify(p.links));
+    assert(p.links.length === 2 && p.links[0].url === 'https://example.com/script' && p.links[1].url === 'https://f.io/abc', 'links ' + JSON.stringify(p.links));
+    assert(p.links.every(l => JSON.stringify(Object.keys(l).sort()) === '["name","notes","url"]'), 'link keys ' + JSON.stringify(p.links));
+    assert(JSON.stringify(p.waiting[0].links) === JSON.stringify([{ name: 'Script V2', url: 'https://example.com/script' }]), 'review link beside item ' + JSON.stringify(p.waiting[0].links));
     assert(p.team.length === 2 && p.team[1].email === '', 'bad email dropped: ' + JSON.stringify(p.team));
     assert(p.updates.length === 2 && p.updates[0].body.startsWith('Script V2'), 'updates newest first');
     assert(p.key_date === rel(9), 'key date ' + p.key_date);
@@ -226,6 +229,8 @@ async function main() {
     assert(t.indexOf('<img src=x') !== -1, 'markup in a name should show as text');
     assert(await page.evaluate(() => window.__xss === undefined), 'XSS ran');
     assert(await page.$eval('.brand-logo img', i => i.naturalWidth === 1), 'client logo');
+    const review = await page.$$eval('.action-item .action-review', as => as.map(a => a.textContent + '|' + a.href + '|' + a.rel));
+    assert(review.length === 1 && review[0] === '↗ Script V2|https://example.com/script|noopener noreferrer', 'review link beside item ' + review);
     const rels = await page.$$eval('a[target=_blank]', as => as.map(a => a.rel));
     assert(rels.length >= 2 && rels.every(r => /noreferrer/.test(r)), 'external links rel ' + rels);
     await page.screenshot({ path: SHOTS + '/portal.png', fullPage: true });

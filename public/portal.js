@@ -127,7 +127,7 @@
       el('div', { class: 'sec-head' },
         el('div', { class: 'sec-title' }, 'Deliverables'),
         d.key_date ? el('div', { class: 'sec-aside' }, 'Expected ' + fmt(d.key_date)) : null),
-      el('div', { class: 'deliv' }, el('div', { class: 'deliv-txt' }, 'Final files will appear here when delivery is complete'))));
+      el('div', { class: 'deliv' }, el('div', { class: 'deliv-txt' }, 'Your producer will share final files through a link on this page'))));
     add(app, body);
 
     add(app, el('footer', null, el('div', { class: 'wrap' }, el('div', { class: 'foot-txt' },
@@ -194,7 +194,11 @@
     }
     add(main, [
       el('div', { class: 'action-due ' + due.cls }, due.text),
-      el('div', { class: 'action-body' }, el('div', { class: 'action-name' }, w.item), note),
+      el('div', { class: 'action-body' }, el('div', { class: 'action-name' }, w.item),
+        (w.links && w.links.length) ? el('div', { class: 'action-links' }, w.links.map(function (l) {
+          return el('a', ext(l.url, { class: 'action-review' }), '↗ ' + l.name);
+        })) : null,
+        note),
       btns]);
     add(row, [main, formSlot]);
     return row;

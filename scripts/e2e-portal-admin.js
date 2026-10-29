@@ -45,6 +45,10 @@ async function main() {
   const data = {
     project_title: 'Portal Admin Test', project_type: 'location_shoot', client_company: 'Acme',
     schedule_days: [{ id: 'sday_1', date_iso: rel(10), label: 'Shoot Day' }],
+    wb_items: [
+      { uuid: 'w-rc', item: 'Approve rough cut', owner: 'Client', mode: 'manual', manual_date: rel(5), status: 'Not Started' },
+      { uuid: 'w-int', item: 'Internal QC', owner: 'Client', mode: 'manual', manual_date: rel(4), status: 'Not Started', internal: true },
+    ],
     urls: [
       { name: 'Review link', url: 'https://example.com/review', notes: '' },
       { name: 'Internal drive', url: 'https://example.com/drive', notes: '' },
@@ -168,11 +172,36 @@ async function main() {
     await waitText(/1 link shared/);
   });
 
+  await step('Review link: workback dropdown shows only when shared, lists portal items, and puts the link beside the item', async () => {
+    await page.evaluate(() => st('urls'));
+    const vis = await page.$$eval('#url-list .url-wb-row', els => els.map(e => getComputedStyle(e).display !== 'none'));
+    assert(JSON.stringify(vis) === '[true,false]', 'dropdown visibility ' + JSON.stringify(vis));
+    const sel = await page.$('#url-list select[id$="_wb"]');
+    await sel.focus();
+    const opts = await page.$$eval('#url-list select[id$="_wb"]', els => Array.from(els[0].options).map(o => o.textContent));
+    assert(opts.includes('Approve rough cut') && !opts.includes('Internal QC'), 'options ' + JSON.stringify(opts));
+    await page.select('#url-list select[id$="_wb"]', 'w-rc');
+    const card = await page.$('#url-list .url-card');
+    await card.screenshot({ path: '/tmp/cv2-e2e/shots/url-card-review-link.png' });
+    const c = await page.$eval('#url-list select[id$="_wb"]', e => getComputedStyle(e).color);
+    assert(c === 'rgb(247, 245, 239)', 'dropdown text color ' + c);
+    await page.evaluate(() => autosaveNow());
+    let ok = false;
+    for (let i = 0; i < 20 && !ok; i++) { await sleep(250); const d = await serverData(); ok = d.urls && d.urls[0].wb_item_uuid === 'w-rc'; }
+    assert(ok, 'wb_item_uuid not saved: ' + JSON.stringify((await serverData()).urls));
+    const j = await (await fetch(BASE + '/api/portal/' + token1)).json();
+    const w = j.waiting.find(x => x.item === 'Approve rough cut');
+    assert(w && JSON.stringify(w.links) === JSON.stringify([{ name: 'Review link', url: 'https://example.com/review' }]), 'waiting ' + JSON.stringify(j.waiting));
+    await page.evaluate(() => st('project'));
+  });
+
   await step('Checkbox state survives reloading the project', async () => {
     await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
     await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
     const checks = await page.$$eval('#url-list input[type=checkbox][id$="_portal"]', els => els.map(e => e.checked));
     assert(JSON.stringify(checks) === '[true,false]', JSON.stringify(checks));
+    const wbVal = await page.$eval('#url-list select[id$="_wb"]', e => e.value);
+    assert(wbVal === 'w-rc', 'review link item after reload: ' + wbVal);
     await waitText(/Portal is on/);
   });
 

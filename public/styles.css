@@ -745,6 +745,10 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .portal-admin .pa-danger-zone{display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border)}
 .portal-admin .lb[disabled]{opacity:.5;cursor:default}
 .url-portal{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer}
+.url-wb-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);flex-wrap:wrap}
+.url-wb-row .select-wrap{flex:1;min-width:180px;max-width:100%}
+.url-wb-row select{padding:6px 28px 6px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit;background-color:var(--surface);color:var(--text-primary)}
+.url-wb-row select option{background:var(--surface);color:var(--text-primary)}
 @media (max-width:768px){.portal-admin .pa-link-row{flex-wrap:wrap}}
 
 /* Client responses from the portal (V1.5 step 5c, portal-admin.js) */
