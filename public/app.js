@@ -3582,6 +3582,7 @@ function addUrl(data) {
       '<input type="text" id="' + id + '_name" placeholder="Name" value="' + (data.name||'') + '" autocomplete="new-password" oninput="updateUrlBtn(\'' + id + '\')">' +
       '<input type="url" id="' + id + '_url" placeholder="https://..." value="' + (data.url||'') + '" autocomplete="new-password">' +
       '<input type="text" id="' + id + '_notes" placeholder="Notes" value="' + (data.notes||'') + '" autocomplete="new-password">' +
+      '<label class="url-portal"><input type="checkbox" id="' + id + '_portal"' + (data.visible_to_client === true ? ' checked' : '') + ' onchange="if(window.PortalAdmin)PortalAdmin.urlsChanged()"> Show on client portal</label>' +
     '</div>';
   document.getElementById("url-list").appendChild(el);
 }
@@ -3605,6 +3606,7 @@ function removeUrl(id) {
   showModal("Remove URL", "Remove \""+_label+"\"? This cannot be undone.", function() {
     const i = urlItems.indexOf(id); if (i > -1) urlItems.splice(i, 1);
     document.getElementById(id).remove();
+    if (window.PortalAdmin) PortalAdmin.urlsChanged();
   });
 }
 
@@ -3625,6 +3627,7 @@ function getUrls() {
       name:     ((document.getElementById(id+"_name")||{}).value||"").trim(),
       notes:    ((document.getElementById(id+"_notes")||{}).value||"").trim(),
       collapsed: fields ? fields.classList.contains("collapsed") : false,
+      visible_to_client: !!(document.getElementById(id+"_portal")||{}).checked,
     };
   }).filter(function(u) { return u.url || u.name; });
 }
@@ -6954,6 +6957,7 @@ function doSave(data, label, key) {
     if (result) console.log("Saved to server:", k);
     else console.warn("Server save failed, localStorage only");
     libRefreshDropdown(k);
+    if (window.PortalAdmin && currentSheetKey === k) PortalAdmin.onProjectLoaded(); // a new project can now have a portal
   });
 }
 
@@ -7164,6 +7168,7 @@ function loadFormData(data) {
   updateNoteDraftIndicator(data._note_draft || "");
   // v2: link people + locations saved before Session 5, check for contact changes.
   if (window.ProjectPeopleV2) ProjectPeopleV2.onProjectLoaded();
+  if (window.PortalAdmin) PortalAdmin.onProjectLoaded();
 }
 
 // ── Clear form ────────────────────────────────────────────────────────────
@@ -7198,6 +7203,7 @@ function clearForm() {
   const ne = document.getElementById("note-editor"); if(ne) ne.innerHTML = "";
   updateNoteDraftIndicator("");
   if (window.BookingConflicts) BookingConflicts.loaded();
+  if (window.PortalAdmin) PortalAdmin.onProjectLoaded();
 }
 
 
@@ -8329,11 +8335,11 @@ document.getElementById("notes-search-clear").addEventListener("click", function
 
 // Wire autosave to all input/change events on the page
 document.addEventListener("input", function(e) {
-  if (e.target.closest(".contacts-modal") || e.target.closest("#agency-modal") || e.target.closest("#crop-modal")) return;
+  if (e.target.closest(".contacts-modal") || e.target.closest("#agency-modal") || e.target.closest("#crop-modal") || e.target.closest(".portal-admin")) return;
   autosaveTrigger();
 });
 document.addEventListener("change", function(e) {
-  if (e.target.closest(".contacts-modal") || e.target.closest("#agency-modal") || e.target.closest("#crop-modal")) return;
+  if (e.target.closest(".contacts-modal") || e.target.closest("#agency-modal") || e.target.closest("#crop-modal") || e.target.closest(".portal-admin")) return;
   autosaveTrigger();
 });
 

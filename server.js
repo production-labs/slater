@@ -68,6 +68,8 @@ app.use('/api/v2', requireAuth, require('./routes/v2'));
 // Client portal, PUBLIC (no requireAuth): access is by link token + optional
 // password. See routes/portal.js before changing anything here.
 app.use('/api/portal', require('./routes/portal'));
+// Client portal, PRODUCER controls (on/off, link, password, updates).
+app.use('/api/portal-admin', requireAuth, require('./routes/portalAdmin'));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', version: '0.1.0' });
