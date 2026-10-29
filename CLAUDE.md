@@ -115,6 +115,12 @@ roles (id, owner_id, name, abbreviation, category, department, sort_order, archi
 contact_roles (contact_id, role_id, sort_order)
 locations (id, owner_id, name, address, city, state, zip, country, hospital, notes, client_uid, archived_at, created_at, updated_at)
 deleted_records (id, owner_id, table_name, record_id, deleted_at)   -- tombstones for sync
+
+-- Client portal (V1.5, added 2026-10-28; applied locally, NOT yet on production). All cascade on projects.id.
+portals (project_id PK, owner_id, token UNIQUE, password_hash, created_at, updated_at)   -- no row = portal off
+portal_updates (id, project_id, owner_id, author_name, body, created_at, updated_at)
+portal_responses (id, project_id, owner_id, wb_item_uuid, kind approved|changes_requested, responder_name, note, created_at, acknowledged_at)
+portal_files (id, project_id, owner_id, direction deliverable|client_upload, wb_item_uuid, filename, content_type, size_bytes, r2_key UNIQUE, uploaded_by_name, status pending|ready, created_at, ready_at)
 ```
 
 - Agencies and client companies are both `organizations` (`is_agency` marks agencies). A project's agency/client link is `projects.agency_org_id` / `client_org_id`. The default agency is `users.default_organization_id`.

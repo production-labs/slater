@@ -405,3 +405,141 @@ CREATE INDEX IF NOT EXISTS projects_client_org_idx ON projects (client_org_id);
 -- table for the V2 Team tier.
 -- ------------------------------------------------------------
 
+
+-- ============================================================
+-- CLIENT PORTAL (V1.5, added 2026-10-28)
+-- Plan: docs/v1.5-client-portal-plan.md (Part A).
+--
+-- Everything hangs off projects.id with ON DELETE CASCADE, so
+-- deleting a project removes its portal rows. (projects.id is
+-- stable: saves upsert ON CONFLICT (key) and keep the row.)
+-- owner_id is repeated on every table, like the contacts tables,
+-- so every producer-side query can filter on it directly.
+--
+-- None of this lives in projects.data, on purpose:
+--   - The producer's app saves the whole data blob on every
+--     autosave, so anything a CLIENT writes (approvals, uploads)
+--     would be overwritten by an open tab. Client actions get their
+--     own rows; the producer's app reads them.
+--   - Project routes return SELECT * / RETURNING *, so a password
+--     hash on the projects row would go to the browser. It lives in
+--     portals instead.
+--
+-- Stays in projects.data (no DDL), filled in by the step 5 UI:
+--   schedule_days[].visible_to_client, urls[].visible_to_client
+--     (opt-in, missing = false). Workback items already carry
+--     owner / internal / uuid; pins use data.internal_pins.
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- PORTALS: one row per project with the portal turned on.
+--   No row          = portal off (turning it off deletes the row,
+--                     so the old link stops working).
+--   Regenerate link = new token on the same row.
+--   password_hash   = bcrypt, NULL means no password (optional per
+--                     project, John 2026-10-28).
+-- The token is stored as-is, not hashed: the producer needs to
+-- copy the link again later. 32 random bytes, base64url (43 chars).
+-- The unlock cookie (step 5) is an HMAC over token + password_hash,
+-- so changing the password or the link signs every client out
+-- without any extra column.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS portals (
+  project_id     INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+  owner_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token          TEXT NOT NULL UNIQUE CHECK (token ~ '^[A-Za-z0-9_-]{32,}$'),
+  password_hash  TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS portals_owner_idx ON portals (owner_id);
+
+DROP TRIGGER IF EXISTS portals_touch ON portals;
+CREATE TRIGGER portals_touch BEFORE UPDATE ON portals
+  FOR EACH ROW EXECUTE FUNCTION slater_touch_updated_at();
+
+
+-- ------------------------------------------------------------
+-- PORTAL_UPDATES: the producer's update feed ("Latest update").
+-- author_name is a snapshot (like crew names on a call sheet).
+-- Clients reply by email; there are no client posts.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS portal_updates (
+  id           SERIAL PRIMARY KEY,
+  project_id   INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  owner_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  author_name  TEXT NOT NULL,
+  body         TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 10000),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS portal_updates_project_idx
+  ON portal_updates (project_id, created_at DESC);
+
+DROP TRIGGER IF EXISTS portal_updates_touch ON portal_updates;
+CREATE TRIGGER portal_updates_touch BEFORE UPDATE ON portal_updates
+  FOR EACH ROW EXECUTE FUNCTION slater_touch_updated_at();
+
+
+-- ------------------------------------------------------------
+-- PORTAL_RESPONSES: a client acting on a "Waiting on you" item
+-- (a workback item that's the client's turn, matched by uuid).
+-- One row per action, never edited, so the history stays.
+-- The producer's app shows new ones; acknowledged_at is set when
+-- the producer has seen / applied it (e.g. marked the item
+-- Complete in the workback, which still lives in projects.data).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS portal_responses (
+  id               SERIAL PRIMARY KEY,
+  project_id       INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  owner_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  wb_item_uuid     TEXT NOT NULL,
+  kind             TEXT NOT NULL CHECK (kind IN ('approved', 'changes_requested')),
+  responder_name   TEXT,                -- as typed by the client
+  note             TEXT CHECK (note IS NULL OR length(note) <= 5000),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  acknowledged_at  TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS portal_responses_project_idx
+  ON portal_responses (project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS portal_responses_unacked_idx
+  ON portal_responses (owner_id) WHERE acknowledged_at IS NULL;
+
+
+-- ------------------------------------------------------------
+-- PORTAL_FILES: files in both directions, stored in a dedicated
+-- R2 bucket (step 6), never in Postgres.
+--   deliverable    producer -> client ("Deliverables")
+--   client_upload  client -> producer ("Upload files"), optionally
+--                  answering a workback item (wb_item_uuid)
+-- Uploads go straight to R2 with a presigned URL, so a row starts
+-- 'pending' and becomes 'ready' once the upload is confirmed.
+-- Pending rows older than a day are abandoned uploads.
+--
+-- Not in the nightly pg_dump: the files themselves (only these
+-- rows). And ON DELETE CASCADE removes rows, not R2 objects:
+-- step 6 must delete the objects, or sweep keys with no row.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS portal_files (
+  id                SERIAL PRIMARY KEY,
+  project_id        INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  owner_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  direction         TEXT NOT NULL CHECK (direction IN ('deliverable', 'client_upload')),
+  wb_item_uuid      TEXT,
+  filename          TEXT NOT NULL CHECK (length(filename) BETWEEN 1 AND 255),
+  content_type      TEXT,
+  size_bytes        BIGINT CHECK (size_bytes IS NULL OR size_bytes >= 0),
+  r2_key            TEXT NOT NULL UNIQUE,
+  uploaded_by_name  TEXT,                -- client uploads: as typed by the client
+  status            TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ready')),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ready_at          TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS portal_files_project_idx
+  ON portal_files (project_id, direction, created_at DESC);
+

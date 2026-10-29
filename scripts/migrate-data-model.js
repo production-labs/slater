@@ -41,8 +41,11 @@ const EXPECTED_NEW_COLUMNS = {
   projects: ['agency_org_id', 'client_org_id'],
 };
 
-const NEW_TABLES = ['roles', 'organizations', 'contacts', 'contact_roles', 'locations', 'deleted_records'];
-const NEW_TRIGGERS = ['roles_touch', 'organizations_touch', 'contacts_touch', 'contact_roles_touch', 'locations_touch'];
+const NEW_TABLES = ['roles', 'organizations', 'contacts', 'contact_roles', 'locations', 'deleted_records',
+  // Client portal (V1.5, 2026-10-28)
+  'portals', 'portal_updates', 'portal_responses', 'portal_files'];
+const NEW_TRIGGERS = ['roles_touch', 'organizations_touch', 'contacts_touch', 'contact_roles_touch', 'locations_touch',
+  'portals_touch', 'portal_updates_touch'];
 
 function describeTarget(url) {
   if (!url) throw new Error('DATABASE_URL is not set.');
