@@ -511,35 +511,48 @@ CREATE INDEX IF NOT EXISTS portal_responses_unacked_idx
 
 
 -- ------------------------------------------------------------
--- PORTAL_FILES: files in both directions, stored in a dedicated
--- R2 bucket (step 6), never in Postgres.
---   deliverable    producer -> client ("Deliverables")
---   client_upload  client -> producer ("Upload files"), optionally
---                  answering a workback item (wb_item_uuid)
+-- PORTAL_FILES: client -> producer file TRANSFER (step 6b), not
+-- storage. Files live in the slater-transfers R2 bucket, never in
+-- Postgres. Producer deliverables are links (urls[].wb_item_uuid,
+-- step 6a), so every row here is a client upload, optionally
+-- answering a workback item (wb_item_uuid).
 -- Uploads go straight to R2 with a presigned URL, so a row starts
 -- 'pending' and becomes 'ready' once the upload is confirmed.
 -- Pending rows older than a day are abandoned uploads.
 --
+-- Retention: 14 days. expires_at drives Slater's own delete and
+-- the "deletes in N days" countdown; the bucket's 14-day lifecycle
+-- rule is the backstop. downloaded_at = producer's first download.
+-- Cap: 5 GiB per file (bigger: WeTransfer / Frame.io).
+--
 -- Not in the nightly pg_dump: the files themselves (only these
 -- rows). And ON DELETE CASCADE removes rows, not R2 objects:
--- step 6 must delete the objects, or sweep keys with no row.
+-- the lifecycle rule (or a sweep of keys with no row) cleans up.
+--
+-- Existing databases: `direction` dropped and expires_at /
+-- downloaded_at added by scripts/migrate-portal-files-transfer.js
+-- (2026-11-01). Run that before re-running migrate-data-model.js.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS portal_files (
   id                SERIAL PRIMARY KEY,
   project_id        INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   owner_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  direction         TEXT NOT NULL CHECK (direction IN ('deliverable', 'client_upload')),
   wb_item_uuid      TEXT,
   filename          TEXT NOT NULL CHECK (length(filename) BETWEEN 1 AND 255),
   content_type      TEXT,
   size_bytes        BIGINT CHECK (size_bytes IS NULL OR size_bytes >= 0),
   r2_key            TEXT NOT NULL UNIQUE,
-  uploaded_by_name  TEXT,                -- client uploads: as typed by the client
+  uploaded_by_name  TEXT,                -- as typed by the client
   status            TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ready')),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  ready_at          TIMESTAMPTZ
+  ready_at          TIMESTAMPTZ,
+  expires_at        TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '14 days'),
+  downloaded_at     TIMESTAMPTZ,
+  CONSTRAINT portal_files_size_cap CHECK (size_bytes IS NULL OR size_bytes <= 5368709120)
 );
 
 CREATE INDEX IF NOT EXISTS portal_files_project_idx
-  ON portal_files (project_id, direction, created_at DESC);
+  ON portal_files (project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS portal_files_expires_idx
+  ON portal_files (expires_at);
 
