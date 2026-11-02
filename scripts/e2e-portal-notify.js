@@ -173,6 +173,7 @@ async function main() {
     assert(/deleted 14 days after they arrive/.test(h), 'retention line');
     assert(/added you to the emails for Notify Test/.test(h) && !/Open Slater/.test(h), 'Sam footer');
     assert(/Open Slater/.test(ownerMail.html) && !/added you/.test(ownerMail.html), 'owner footer');
+    assert(ownerMail.html.includes('to mark approved items complete and see every file your client has sent.'), 'owner footer wording (approvals)');
     assert(links(h).length === 2 && links(ownerMail.html).length === 2, 'two download links each');
     assert(links(h).every(l => !links(ownerMail.html).includes(l)), 'links not per recipient');
     assert(links(h).every(l => l.startsWith(BASE + '/f/')), 'link base');
@@ -264,7 +265,19 @@ async function main() {
     await sleep(1500);
     const sent = mails().slice(before).map(x => x.to);
     assert(sent.length === 1 && sent[0] === EMAIL, 'sent to ' + sent.join());
-    assert(/1 change request from Acme/.test(mails().pop().subject), 'subject');
+    const last = mails().pop();
+    assert(/1 change request from Acme/.test(last.subject), 'subject');
+    assert(last.html.includes('to review the requested changes and see every file your client has sent.'), 'owner footer wording (change requests only)');
+  });
+
+  await step('Files-only email tells the owner just to see the files', async () => {
+    const { buildEmail } = require(APP + '/routes/portalNotify');
+    const e = buildEmail({
+      project: { title: 'T' }, client: 'Acme', responses: [], who: 'o', toOwner: true, ownerName: 'Jo',
+      files: [{ id: 1, r2_key: 'k', filename: 'a.pdf', size_bytes: 10, uploaded_by_name: 'Pat', item: '', expires_at: new Date(Date.now() + 864e5).toISOString() }],
+    });
+    assert(e.html.includes('Open Slater</a> to see every file your client has sent for this project.'), 'files-only wording');
+    assert(!/mark approved|requested changes/.test(e.html), 'mentions answers that are not there');
   });
 
   await step('Download link tokens never reach the server log', async () => {

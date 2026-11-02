@@ -191,8 +191,14 @@ function buildEmail({ project, client, files, responses, who, toOwner, ownerName
         '</div>';
     }
   }
+  // What to do next depends on what's in this email.
+  const next = approvals
+    ? 'to mark approved items complete and see every file your client has sent.'
+    : changes
+      ? 'to review the requested changes and see every file your client has sent.'
+      : 'to see every file your client has sent for this project.';
   const footer = toOwner
-    ? `<p style="font-size:13px;margin:22px 0 0"><a href="${esc(appUrl())}" style="color:#222222">Open Slater</a> to confirm answers and see every file for this project.</p>`
+    ? `<p style="font-size:13px;margin:22px 0 0"><a href="${esc(appUrl())}" style="color:#222222">Open Slater</a> ${next}</p>`
     : `<p style="color:#9D9D99;font-size:12px;margin:22px 0 0">You're getting this because ${esc(ownerName || 'your producer')} added you to the emails for ${esc(title)} in Slater. The download links are just for you; please don't forward this email.</p>`;
 
   const html =
