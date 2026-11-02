@@ -171,6 +171,7 @@ async function main() {
   await page.evaluate(k => localStorage.setItem('slater_last_project', k), KEY);
   await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
   await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
+  await page.evaluate(() => st('portal'));
   try { await page.waitForFunction(() => /Client responses \(2\)/.test(document.getElementById('portal-admin').textContent), { timeout: 5000 }); }
   catch (e) { console.log('PANEL HTML: ' + await page.$eval('#portal-admin', el => el.innerHTML)); console.log('ERRORS: ' + consoleErrors.join(' | ')); throw e; }
 
@@ -251,7 +252,7 @@ async function main() {
   });
 
   await step('"Got it" on a change request clears it everywhere', async () => {
-    await page.evaluate(() => st('project'));
+    await page.evaluate(() => st('portal'));
     await page.waitForSelector('#portal-admin [data-pa-resp="dismiss"]');
     await page.click('#portal-admin [data-pa-resp="dismiss"]');
     await page.waitForFunction(() => !/Client responses/.test(document.getElementById('portal-admin').textContent), { timeout: 5000 });

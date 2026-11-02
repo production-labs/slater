@@ -236,6 +236,27 @@ async function main() {
     await page.screenshot({ path: SHOTS + '/portal.png', fullPage: true });
   });
 
+  await step('timeline zoom: 2 / 4 / 6 weeks / Whole project; Whole project first; choice remembered', async () => {
+    const chips = await page.$$eval('.tl-chip', bs => bs.map(b => b.textContent + (b.classList.contains('on') ? '*' : '')));
+    assert(JSON.stringify(chips) === JSON.stringify(['2 weeks', '4 weeks', '6 weeks', 'Whole project*']), 'chips ' + chips);
+    const all = payload.timeline.length;
+    assert((await page.$$('.tl-node')).length === all, 'whole project shows every date');
+    await page.click('.tl-chip[data-range="2w"]');
+    const start = rel(-3), end = rel(11);
+    const inside = payload.timeline.filter(n => n.date >= start && n.date <= end).length;
+    const after = payload.timeline.filter(n => n.date > end).length;
+    assert((await page.$$('.tl-node')).length === inside, '2 weeks shows ' + (await page.$$('.tl-node')).length + ', want ' + inside);
+    const more = await page.$eval('.tl-more', e => e.textContent);
+    assert(after ? more.startsWith(after + ' more date') : true, 'more note: "' + more + '" (after=' + after + ')');
+    assert((await page.$$('.tl-wk')).length === 8, 'axis labels every 2 days');
+    await page.screenshot({ path: SHOTS + '/portal-timeline-2w.png' });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.tl-chip.on', { timeout: 8000 });
+    assert(await page.$eval('.tl-chip.on', b => b.getAttribute('data-range')) === '2w', 'choice not remembered');
+    await page.click('.tl-chip[data-range="all"]');
+    assert((await page.$$('.tl-node')).length === all, 'back to whole project');
+  });
+
   await step('lock screen: wrong then right password in the browser', async () => {
     const fresh = newToken();
     await db.query(`INSERT INTO portals (project_id, owner_id, token, password_hash) VALUES ($1,$2,$3,$4)`, [pidB, userId, fresh, hash]);

@@ -42,7 +42,7 @@ a{color:var(--accent)}
 .masthead-inner{display:flex;align-items:center;justify-content:space-between;padding:22px 0;gap:24px}
 .brand{display:flex;align-items:center;gap:16px;min-width:0}
 .brand-logo{width:46px;height:46px;border-radius:8px;flex-shrink:0;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;letter-spacing:.02em;overflow:hidden}
-.brand-logo.img{background:#fff;border:1px solid var(--line)}
+.brand-logo.img{background:none;border:none;border-radius:0}
 .brand-logo img{width:100%;height:100%;object-fit:contain}
 .brand-text{min-width:0}
 .brand-client{font-size:11px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.09em}
@@ -96,6 +96,17 @@ section + section{border-top:1px solid var(--line-soft)}
 .tl-cap.above{top:4px}
 .tl-cap.below{top:58px}
 .tl-cap strong{display:block;color:var(--ink-2);font-weight:600;font-size:10.5px;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.tl-cap.edge-l{transform:translateX(-7px);text-align:left}
+.tl-cap.edge-r{transform:translateX(calc(-100% + 7px));text-align:right}
+.tl-head-r{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end}
+.tl-chips{display:inline-flex;background:var(--line-soft);border-radius:7px;padding:2px}
+.tl-chip{font:inherit;font-size:11.5px;font-weight:500;color:var(--ink-3);background:none;border:none;border-radius:5px;padding:4px 10px;cursor:pointer}
+.tl-chip:hover{color:var(--ink)}
+.tl-chip.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.tl-chip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tl-empty{position:absolute;top:50px;left:0;right:0;text-align:center;font-size:12px;color:var(--ink-4)}
+.tl-axis{position:relative;height:16px;margin:4px 8px 0;border-top:1px solid var(--line-soft)}
+.tl-wk{position:absolute;top:4px;transform:translateX(-50%);font-size:10px;color:var(--ink-4);white-space:nowrap}
 .tl-legend{display:flex;gap:20px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--ink-3);flex-wrap:wrap}
 .lg{display:flex;align-items:center;gap:7px}
 .lg-dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--ink-4);background:#fff;flex-shrink:0}

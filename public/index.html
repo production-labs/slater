@@ -36,6 +36,7 @@
       <button class="app-nav-item" data-tab="crew" onclick="st('crew')"><i data-lucide="users" class="lucide nav-icon"></i> Crew</button>
       <button class="app-nav-item" data-tab="talent" onclick="st('talent')"><i data-lucide="star" class="lucide nav-icon"></i> Talent</button>
       <button class="app-nav-item" data-tab="urls" onclick="st('urls')"><i data-lucide="link" class="lucide nav-icon"></i> URLs</button>
+      <button class="app-nav-item" data-tab="portal" onclick="st('portal')"><i data-lucide="globe" class="lucide nav-icon"></i> Portal</button>
       <button class="app-nav-item" data-tab="notes" onclick="st('notes')"><i data-lucide="file-text" class="lucide nav-icon"></i> Notes</button>
       <button class="app-nav-item" data-tab="expenses" onclick="st('expenses')"><i data-lucide="receipt" class="lucide nav-icon"></i> Expenses</button>
       <button class="app-nav-item app-nav-toggle active" id="sidebar-rundown-btn" onclick="toggleSidebar()">
@@ -105,6 +106,7 @@
           <button class="tab" onclick="st('talent')">Talent</button>
           <button class="tab" onclick="st('workback')">Workback</button>
           <button class="tab" onclick="st('urls')">URLs</button>
+          <button class="tab" onclick="st('portal')">Portal</button>
           <button class="tab" onclick="st('notes')">Notes</button>
           <button class="tab" onclick="st('expenses')">Expenses</button>
         </div>
@@ -148,8 +150,6 @@
           <div class="sh" style="margin-top:1.5rem">Key personnel</div>
           <div id="kp-list"></div>
           <button id="add-kp-btn" class="ab" style="margin-top:8px" onclick="addKP();autosaveTrigger()">+ Add key personnel</button>
-          <div class="sh" style="margin-top:1.5rem">Client portal</div>
-          <div id="portal-admin" class="portal-admin"></div>
         </div>
 
         <div id="tab-schedule" class="sec">
@@ -389,6 +389,11 @@
           <div class="sh">URLs</div>
           <div id="url-list"></div>
           <button class="ab" onclick="addUrl()" style="margin-top:4px">+ Add URL</button>
+        </div>
+
+        <div id="tab-portal" class="sec">
+          <div class="sh">Client portal</div>
+          <div id="portal-admin" class="portal-admin"></div>
         </div>
 
         <div id="tab-notes" class="sec">
@@ -659,6 +664,7 @@
   <button onclick="mobileNavGo('talent')">Talent</button>
   <button onclick="mobileNavGo('workback')">Workback</button>
   <button onclick="mobileNavGo('urls')">URLs</button>
+  <button onclick="mobileNavGo('portal')">Portal</button>
   <button onclick="mobileNavGo('notes')">Notes</button>
 </div>
 

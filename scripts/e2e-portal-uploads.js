@@ -391,6 +391,7 @@ async function main() {
   await ppage.evaluate(k => localStorage.setItem('slater_last_project', k), KEY);
   await ppage.goto(BASE + '/', { waitUntil: 'networkidle2' });
   await ppage.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
+  await ppage.evaluate(() => st('portal'));
   const panelText = () => ppage.$eval('#portal-admin', el => el.textContent);
   const fileCard = (name) => ppage.evaluateHandle(n => [...document.querySelectorAll('#portal-admin .pa-file')].find(c => c.querySelector('.pa-file-name').textContent === n), name);
 
@@ -446,7 +447,7 @@ async function main() {
     await ppage.waitForSelector('#wb-edit-panel .pa-file', { timeout: 3000 });
     const names = await ppage.$$eval('#wb-edit-panel .pa-file-name', ns => ns.map(n => n.textContent));
     assert(names.length === 1 && names[0] === 'Script notes v2.txt', JSON.stringify(names));
-    await ppage.evaluate(() => st('project'));
+    await ppage.evaluate(() => st('portal'));
   });
 
   await step('Delete asks first, then removes the file everywhere', async () => {
@@ -461,6 +462,18 @@ async function main() {
     await ppage.waitForFunction(() => ![...document.querySelectorAll('#portal-admin .pa-file-name')].some(n => n.textContent === 'again.txt'), { timeout: 5000 });
     assert(!(await rows()).some(x => x.id === victim.id), 'row kept');
     assert(!fake.objects.has(victim.r2_key), 'object kept');
+  });
+
+  await step('Portal menu count = files not yet downloaded (+ open responses); a new arrival shows without reopening', async () => {
+    const badge = () => ppage.$eval('.app-nav-item[data-tab="portal"]', b => { const x = b.querySelector('.pa-nav-badge'); return x ? x.textContent + '|' + x.title : ''; });
+    const fresh = (await ready()).filter(x => !x.downloaded_at).length;
+    assert(fresh > 0, 'setup');
+    assert((await badge()).startsWith(fresh + '|') && /new files?/.test(await badge()), 'badge ' + (await badge()) + ', want ' + fresh);
+    const r = await apiUpload('late-arrival.txt', crypto.randomBytes(20));
+    assert(r.status === 200, 'upload ' + r.status);
+    await ppage.evaluate(() => PortalAdmin.poll(true));
+    await ppage.waitForFunction(n => { const x = document.querySelector('.app-nav-item[data-tab="portal"] .pa-nav-badge'); return x && x.textContent === n; }, { timeout: 5000 }, String(fresh + 1));
+    assert((await panelText()).includes('late-arrival.txt'), 'new file not in the panel');
   });
 
   await step('Expired files leave the list and can no longer be downloaded', async () => {

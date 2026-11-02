@@ -267,10 +267,61 @@
     return form;
   }
 
+  // Zoom: a window of N weeks starting a few days before today (days before /
+  // after today), or the whole project. The client's pick is remembered.
+  var TL_RANGES = { '2w': [3, 11], '4w': [5, 23], '6w': [7, 35], 'all': null };
+  var TL_CHOICES = [['2w', '2 weeks'], ['4w', '4 weeks'], ['6w', '6 weeks'], ['all', 'Whole project']];
+  function tlRange() { try { var r = localStorage.getItem('slater_portal_tl_range'); return r in TL_RANGES ? r : 'all'; } catch (_) { return 'all'; } }
+  function setTlRange(r) { try { localStorage.setItem('slater_portal_tl_range', r); } catch (_) {} }
+
   function timelineSection(nodes, today) {
-    var first = nodes[0].date, last = nodes[nodes.length - 1].date;
-    var start = today < first ? today : first, end = today > last ? today : last;
-    if (start === end) { start = addDays(start, -3); end = addDays(end, 3); }
+    var range = tlRange();
+    var frame = el('div', { class: 'tl-frame' });
+    var aside = el('div', { class: 'sec-aside tl-more' });
+    var chips = el('div', { class: 'tl-chips', role: 'group', 'aria-label': 'Timeline zoom' });
+    TL_CHOICES.forEach(function (c) {
+      add(chips, el('button', { type: 'button', class: 'tl-chip', 'data-range': c[0], onclick: function () {
+        range = c[0]; setTlRange(range); draw();
+      } }, c[1]));
+    });
+    var legend = el('div', { class: 'tl-legend' },
+      el('div', { class: 'lg' }, el('span', { class: 'lg-dot ms' }), 'Key date'),
+      el('div', { class: 'lg' }, el('span', { class: 'lg-dot client' }), 'Needs you'),
+      el('div', { class: 'lg' }, el('span', { class: 'lg-dot' }), 'Our work'));
+
+    function draw() {
+      chips.querySelectorAll('.tl-chip').forEach(function (b) {
+        var on = b.getAttribute('data-range') === range;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      var r = TL_RANGES[range], start, end;
+      if (r) { start = addDays(today, -r[0]); end = addDays(today, r[1]); }
+      else {
+        // Whole project: first to last date, always including today.
+        var first = nodes[0].date, last = nodes[nodes.length - 1].date;
+        start = today < first ? today : first; end = today > last ? today : last;
+        if (daysBetween(start, end) < 6) { start = addDays(start, -3); end = addDays(end, 3); }
+      }
+      var before = nodes.filter(function (n) { return n.date < start; }).length;
+      var after = nodes.filter(function (n) { return n.date > end; });
+      var shown = nodes.filter(function (n) { return n.date >= start && n.date <= end; });
+      aside.textContent = after.length
+        ? after.length + (after.length === 1 ? ' more date' : ' more dates') + ' after ' + fmt(end)
+        : before ? before + (before === 1 ? ' earlier date' : ' earlier dates') + ' before ' + fmt(start) : '';
+      frame.textContent = '';
+      add(frame, [drawLine(shown, today, start, end, range), legend]);
+    }
+    draw();
+
+    return el('section', null,
+      el('div', { class: 'sec-head' },
+        el('div', { class: 'sec-title' }, 'Project timeline'),
+        el('div', { class: 'tl-head-r' }, aside, chips)),
+      frame);
+  }
+
+  function drawLine(nodes, today, start, end, range) {
     var span = daysBetween(start, end);
     var pct = function (iso) { return daysBetween(start, iso) / span * 100; };
     var tp = pct(today);
@@ -305,18 +356,21 @@
       if (x - lastCap[side] < 12) side = side === 'above' ? 'below' : 'above';
       if (x - lastCap[side] < 12) return;
       lastCap[side] = x;
-      add(tl, el('div', { class: 'tl-cap ' + side, style: 'left:' + x + '%' }, el('strong', null, n.label), fmt(n.date)));
+      // Near either end, anchor the caption inward so it stays in the box.
+      var edge = x < 8 ? ' edge-l' : x > 92 ? ' edge-r' : '';
+      add(tl, el('div', { class: 'tl-cap ' + side + edge, style: 'left:' + x + '%' }, el('strong', null, n.label), fmt(n.date)));
       side = side === 'above' ? 'below' : 'above';
     });
+    if (!nodes.length) add(tl, el('div', { class: 'tl-empty' }, 'Nothing scheduled in these weeks'));
 
-    return el('section', null,
-      el('div', { class: 'sec-head' },
-        el('div', { class: 'sec-title' }, 'Project timeline'),
-        el('div', { class: 'sec-aside' }, fmt(first) + ' to ' + fmtY(last))),
-      el('div', { class: 'tl-frame' }, tl, el('div', { class: 'tl-legend' },
-        el('div', { class: 'lg' }, el('span', { class: 'lg-dot ms' }), 'Key date'),
-        el('div', { class: 'lg' }, el('span', { class: 'lg-dot client' }), 'Needs you'),
-        el('div', { class: 'lg' }, el('span', { class: 'lg-dot' }), 'Our work'))));
+    // Dates along the bottom: every 2 days on 2 weeks, weekly on 4 and 6,
+    // and whole weeks spaced to fit (at most ~8 labels) on the whole project.
+    var axis = el('div', { class: 'tl-axis', 'aria-hidden': 'true' });
+    var step = range === '2w' ? 2 : range === 'all' ? 7 * Math.max(1, Math.ceil(span / 7 / 8)) : 7;
+    for (var w = start; w <= end; w = addDays(w, step)) {
+      add(axis, el('div', { class: 'tl-wk', style: 'left:' + pct(w) + '%' }, fmt(w)));
+    }
+    return el('div', null, tl, axis);
   }
 
   function scheduleList(rows, today) {

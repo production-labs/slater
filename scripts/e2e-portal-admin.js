@@ -76,13 +76,24 @@ async function main() {
   await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
   await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
 
+  await step('Client portal has its own Portal tab, right after URLs', async () => {
+    const nav = await page.$$eval('.app-nav-item[data-tab]', bs => bs.map(b => b.dataset.tab));
+    assert(nav.indexOf('portal') === nav.indexOf('urls') + 1, 'nav order ' + nav.join());
+    assert(await page.$('#tab-portal #portal-admin'), 'panel not in the Portal tab');
+    assert(!(await page.$('#tab-project #portal-admin')), 'panel still in the Project tab');
+    await page.click('.app-nav-item[data-tab="portal"]');
+    assert(await page.$eval('#tab-portal', e => e.classList.contains('active')), 'Portal tab not shown');
+    assert(await page.$eval('.app-nav-item[data-tab="portal"]', e => e.classList.contains('active')), 'nav item not highlighted');
+    assert(!(await page.$eval('#tab-project', e => e.classList.contains('active'))), 'Project tab still shown');
+  });
+
   const panel = () => page.$eval('#portal-admin', el => el.innerText);
   const click = async (a) => { await page.click('#portal-admin [data-pa="' + a + '"]'); };
   const confirmModal = async () => { await page.waitForSelector('#modal-overlay.open', { timeout: 3000 }); await page.click('#modal-ok'); };
   const waitText = (re) => page.waitForFunction(src => new RegExp(src).test(document.getElementById('portal-admin').innerText), { timeout: 5000 }, re.source);
   const portalStatus = async (token) => (await fetch(BASE + '/api/portal/' + token)).status;
 
-  await step('Project tab shows the portal as off with a turn-on button', async () => {
+  await step('Portal tab shows the portal as off with a turn-on button', async () => {
     await waitText(/Turn on client portal/);
     assert(!(await portalRow()), 'portal row exists already');
   });
@@ -168,7 +179,7 @@ async function main() {
     assert(ok, 'urls not saved: ' + JSON.stringify((await serverData()).urls));
     const j = await (await fetch(BASE + '/api/portal/' + token1)).json();
     assert(j.links.length === 1 && j.links[0].name === 'Review link', JSON.stringify(j.links));
-    await page.evaluate(() => st('project'));
+    await page.evaluate(() => st('portal'));
     await waitText(/1 link shared/);
   });
 
@@ -192,12 +203,13 @@ async function main() {
     const j = await (await fetch(BASE + '/api/portal/' + token1)).json();
     const w = j.waiting.find(x => x.item === 'Approve rough cut');
     assert(w && JSON.stringify(w.links) === JSON.stringify([{ name: 'Review link', url: 'https://example.com/review' }]), 'waiting ' + JSON.stringify(j.waiting));
-    await page.evaluate(() => st('project'));
+    await page.evaluate(() => st('portal'));
   });
 
   await step('Checkbox state survives reloading the project', async () => {
     await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
     await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
+    await page.evaluate(() => st('portal'));
     const checks = await page.$$eval('#url-list input[type=checkbox][id$="_portal"]', els => els.map(e => e.checked));
     assert(JSON.stringify(checks) === '[true,false]', JSON.stringify(checks));
     const wbVal = await page.$eval('#url-list select[id$="_wb"]', e => e.value);

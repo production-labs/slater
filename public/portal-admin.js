@@ -1,11 +1,11 @@
 /* Client Portal, producer controls (V1.5 step 5b).
-   A "Client portal" section at the bottom of the Project tab: turn the portal
+   The Portal tab (#tab-portal, its own tab since 2026-11-02): turn the portal
    on/off, copy/open the link, make a new link, set/remove a password, post
    updates. Each action saves straight to /api/portal-admin (not part of the
    project autosave). Which URLs the client sees is a checkbox on each URL card
    (app.js, urls[].visible_to_client).
    Client responses (step 5c): when a client presses Approve / Request changes
-   on the portal, it shows here (Project tab panel), as a tag + box on the
+   on the portal, it shows here (Portal tab panel), as a tag + box on the
    workback item, and as a "Client responses" group at the top of the
    Rundown (all projects, polled every minute). Approving never completes the
    item by itself: "Mark complete" does, then the response is confirmed.
@@ -174,7 +174,7 @@
       h += '<label class="pa-rcpt"><input type="checkbox" data-pa-rcpt="' + esc(k.email) + '"' + (picked.indexOf(k.email) > -1 ? ' checked' : '') + dis + '> ' +
         esc(k.name || k.email) + ' <span class="pa-rcpt-sub">' + esc([k.role, k.email].filter(Boolean).join(' · ')) + '</span></label>';
     });
-    if (!kps.length) h += '<p class="pa-note pa-small">To include your producer or others, add them with an email under Key Personnel on this tab.</p>';
+    if (!kps.length) h += '<p class="pa-note pa-small">To include your producer or others, add them with an email under Key Personnel on the Project tab.</p>';
     return h + '</div>';
   }
   function saveRecipients() {
@@ -269,6 +269,40 @@
     else if (a === 'open') openFromRundown(b.getAttribute('data-key'), b.getAttribute('data-uuid'));
   });
 
+  // ── Portal menu count ─────────────────────────────────────────────────────
+  // On the Portal menu item: client responses not yet dealt with + files not
+  // yet downloaded, for the open project. Same look as the booking-conflict
+  // counts (booking-conflicts.js).
+  function updateNavBadge() {
+    var resp = openResponses().length;
+    var fresh = openFiles().filter(function (f) { return !f.downloaded_at; }).length;
+    var n = resp + fresh;
+    document.querySelectorAll('.app-nav-item[data-tab="portal"]').forEach(function (btn) {
+      var badge = btn.querySelector('.pa-nav-badge');
+      if (!n) { if (badge) badge.parentNode.removeChild(badge); return; }
+      if (!badge) { badge = document.createElement('span'); btn.appendChild(badge); }
+      badge.className = 'bc-nav-badge bc-red pa-nav-badge';
+      badge.textContent = n;
+      badge.title = [resp ? resp + (resp === 1 ? ' client response' : ' client responses') : '',
+                     fresh ? fresh + (fresh === 1 ? ' new file' : ' new files') : ''].filter(Boolean).join(', ');
+    });
+  }
+
+  // New files don't come with the cross-project response poll, so the poll
+  // also re-reads the open project's portal (quietly; skipped while a
+  // password is being typed or an action is running).
+  function panelSig() {
+    return openFiles().map(function (f) { return f.id + (f.downloaded_at ? 'd' : ''); }).join(',') + '|' + sig(openResponses());
+  }
+  async function refreshFiles() {
+    var k = key();
+    if (!k || busy || showPw || !state || forKey !== k || state.error) return;
+    var before = panelSig();
+    var j = await call('GET', '');
+    if (!j || j.error || k !== key()) return;
+    if (panelSig() !== before) { render(); refreshWorkback(); }
+  }
+
   // ── all projects (Rundown) ────────────────────────────────────────────────
   function sig(list) { return list.map(function (r) { return r.id; }).join(','); }
 
@@ -282,6 +316,7 @@
       list = await r.json();
     } catch (e) { return; }
     if (!Array.isArray(list)) return;
+    await refreshFiles();
     var s2 = sig(list);
     var changed = s2 !== pendingSig;
     pendingAll = list; pendingSig = s2;
@@ -352,7 +387,12 @@
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────
+  // Every redraw also refreshes the Portal menu count.
   function render() {
+    renderPanel();
+    updateNavBadge();
+  }
+  function renderPanel() {
     if (!root) return;
     var k = key();
     if (!k) {

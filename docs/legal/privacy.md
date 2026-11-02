@@ -140,7 +140,7 @@ Slater uses only what it needs to work, so no cookie banner is needed:
 | Browser storage: your settings | Remembers the last project you opened, your sort order and views, and your workback templates and defaults | Until you clear it |
 | Browser storage: unsaved work | A temporary copy of changes and your recent projects' call sheets, so nothing is lost if your connection drops; cleared once saved | Until saved, or you clear it |
 | Browser storage: open tabs | Stops two open Slater tabs from overwriting each other's changes | While Slater is open |
-| Browser storage: portal name | Remembers the name a Portal Visitor typed, so they don't retype it | Until they clear it |
+| Browser storage: portal name and timeline view | Remembers the name a Portal Visitor typed, so they don't retype it, and the timeline zoom they picked | Until they clear it |
 
 We don't use advertising or analytics cookies. Our fonts are served from our own
 server. [CONFIRM: switch from Google Fonts to self-hosted fonts before publishing.]

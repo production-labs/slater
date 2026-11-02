@@ -112,6 +112,7 @@ async function main() {
   await page.evaluate(k => localStorage.setItem('slater_last_project', k), KEY);
   await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
   await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
+  await page.evaluate(() => st('portal'));
   await page.waitForSelector('#portal-admin .pa-emails', { timeout: 8000 });
   const api = (method, p, body) => page.evaluate(async (m, u, b) => {
     const r = await fetch(u, { method: m, headers: b ? { 'Content-Type': 'application/json' } : {}, body: b ? JSON.stringify(b) : undefined });

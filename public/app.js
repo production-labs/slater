@@ -136,7 +136,8 @@ let crew = [], talent = [], kp = [], lt = null, _uid = 0;
 function st(n) {
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   document.querySelectorAll(".sec").forEach(s => s.classList.remove("active"));
-  ["project","schedule","crew","talent","workback","urls","notes","expenses"].forEach((x,i) => {
+  // Same order as the hidden .tabs buttons in index.html (matched by index).
+  ["project","schedule","crew","talent","workback","urls","portal","notes","expenses"].forEach((x,i) => {
     if (x === n) {
       document.querySelectorAll(".tab")[i].classList.add("active");
       document.getElementById("tab-"+n).classList.add("active");
