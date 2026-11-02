@@ -19,6 +19,10 @@
 // with Approve or Request changes. That only ever adds a portal_responses
 // row; it never touches projects.data. The producer confirms in the app.
 //
+// Clients can send files (step 6b): routes/portalUploads.js, registered on
+// this router so it shares the token + password checks. The payload lists
+// what was sent (name, size, who, when), never a way to download it.
+//
 // Producer-side controls live in routes/portalAdmin.js (requireAuth).
 // Plan: docs/v1.5-client-portal-plan.md (Part A).
 
@@ -27,6 +31,8 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { Pool } = require('pg');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const transfers = require('./transfers');
+const registerUploads = require('./portalUploads');
 
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -160,7 +166,7 @@ function isClientOwner(owner, client) {
 }
 function isDone(status) { return status === 'Complete'; }
 
-// row: findPortal() row. extra: { clientOrg, agencyOrg, locations, updates, responses }
+// row: findPortal() row. extra: { clientOrg, agencyOrg, locations, updates, responses, sent }
 function buildPayload(row, extra) {
   const data = (row.data && typeof row.data === 'object') ? row.data : {};
   const clientOrg = extra.clientOrg || null;
@@ -275,6 +281,12 @@ function buildPayload(row, extra) {
     venues,
     updates: (extra.updates || []).map(u => ({ author: str(u.author_name, 200), body: str(u.body, 10000), at: u.created_at })),
     key_date: pins.length ? (pins[pins.length - 1].end_date || pins[pins.length - 1].date) : '',
+    uploads: transfers.isConfigured()
+      ? { enabled: true, max_bytes: transfers.MAX_FILE_BYTES, keep_days: transfers.RETENTION_DAYS }
+      : { enabled: false },
+    sent: (extra.sent || []).map(f => ({
+      name: str(f.filename, 255), size: Number(f.size_bytes) || 0, by: str(f.uploaded_by_name, 200), at: f.ready_at,
+    })),
   };
 }
 
@@ -283,7 +295,7 @@ async function loadExtras(row) {
   const orgIds = [row.client_org_id, row.agency_org_id].filter(Boolean);
   const locIds = [...new Set((Array.isArray(data.schedule_days) ? data.schedule_days : [])
     .map(d => Number(d && d.location_id)).filter(n => Number.isInteger(n) && n > 0))];
-  const [orgs, locs, updates, responses] = await Promise.all([
+  const [orgs, locs, updates, responses, sent] = await Promise.all([
     orgIds.length
       ? pool.query('SELECT id, name, logo FROM organizations WHERE owner_id = $1 AND id = ANY($2::int[])', [row.owner_id, orgIds])
       : { rows: [] },
@@ -292,6 +304,7 @@ async function loadExtras(row) {
       : { rows: [] },
     pool.query('SELECT author_name, body, created_at FROM portal_updates WHERE project_id = $1 ORDER BY created_at DESC LIMIT 10', [row.project_id]),
     pool.query('SELECT wb_item_uuid, kind, created_at, acknowledged_at FROM portal_responses WHERE project_id = $1 ORDER BY created_at DESC', [row.project_id]),
+    registerUploads.loadSent(pool, row.project_id),
   ]);
   const byId = new Map(orgs.rows.map(o => [o.id, o]));
   return {
@@ -300,6 +313,7 @@ async function loadExtras(row) {
     locations: locs.rows,
     updates: updates.rows,
     responses: responses.rows,
+    sent,
   };
 }
 
@@ -379,6 +393,8 @@ router.post('/:token/respond', respondLimiter, async (req, res) => {
     res.status(500).json({ error: 'server_error' });
   }
 });
+
+registerUploads(router, { pool, findPortal, isUnlocked });
 
 module.exports = router;
 module.exports.buildPayload = buildPayload;

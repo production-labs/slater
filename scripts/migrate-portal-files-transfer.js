@@ -14,6 +14,7 @@
 //   ADD    expires_at     TIMESTAMPTZ NOT NULL, default NOW() + 14 days.
 //                         Existing rows (if any) get created_at + 14 days.
 //   ADD    downloaded_at  TIMESTAMPTZ (producer's first download)
+//   ADD    upload_id      TEXT (R2 multipart upload id while pending)
 //   ADD    CHECK portal_files_size_cap: size_bytes <= 5 GiB
 //   INDEX  portal_files_project_idx (project_id, created_at DESC)  re-created
 //          portal_files_expires_idx (expires_at)                   for the delete sweep
@@ -35,7 +36,7 @@ const ALLOW_REMOTE = args.has('--allow-remote');
 
 const TABLE = 'portal_files';
 const DROPPED = ['direction'];
-const ADDED = ['expires_at', 'downloaded_at'];
+const ADDED = ['expires_at', 'downloaded_at', 'upload_id'];
 const SIZE_CAP_BYTES = 5 * 1024 ** 3; // 5 GiB, matches schema.sql
 const SKIP_TABLES = ['sessions']; // sessions change with every request
 
@@ -136,6 +137,7 @@ async function main() {
     await c.query(`ALTER TABLE ${TABLE} ALTER COLUMN expires_at SET NOT NULL`);
 
     await c.query(`ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS downloaded_at TIMESTAMPTZ`);
+    await c.query(`ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS upload_id TEXT`);
 
     await c.query(`ALTER TABLE ${TABLE} DROP CONSTRAINT IF EXISTS portal_files_size_cap`);
     await c.query(`ALTER TABLE ${TABLE} ADD CONSTRAINT portal_files_size_cap CHECK (size_bytes IS NULL OR size_bytes <= ${SIZE_CAP_BYTES})`);

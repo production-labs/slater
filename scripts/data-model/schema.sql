@@ -530,7 +530,7 @@ CREATE INDEX IF NOT EXISTS portal_responses_unacked_idx
 -- the lifecycle rule (or a sweep of keys with no row) cleans up.
 --
 -- Existing databases: `direction` dropped and expires_at /
--- downloaded_at added by scripts/migrate-portal-files-transfer.js
+-- downloaded_at / upload_id added by scripts/migrate-portal-files-transfer.js
 -- (2026-11-01). Run that before re-running migrate-data-model.js.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS portal_files (
@@ -548,6 +548,7 @@ CREATE TABLE IF NOT EXISTS portal_files (
   ready_at          TIMESTAMPTZ,
   expires_at        TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '14 days'),
   downloaded_at     TIMESTAMPTZ,
+  upload_id         TEXT,                -- R2 multipart upload id while 'pending', NULL once ready
   CONSTRAINT portal_files_size_cap CHECK (size_bytes IS NULL OR size_bytes <= 5368709120)
 );
 

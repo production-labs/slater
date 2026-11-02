@@ -119,7 +119,7 @@ async function main() {
     ['SECRET_', 'SecretOwner', '5:45', '7:00 AM', 'password', 'sday_', 'budget', 'javascript:', 'w-internal', 'w-na', String(userId) + ',']
       .forEach(x => assert(s.indexOf(x) === -1, 'leaked "' + x + '"'));
     assert(!('crew' in payload) && !('talent' in payload) && !('expenses' in payload) && !('notes' in payload), 'unexpected keys ' + Object.keys(payload));
-    assert(JSON.stringify(Object.keys(payload).sort()) === JSON.stringify(['client', 'key_date', 'links', 'producer', 'project', 'schedule', 'team', 'timeline', 'updates', 'venues', 'waiting']), 'top-level keys ' + Object.keys(payload).sort());
+    assert(JSON.stringify(Object.keys(payload).sort()) === JSON.stringify(['client', 'key_date', 'links', 'producer', 'project', 'schedule', 'sent', 'team', 'timeline', 'updates', 'uploads', 'venues', 'waiting']), 'top-level keys ' + Object.keys(payload).sort());
   });
 
   await step('payload has what the client should see', async () => {

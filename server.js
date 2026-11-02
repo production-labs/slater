@@ -254,10 +254,13 @@ app.get('/reset-password', (req, res) => {
 // served for any token and the page asks /api/portal/:token. Locked down: no
 // inline scripts, no third-party code, never framed, and the link (which
 // carries the token) is never sent on to sites the client clicks through to.
+// connect-src also allows the transfers bucket's R2 endpoint (only that
+// origin), because file uploads go from the browser straight to R2.
+const portalUploadOrigin = require('./routes/transfers').endpointOrigin();
 app.get('/portal/:token', (req, res) => {
   res.set({
     'Content-Security-Policy': [
-      "default-src 'none'", "script-src 'self'", "connect-src 'self'",
+      "default-src 'none'", "script-src 'self'", ("connect-src 'self' " + portalUploadOrigin).trim(),
       "style-src 'self' https://fonts.googleapis.com", "font-src https://fonts.gstatic.com",
       "img-src 'self' data:", "base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'",
     ].join('; '),

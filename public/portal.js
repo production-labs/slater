@@ -123,6 +123,8 @@
         el('div', null, side))));
     }
     if (d.updates.length) add(body, updatesSection(d));
+    var files = filesSection(d);
+    if (files) add(body, files);
     add(body, el('section', null,
       el('div', { class: 'sec-head' },
         el('div', { class: 'sec-title' }, 'Deliverables'),
@@ -370,6 +372,227 @@
       } }, 'Earlier updates (' + (d.updates.length - 1) + ')');
       add(sec, more);
     }
+    return sec;
+  }
+
+  // ── send files (step 6b) ─────────────────────────────────────────────────
+  // Files go from this browser straight to storage in parts (presigned URLs
+  // from our server), never through Slater's server. Server: routes/portalUploads.js.
+  var PARALLEL_PARTS = 4, SIGN_BATCH = 20, PART_TRIES = 4;
+  var activeUploads = 0;
+  window.addEventListener('beforeunload', function (e) {
+    if (activeUploads > 0) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  function fmtSize(n) {
+    if (n < 1024) return n + ' bytes';
+    var u = ['KB', 'MB', 'GB'], i = -1;
+    do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1);
+    return (n >= 100 || i === 0 ? Math.round(n) : Math.round(n * 10) / 10) + ' ' + u[i];
+  }
+  function api(method, path, body) {
+    return fetch(API + path, {
+      method: method, credentials: 'same-origin',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) { var e = new Error(j.error || 'http_' + r.status); e.status = r.status; e.code = j.error; throw e; }
+        return j;
+      });
+    });
+  }
+  function uploadError(e) {
+    var c = e && e.code, s = e && e.status;
+    if (c === 'too_large') return 'Over 5 GB. Please send this one with WeTransfer or Frame.io.';
+    if (c === 'project_full') return 'This project has reached its upload limit. Please contact your producer.';
+    if (c === 'size_mismatch') return 'The file changed while it was sending. Please try again.';
+    if (c === 'uploads_unavailable') return 'Sending files isn\'t available right now.';
+    if (c === 'cancelled') return 'Cancelled';
+    if (s === 429) return 'Too many uploads at once. Please wait a few minutes.';
+    if (c === 'storage_blocked') return 'Your browser couldn\'t reach our file storage. Please try again later.';
+    return 'That didn\'t send. Please try again.';
+  }
+
+  // PUT one part; resolves with its ETag. onProgress(bytesSoFar).
+  function putPart(url, blob, onProgress, track) {
+    return new Promise(function (resolve, reject) {
+      var x = new XMLHttpRequest();
+      track(x);
+      x.open('PUT', url);
+      x.upload.onprogress = function (e) { onProgress(e.loaded); };
+      x.onload = function () {
+        track(null, x);
+        var etag = x.getResponseHeader('ETag');
+        if (x.status >= 200 && x.status < 300 && etag) return resolve(etag);
+        var err = new Error('part_' + x.status); err.status = x.status;
+        if (x.status >= 200 && x.status < 300) err.code = 'storage_blocked'; // ETag hidden: bucket CORS
+        reject(err);
+      };
+      x.onerror = function () { track(null, x); var err = new Error('network'); err.code = 'network'; reject(err); };
+      x.onabort = function () { track(null, x); var err = new Error('cancelled'); err.code = 'cancelled'; reject(err); };
+      x.send(blob);
+    });
+  }
+
+  // Upload one file. job: { file, name, onProgress(fraction), cancelled }.
+  function sendFile(job) {
+    var file = job.file, xhrs = [], id = null, partBytes, parts, signed = {}, batches = {}, failed = false;
+    job.cancel = function () {
+      job.cancelled = true;
+      xhrs.slice().forEach(function (x) { x.abort(); });
+      if (id) api('DELETE', '/uploads/' + id).catch(function () {});
+    };
+    function track(x, done) {
+      if (x) xhrs.push(x);
+      else xhrs = xhrs.filter(function (y) { return y !== done; });
+    }
+    function urlFor(n, fresh) {
+      if (!fresh && signed[n]) return Promise.resolve(signed[n]);
+      var b = Math.floor((n - 1) / SIGN_BATCH);
+      if (fresh || !batches[b]) {
+        var want = [];
+        for (var i = b * SIGN_BATCH + 1; i <= Math.min(parts, (b + 1) * SIGN_BATCH); i++) want.push(i);
+        batches[b] = api('POST', '/uploads/' + id + '/parts', { parts: want }).then(function (j) {
+          Object.keys(j.urls).forEach(function (k) { signed[k] = j.urls[k]; });
+        });
+      }
+      return batches[b].then(function () { return signed[n]; });
+    }
+    var loaded = {};
+    function report() {
+      var sum = 0;
+      Object.keys(loaded).forEach(function (k) { sum += loaded[k]; });
+      job.onProgress(Math.min(1, sum / file.size));
+    }
+    function sendPart(n, attempt) {
+      if (job.cancelled) return Promise.reject(Object.assign(new Error('cancelled'), { code: 'cancelled' }));
+      if (failed) return Promise.reject(new Error('stopped'));
+      var blob = file.slice((n - 1) * partBytes, Math.min(file.size, n * partBytes));
+      return urlFor(n, attempt > 1).then(function (url) {
+        return putPart(url, blob, function (b) { loaded[n] = b; report(); }, track);
+      }).catch(function (e) {
+        loaded[n] = 0; report();
+        if (e.code === 'cancelled' || e.code === 'storage_blocked' || e.status === 401 || e.status === 404 || attempt >= PART_TRIES) throw e;
+        return new Promise(function (r) { setTimeout(r, 1000 * attempt * attempt); })
+          .then(function () { return sendPart(n, attempt + 1); });
+      });
+    }
+
+    return api('POST', '/uploads', { filename: file.name, size: file.size, content_type: file.type, name: job.name })
+      .then(function (j) {
+        id = j.id; partBytes = j.part_bytes; parts = j.parts;
+        if (job.cancelled) { job.cancel(); throw Object.assign(new Error('cancelled'), { code: 'cancelled' }); }
+        var etags = new Array(parts), next = 1;
+        function worker() {
+          if (next > parts) return Promise.resolve();
+          var n = next++;
+          return sendPart(n, 1).then(function (etag) { etags[n - 1] = { part: n, etag: etag }; return worker(); });
+        }
+        var pool = [];
+        for (var w = 0; w < Math.min(PARALLEL_PARTS, parts); w++) pool.push(worker());
+        return Promise.all(pool).then(function () {
+          return api('POST', '/uploads/' + id + '/complete', { parts: etags });
+        });
+      })
+      .catch(function (e) {
+        failed = true;  // stop the other parts
+        xhrs.slice().forEach(function (x) { x.abort(); });
+        if (id && e.code !== 'size_mismatch') api('DELETE', '/uploads/' + id).catch(function () {});
+        throw e;
+      });
+  }
+
+  function filesSection(d) {
+    var up = d.uploads || {};
+    var sent = d.sent || [];
+    if (!up.enabled && !sent.length) return null;
+
+    var sentList = el('div', { class: 'sent-list' });
+    function sentRow(f) {
+      return el('div', { class: 'sent-row' },
+        el('div', { class: 'sent-name' }, f.name),
+        el('div', { class: 'sent-meta' }, [fmtSize(f.size), f.by, f.at ? when(f.at) : ''].filter(Boolean).join('  ·  ')));
+    }
+    var sentBlock = el('div', { class: 'sent', style: sent.length ? '' : 'display:none' },
+      el('div', { class: 'card-t' }, 'You sent'), sentList);
+    add(sentList, sent.map(sentRow));
+
+    var sec = el('section', { class: 'files' },
+      el('div', { class: 'sec-head' },
+        el('div', { class: 'sec-title' }, 'Send files to your producer'),
+        up.enabled ? el('div', { class: 'sec-aside' }, 'Up to ' + fmtSize(up.max_bytes) + ' per file  ·  kept ' + up.keep_days + ' days') : null));
+
+    if (up.enabled) {
+      var name = el('input', { type: 'text', maxlength: '200', placeholder: 'Your name', autocomplete: 'name', 'aria-label': 'Your name', class: 'drop-name' });
+      name.value = savedName();
+      var err = el('div', { class: 'err', role: 'alert' });
+      var input = el('input', { type: 'file', multiple: 'multiple', class: 'drop-input', 'aria-label': 'Choose files to send' });
+      var queue = el('div', { class: 'up-list' });
+      var zone = el('label', { class: 'drop' },
+        input,
+        el('div', { class: 'drop-main' }, 'Drag files here or ', el('span', { class: 'drop-pick' }, 'choose files')),
+        el('div', { class: 'drop-sub' }, 'Bigger than ' + fmtSize(up.max_bytes) + '? Send it with WeTransfer or Frame.io and email your producer the link.'));
+
+      var waiting = [], running = false;
+      function enqueue(fileList) {
+        err.textContent = '';
+        var n = name.value.trim();
+        if (!n) { err.textContent = 'Please add your name first.'; name.focus(); return; }
+        saveName(n);
+        Array.prototype.forEach.call(fileList, function (file) {
+          var bar = el('div', { class: 'up-bar-fill' });
+          var status = el('div', { class: 'up-status' }, 'Waiting');
+          var job = { file: file, name: n, cancelled: false };
+          var cancel = el('button', { type: 'button', class: 'action-link up-cancel', onclick: function () {
+            if (job.cancel) job.cancel(); else { job.cancelled = true; done('Cancelled', 'cancelled'); }
+          } }, 'Cancel');
+          var row = el('div', { class: 'up-row' },
+            el('div', { class: 'up-top' }, el('div', { class: 'up-name' }, file.name), el('div', { class: 'up-size' }, fmtSize(file.size)), cancel),
+            el('div', { class: 'up-bar' }, bar), status);
+          function done(text, cls) { cancel.remove(); status.textContent = text; row.classList.add(cls); }
+          job.onProgress = function (f) { bar.style.width = (f * 100).toFixed(1) + '%'; status.textContent = Math.floor(f * 100) + '%'; };
+          job.done = done;
+          if (file.size > up.max_bytes) { done(uploadError({ code: 'too_large' }), 'failed'); add(queue, row); return; }
+          if (file.size === 0) { done('This file is empty.', 'failed'); add(queue, row); return; }
+          add(queue, row);
+          waiting.push(job);
+        });
+        input.value = '';
+        run();
+      }
+      // One file at a time (its parts go in parallel), in the order chosen.
+      function run() {
+        if (running) return;
+        var job = waiting.shift();
+        if (!job) return;
+        if (job.cancelled) return run();
+        running = true; activeUploads++;
+        job.onProgress(0);
+        sendFile(job).then(function () {
+          job.onProgress(1);
+          job.done('Sent', 'sent');
+          sentBlock.style.display = '';
+          sentList.insertBefore(sentRow({ name: job.file.name, size: job.file.size, by: job.name, at: new Date().toISOString() }), sentList.firstChild);
+        }, function (e) {
+          // Link turned off or password changed mid-upload: start over from the top.
+          if (e.status === 401 || e.status === 404) { waiting.length = 0; setTimeout(load, 0); return; }
+          job.done(uploadError(e), e.code === 'cancelled' ? 'cancelled' : 'failed');
+        }).then(function () { running = false; activeUploads--; run(); });
+      }
+
+      input.addEventListener('change', function () { if (input.files.length) enqueue(input.files); });
+      ['dragenter', 'dragover'].forEach(function (t) {
+        zone.addEventListener(t, function (e) { e.preventDefault(); zone.classList.add('over'); });
+      });
+      ['dragleave', 'drop'].forEach(function (t) {
+        zone.addEventListener(t, function (e) { e.preventDefault(); zone.classList.remove('over'); });
+      });
+      zone.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files.length) enqueue(e.dataTransfer.files); });
+
+      add(sec, el('div', { class: 'drop-wrap' }, name, zone, err, queue));
+    }
+    add(sec, sentBlock);
     return sec;
   }
 
