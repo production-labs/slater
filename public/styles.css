@@ -764,6 +764,17 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .pa-badge{display:inline-block;font:inherit;font-size:10px;font-weight:700;padding:1px 6px;border:none;cursor:pointer;border-radius:9px;margin-top:3px;background:rgba(58,154,91,.15);color:#3a9a5b;white-space:nowrap}
 .tv-val-label + .pa-badge{margin:0 0 0 6px}
 .pa-badge.chg{background:rgba(224,160,48,.15);color:#E0A030}
+/* Client files (V1.5 step 6b) */
+.pa-file{border:1px solid var(--border);border-left:3px solid #4a8fd9;border-radius:8px;padding:9px 11px;margin-top:8px;background:var(--surface);font-size:13px}
+.pa-file-head{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.pa-file-name{font-weight:600;color:var(--text-primary);overflow-wrap:anywhere}
+.pa-file-tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:9px;white-space:nowrap}
+.pa-file-tag.new{background:rgba(74,143,217,.18);color:#6aa8eb}
+.pa-file-tag.done{background:rgba(58,154,91,.15);color:#3a9a5b}
+.pa-file-meta{font-size:12px;color:var(--text-muted);margin-top:2px;overflow-wrap:anywhere}
+.pa-file-left.soon{color:#E05A4F;font-weight:600}
+.pa-file-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pa-file-btns a.lb{text-decoration:none;display:inline-flex;align-items:center}
 .daily-section-title.client-resp{color:#3a9a5b}
 .pa-rd-kind{font-size:11px;font-weight:600;color:#3a9a5b;margin-top:1px}
 .pa-rd-kind.chg{color:#E0A030}

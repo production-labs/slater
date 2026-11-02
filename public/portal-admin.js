@@ -10,6 +10,10 @@
    Rundown (all projects, polled every minute). Approving never completes the
    item by itself: "Mark complete" does, then the response is confirmed.
    Client-typed text (name, note) is always escaped.
+   Client files (step 6b): "Files from your client" in the panel (and the
+   files sent for a workback item in its edit panel). Download goes through
+   /api/portal-admin/:key/files/:id/download (a 5-minute R2 link); files are
+   deleted 14 days after they arrive. Filenames are client-typed: escaped.
    Public side: routes/portal.js. Plan: docs/v1.5-client-portal-plan.md */
 (function () {
   'use strict';
@@ -92,6 +96,70 @@
     return '<div class="pa-block pa-resps"><div class="pa-label">Client responses (' + list.length + ')</div>' +
       list.map(function (r) { return responseHtml(r, 'panel'); }).join('') + '</div>';
   }
+
+  // ── client files ──────────────────────────────────────────────────────────
+  function openFiles() {
+    return (state && forKey === key() && !state.error && state.files) ? state.files : [];
+  }
+  function fmtSize(n) {
+    if (n < 1024) return n + ' bytes';
+    var u = ['KB', 'MB', 'GB'], i = -1;
+    do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1);
+    return (n >= 100 || i === 0 ? Math.round(n) : Math.round(n * 10) / 10) + ' ' + u[i];
+  }
+  // "Deletes in N days", from expires_at, rounded up (a new file says 14).
+  // Soon = 2 days or less (shown in red).
+  function leftText(expires) {
+    var ms = new Date(expires).getTime() - Date.now();
+    if (ms < 864e5) return { text: 'Deletes within a day', soon: true };
+    var days = Math.ceil(ms / 864e5);
+    return { text: 'Deletes in ' + days + (days === 1 ? ' day' : ' days'), soon: days <= 2 };
+  }
+  function downloadUrl(f) {
+    return '/api/portal-admin/' + encodeURIComponent(key()) + '/files/' + encodeURIComponent(f.id) + '/download';
+  }
+  // One file as HTML. where: 'panel' | 'item'. Client text escaped.
+  function fileHtml(f, where) {
+    var left = leftText(f.expires_at);
+    var wid = f.wb_item_uuid ? wbIdForUuid(f.wb_item_uuid) : null;
+    var itemName = wid && _wbData[wid] ? (_wbData[wid].item || '(untitled)') : '';
+    var dis = busy ? ' disabled' : '';
+    return '<div class="pa-file">' +
+      '<div class="pa-file-head"><span class="pa-file-name">' + esc(f.filename) + '</span>' +
+        (f.downloaded_at ? '<span class="pa-file-tag done" title="First downloaded ' + esc(when(f.downloaded_at)) + '">Downloaded</span>' : '<span class="pa-file-tag new">New</span>') +
+      '</div>' +
+      '<div class="pa-file-meta">' + esc(fmtSize(f.size_bytes)) + ' &middot; ' + esc(f.uploaded_by_name || 'Client') + ' &middot; ' + esc(when(f.ready_at)) +
+        ' &middot; <span class="pa-file-left' + (left.soon ? ' soon' : '') + '">' + left.text + '</span></div>' +
+      (where === 'panel' && itemName ? '<div class="pa-file-meta">For &ldquo;' + esc(itemName) + '&rdquo;</div>' : '') +
+      '<div class="pa-file-btns">' +
+        '<a class="lb primary" href="' + esc(downloadUrl(f)) + '" data-pa-file="download" data-id="' + f.id + '">Download</a>' +
+        '<button class="lb danger" data-pa-file="delete" data-id="' + f.id + '"' + dis + '>Delete</button>' +
+        (where === 'panel' && wid ? '<button class="lb" data-pa-resp="show" data-uuid="' + esc(f.wb_item_uuid) + '">Show in workback</button>' : '') +
+      '</div></div>';
+  }
+  function filesBlock() {
+    var list = openFiles();
+    if (!list.length) return '';
+    return '<div class="pa-block pa-files"><div class="pa-label">Files from your client (' + list.length + ')</div>' +
+      '<p class="pa-note pa-small">Download what you need: each file is deleted 14 days after it arrives.</p>' +
+      list.map(function (f) { return fileHtml(f, 'panel'); }).join('') + '</div>';
+  }
+  function deleteFile(id) {
+    var f = openFiles().filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!f) return;
+    showModal('Delete file', 'Delete "' + f.filename + '" now? It can\'t be brought back, and your client would need to send it again.', function () {
+      act('DELETE', '/files/' + encodeURIComponent(id), undefined, 'File deleted.').then(refreshWorkback);
+    });
+  }
+  // Download: the link itself saves the file (the browser stays here); then
+  // re-read the status so the file shows as Downloaded.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pa-file]');
+    if (!b || b.disabled) return;
+    var a = b.getAttribute('data-pa-file');
+    if (a === 'download') setTimeout(function () { if (!showPw) load(); }, 1500);
+    else if (a === 'delete') deleteFile(b.getAttribute('data-id'));
+  });
 
   function refreshWorkback() {
     try {
@@ -268,7 +336,7 @@
         '<p class="pa-note">Give your client a private page for this project: key dates, items waiting on them, your updates, and any links you choose to share. Crew, talent, call times, expenses, notes and internal-only items are never shown.</p>' +
         '<button class="lb primary" data-pa="enable"' + dis + '>Turn on client portal</button>' +
         (state.updates.length ? '<p class="pa-note pa-small">Your ' + state.updates.length + ' earlier update' + (state.updates.length === 1 ? ' is' : 's are') + ' kept and will show again.</p>' : '') +
-        responsesBlock();
+        responsesBlock() + filesBlock();
       return;
     }
     var n = sharedLinkCount();
@@ -278,6 +346,7 @@
       '<button class="lb" data-pa="copy"' + dis + '>Copy link</button>' +
       '<button class="lb" data-pa="open"' + dis + '>Open</button></div>';
     h += responsesBlock();
+    h += filesBlock();
 
     // Password
     h += '<div class="pa-block"><div class="pa-label">Password</div>';
@@ -425,9 +494,14 @@
       return r ? '<button type="button" class="pa-badge ' + (r.kind === 'approved' ? 'ok' : 'chg') + '" data-pa-resp="badge" data-uuid="' + esc(uuid) + '" title="Client response: click to review">' + kindLabel(r.kind) + '</button>' : '';
     },
     // Workback edit panel: the response box with its buttons.
+    // Workback edit panel: the response box with its buttons, then any files
+    // the client sent for this item.
     editPanelHtml: function (uuid) {
       var r = uuid && responseFor(uuid);
-      return r ? '<div class="ep-sec">' + responseHtml(r, 'item') + '</div>' : '';
+      var files = uuid ? openFiles().filter(function (f) { return f.wb_item_uuid === uuid; }) : [];
+      return (r ? '<div class="ep-sec">' + responseHtml(r, 'item') + '</div>' : '') +
+        (files.length ? '<div class="ep-sec pa-files"><div class="pa-label">Files from your client (' + files.length + ')</div>' +
+          files.map(function (f) { return fileHtml(f, 'item'); }).join('') + '</div>' : '');
     },
     // Rundown Pending tab: the cross-project group (or null), and a nudge to re-check.
     rundownGroup: rundownGroup,

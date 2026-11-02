@@ -16,6 +16,12 @@
 //                                    dismissed); it drops off every list
 //   GET    /responses/pending   unconfirmed client responses, all projects
 //                               (for the Rundown)
+//   GET    /:key/files/:id/download  302 to a 5-minute R2 link (saves as a file);
+//                                    marks the file downloaded
+//   DELETE /:key/files/:id      deletes a client's file now (R2 object + row)
+//
+// Client files (step 6b) are in the status as `files`: ready, not expired,
+// newest first. filename / uploaded_by_name are client-typed: plain text only.
 //
 // Client responses (approve / request changes) are written by the PUBLIC
 // side and include text the client typed. The browser must treat
@@ -28,6 +34,7 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { Pool } = require('pg');
+const transfers = require('./transfers');
 
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -42,11 +49,15 @@ async function findProject(req) {
 }
 
 async function status(projectId, ownerId) {
-  const [p, u, r] = await Promise.all([
+  const [p, u, r, f] = await Promise.all([
     pool.query('SELECT token, password_hash IS NOT NULL AS has_password, created_at FROM portals WHERE project_id = $1 AND owner_id = $2', [projectId, ownerId]),
     pool.query('SELECT id, author_name, body, created_at FROM portal_updates WHERE project_id = $1 AND owner_id = $2 ORDER BY created_at DESC, id DESC', [projectId, ownerId]),
     pool.query(`SELECT id, wb_item_uuid, kind, responder_name, note, created_at FROM portal_responses
                  WHERE project_id = $1 AND owner_id = $2 AND acknowledged_at IS NULL ORDER BY created_at DESC, id DESC`, [projectId, ownerId]),
+    pool.query(`SELECT id, filename, size_bytes, uploaded_by_name, wb_item_uuid, ready_at, expires_at, downloaded_at
+                  FROM portal_files
+                 WHERE project_id = $1 AND owner_id = $2 AND status = 'ready' AND expires_at > NOW()
+                 ORDER BY ready_at DESC, id DESC`, [projectId, ownerId]),
   ]);
   const row = p.rows[0];
   return {
@@ -56,7 +67,21 @@ async function status(projectId, ownerId) {
     enabled_at: row ? row.created_at : null,
     updates: u.rows,
     responses: r.rows,
+    files: f.rows.map(x => Object.assign(x, { size_bytes: Number(x.size_bytes) })),
+    uploads_enabled: transfers.isConfigured(),
   };
+}
+
+// A ready, unexpired client file in this user's project, or null.
+async function findFile(req) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return null;
+  const r = await pool.query(
+    `SELECT f.id, f.r2_key, f.filename FROM portal_files f
+       JOIN projects p ON p.id = f.project_id AND p.owner_id = f.owner_id
+      WHERE f.id = $1 AND p.key = $2 AND f.owner_id = $3 AND f.status = 'ready' AND f.expires_at > NOW()`,
+    [id, req.params.key, req.session.userId]);
+  return r.rows[0] || null;
 }
 
 // Wraps a handler: finds the project (404 if it isn't this user's) and
@@ -158,6 +183,35 @@ router.post('/:key/responses/:id/ack', withProject(async (req, res, project) => 
     `UPDATE portal_responses SET acknowledged_at = NOW()
       WHERE id = $1 AND project_id = $2 AND owner_id = $3 AND acknowledged_at IS NULL`,
     [id, project.id, req.session.userId]);
+}));
+
+// Signed at click time, so a link never goes stale on an open page, and the
+// file streams from R2, not through the app. "Downloaded" means the producer
+// asked for it at least once.
+router.get('/:key/files/:id/download', async (req, res) => {
+  try {
+    const file = await findFile(req);
+    if (!file) return res.status(404).json({ error: 'not_found' });
+    if (!transfers.isConfigured()) return res.status(503).json({ error: 'uploads_unavailable' });
+    const url = await transfers.signDownload(file.r2_key, file.filename);
+    await pool.query('UPDATE portal_files SET downloaded_at = COALESCE(downloaded_at, NOW()) WHERE id = $1', [file.id]);
+    res.set('Cache-Control', 'no-store');
+    res.redirect(302, url);
+  } catch (err) {
+    console.error('Portal file download failed:', err.message);
+    if (!res.headersSent) res.status(502).json({ error: 'download_failed' });
+  }
+});
+
+// Delete now instead of waiting for day 14. If R2 can't be reached, the row
+// still goes and the bucket's 14-day lifecycle rule removes the object.
+router.delete('/:key/files/:id', withProject(async (req, res) => {
+  const file = await findFile(req);
+  if (!file) { res.status(404).json({ error: 'not_found' }); return false; }
+  if (transfers.isConfigured()) {
+    await transfers.deleteObject(file.r2_key).catch(err => console.error('Portal file R2 delete failed:', err.message));
+  }
+  await pool.query('DELETE FROM portal_files WHERE id = $1', [file.id]);
 }));
 
 module.exports = router;

@@ -110,7 +110,8 @@
     document.title = d.project.title + (d.client.name ? ' | ' + d.client.name : '');
     app.textContent = '';
     add(app, masthead(d));
-    if (d.waiting.length) add(app, waitingBand(d.waiting, today));
+    var uploader = d.uploads && d.uploads.enabled ? makeUploader(d) : null;
+    if (d.waiting.length) add(app, waitingBand(d.waiting, today, uploader));
 
     var body = el('div', { class: 'wrap' });
     if (d.timeline.length) add(body, timelineSection(d.timeline, today));
@@ -123,7 +124,7 @@
         el('div', null, side))));
     }
     if (d.updates.length) add(body, updatesSection(d));
-    var files = filesSection(d);
+    var files = filesSection(d, uploader);
     if (files) add(body, files);
     add(body, el('section', null,
       el('div', { class: 'sec-head' },
@@ -160,16 +161,35 @@
     return { text: fmt(due), cls: 'later' };
   }
 
-  function waitingBand(list, today) {
+  function waitingBand(list, today, uploader) {
     return el('div', { class: 'action-band' }, el('div', { class: 'wrap' }, el('div', { class: 'action-inner' },
       el('div', { class: 'action-head' },
         el('div', { class: 'action-title' }, 'Waiting on you'),
         el('div', { class: 'action-sub' }, list.length + (list.length === 1 ? ' item' : ' items'))),
-      el('div', { class: 'action-list' }, list.map(function (w) { return actionRow(w, today); })))));
+      el('div', { class: 'action-list' }, list.map(function (w) { return actionRow(w, today, uploader); })))));
+  }
+
+  // "You sent N files for this" + a link that sends files tagged to the item.
+  // Progress shows in the Send files section, which the page scrolls to.
+  function itemFilesLine(w, u) {
+    var count = w.files || 0;
+    var label = el('span', { class: 'action-files-count' });
+    function show() { label.textContent = count ? 'You sent ' + count + (count === 1 ? ' file' : ' files') + ' for this. ' : ''; }
+    show();
+    u.onItemSent(w.uuid, function () { count++; show(); });
+    var picker = el('input', { type: 'file', multiple: 'multiple', class: 'drop-input', 'aria-label': 'Choose files for ' + w.item });
+    picker.addEventListener('change', function () {
+      if (!picker.files.length) return;
+      u.enqueue(picker.files, { uuid: w.uuid, name: w.item });
+      picker.value = '';
+      u.queue.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    var send = el('button', { type: 'button', class: 'action-link action-send-files', onclick: function () { if (u.askName()) picker.click(); } }, 'Send files for this');
+    return el('div', { class: 'action-note action-files' }, label, send, picker);
   }
 
   // One "Waiting on you" row: Approve / Request changes, or what was sent.
-  function actionRow(w, today) {
+  function actionRow(w, today, uploader) {
     var due = dueLabel(w.due, today);
     var row = el('div', { class: 'action-item' });
     var main = el('div', { class: 'action-row' });
@@ -200,7 +220,8 @@
         (w.links && w.links.length) ? el('div', { class: 'action-links' }, w.links.map(function (l) {
           return el('a', ext(l.url, { class: 'action-review' }), '↗ ' + l.name);
         })) : null,
-        note),
+        note,
+        uploader && w.uuid ? itemFilesLine(w, uploader) : null),
       btns]);
     add(row, [main, formSlot]);
     return row;
@@ -409,6 +430,7 @@
     if (c === 'size_mismatch') return 'The file changed while it was sending. Please try again.';
     if (c === 'uploads_unavailable') return 'Sending files isn\'t available right now.';
     if (c === 'cancelled') return 'Cancelled';
+    if (c === 'not_waiting') return 'This item isn\'t waiting on you anymore. Reload the page to see what changed.';
     if (s === 429) return 'Too many uploads at once. Please wait a few minutes.';
     if (c === 'storage_blocked') return 'Your browser couldn\'t reach our file storage. Please try again later.';
     return 'That didn\'t send. Please try again.';
@@ -479,7 +501,7 @@
       });
     }
 
-    return api('POST', '/uploads', { filename: file.name, size: file.size, content_type: file.type, name: job.name })
+    return api('POST', '/uploads', { filename: file.name, size: file.size, content_type: file.type, name: job.name, item: job.item ? job.item.uuid : undefined })
       .then(function (j) {
         id = j.id; partBytes = j.part_bytes; parts = j.parts;
         if (job.cancelled) { job.cancel(); throw Object.assign(new Error('cancelled'), { code: 'cancelled' }); }
@@ -503,83 +525,110 @@
       });
   }
 
-  function filesSection(d) {
+  function sentRow(f) {
+    return el('div', { class: 'sent-row' },
+      el('div', { class: 'sent-name' }, f.name),
+      el('div', { class: 'sent-meta' }, [fmtSize(f.size), f.by, f.at ? when(f.at) : ''].filter(Boolean).join('  ·  ')),
+      f.item ? el('div', { class: 'sent-for' }, 'For "' + f.item + '"') : null);
+  }
+
+  // The upload queue, shared by the "Send files" section and the "Send files
+  // for this" link on each waiting item. Built once per render.
+  function makeUploader(d) {
+    var up = d.uploads, u = {}, counters = {};
+    u.name = el('input', { type: 'text', maxlength: '200', placeholder: 'Your name', autocomplete: 'name', 'aria-label': 'Your name', class: 'drop-name' });
+    u.name.value = savedName();
+    u.err = el('div', { class: 'err', role: 'alert' });
+    u.queue = el('div', { class: 'up-list' });
+    u.sentList = el('div', { class: 'sent-list' });
+    u.sentBlock = el('div', { class: 'sent', style: d.sent.length ? '' : 'display:none' },
+      el('div', { class: 'card-t' }, 'You sent'), u.sentList);
+    add(u.sentList, d.sent.map(sentRow));
+
+    // A waiting item's "You sent N files" line, bumped when one finishes.
+    u.onItemSent = function (uuid, fn) { counters[uuid] = fn; };
+
+    // The name, or '' after pointing the client at the name field.
+    u.askName = function () {
+      u.err.textContent = '';
+      var n = u.name.value.trim();
+      if (n) { saveName(n); return n; }
+      u.err.textContent = 'Please add your name first, then choose your files.';
+      u.name.scrollIntoView({ block: 'center' });
+      u.name.focus();
+      return '';
+    };
+
+    var waiting = [], running = false;
+    // item: { uuid, name } when sent for a "Waiting on you" item, else null.
+    u.enqueue = function (fileList, item) {
+      var n = u.askName();
+      if (!n) return;
+      Array.prototype.forEach.call(fileList, function (file) {
+        var bar = el('div', { class: 'up-bar-fill' });
+        var status = el('div', { class: 'up-status' }, 'Waiting');
+        var job = { file: file, name: n, item: item || null, cancelled: false };
+        var cancel = el('button', { type: 'button', class: 'action-link up-cancel', onclick: function () {
+          if (job.cancel) job.cancel(); else { job.cancelled = true; done('Cancelled', 'cancelled'); }
+        } }, 'Cancel');
+        var row = el('div', { class: 'up-row' },
+          el('div', { class: 'up-top' }, el('div', { class: 'up-name' }, file.name), el('div', { class: 'up-size' }, fmtSize(file.size)), cancel),
+          item ? el('div', { class: 'up-for' }, 'For "' + item.name + '"') : null,
+          el('div', { class: 'up-bar' }, bar), status);
+        function done(text, cls) { cancel.remove(); status.textContent = text; row.classList.add(cls); }
+        job.onProgress = function (f) { bar.style.width = (f * 100).toFixed(1) + '%'; status.textContent = Math.floor(f * 100) + '%'; };
+        job.done = done;
+        add(u.queue, row);
+        if (file.size > up.max_bytes) return done(uploadError({ code: 'too_large' }), 'failed');
+        if (file.size === 0) return done('This file is empty.', 'failed');
+        waiting.push(job);
+      });
+      run();
+    };
+    // One file at a time (its parts go in parallel), in the order chosen.
+    function run() {
+      if (running) return;
+      var job = waiting.shift();
+      if (!job) return;
+      if (job.cancelled) return run();
+      running = true; activeUploads++;
+      job.onProgress(0);
+      sendFile(job).then(function () {
+        job.onProgress(1);
+        job.done('Sent', 'sent');
+        u.sentBlock.style.display = '';
+        u.sentList.insertBefore(sentRow({ name: job.file.name, size: job.file.size, by: job.name, at: new Date().toISOString(), item: job.item ? job.item.name : '' }), u.sentList.firstChild);
+        if (job.item && counters[job.item.uuid]) counters[job.item.uuid]();
+      }, function (e) {
+        // Link turned off or password changed mid-upload: start over from the top.
+        if (e.status === 401 || e.status === 404) { waiting.length = 0; setTimeout(load, 0); return; }
+        job.done(uploadError(e), e.code === 'cancelled' ? 'cancelled' : 'failed');
+      }).then(function () { running = false; activeUploads--; run(); });
+    }
+    return u;
+  }
+
+  function filesSection(d, u) {
     var up = d.uploads || {};
     var sent = d.sent || [];
-    if (!up.enabled && !sent.length) return null;
-
-    var sentList = el('div', { class: 'sent-list' });
-    function sentRow(f) {
-      return el('div', { class: 'sent-row' },
-        el('div', { class: 'sent-name' }, f.name),
-        el('div', { class: 'sent-meta' }, [fmtSize(f.size), f.by, f.at ? when(f.at) : ''].filter(Boolean).join('  ·  ')));
-    }
-    var sentBlock = el('div', { class: 'sent', style: sent.length ? '' : 'display:none' },
-      el('div', { class: 'card-t' }, 'You sent'), sentList);
-    add(sentList, sent.map(sentRow));
+    if (!u && !sent.length) return null;
 
     var sec = el('section', { class: 'files' },
       el('div', { class: 'sec-head' },
-        el('div', { class: 'sec-title' }, 'Send files to your producer'),
-        up.enabled ? el('div', { class: 'sec-aside' }, 'Up to ' + fmtSize(up.max_bytes) + ' per file  ·  kept ' + up.keep_days + ' days') : null));
+        el('div', { class: 'sec-title' }, u ? 'Send files to your producer' : 'Files you sent'),
+        u ? el('div', { class: 'sec-aside' }, 'Up to ' + fmtSize(up.max_bytes) + ' per file  ·  kept ' + up.keep_days + ' days') : null));
 
-    if (up.enabled) {
-      var name = el('input', { type: 'text', maxlength: '200', placeholder: 'Your name', autocomplete: 'name', 'aria-label': 'Your name', class: 'drop-name' });
-      name.value = savedName();
-      var err = el('div', { class: 'err', role: 'alert' });
+    if (!u) {
+      add(sec, el('div', { class: 'sent' }, el('div', { class: 'card-t' }, 'You sent'), el('div', { class: 'sent-list' }, sent.map(sentRow))));
+      return sec;
+    }
+    {
       var input = el('input', { type: 'file', multiple: 'multiple', class: 'drop-input', 'aria-label': 'Choose files to send' });
-      var queue = el('div', { class: 'up-list' });
       var zone = el('label', { class: 'drop' },
         input,
         el('div', { class: 'drop-main' }, 'Drag files here or ', el('span', { class: 'drop-pick' }, 'choose files')),
         el('div', { class: 'drop-sub' }, 'Bigger than ' + fmtSize(up.max_bytes) + '? Send it with WeTransfer or Frame.io and email your producer the link.'));
-
-      var waiting = [], running = false;
-      function enqueue(fileList) {
-        err.textContent = '';
-        var n = name.value.trim();
-        if (!n) { err.textContent = 'Please add your name first.'; name.focus(); return; }
-        saveName(n);
-        Array.prototype.forEach.call(fileList, function (file) {
-          var bar = el('div', { class: 'up-bar-fill' });
-          var status = el('div', { class: 'up-status' }, 'Waiting');
-          var job = { file: file, name: n, cancelled: false };
-          var cancel = el('button', { type: 'button', class: 'action-link up-cancel', onclick: function () {
-            if (job.cancel) job.cancel(); else { job.cancelled = true; done('Cancelled', 'cancelled'); }
-          } }, 'Cancel');
-          var row = el('div', { class: 'up-row' },
-            el('div', { class: 'up-top' }, el('div', { class: 'up-name' }, file.name), el('div', { class: 'up-size' }, fmtSize(file.size)), cancel),
-            el('div', { class: 'up-bar' }, bar), status);
-          function done(text, cls) { cancel.remove(); status.textContent = text; row.classList.add(cls); }
-          job.onProgress = function (f) { bar.style.width = (f * 100).toFixed(1) + '%'; status.textContent = Math.floor(f * 100) + '%'; };
-          job.done = done;
-          if (file.size > up.max_bytes) { done(uploadError({ code: 'too_large' }), 'failed'); add(queue, row); return; }
-          if (file.size === 0) { done('This file is empty.', 'failed'); add(queue, row); return; }
-          add(queue, row);
-          waiting.push(job);
-        });
-        input.value = '';
-        run();
-      }
-      // One file at a time (its parts go in parallel), in the order chosen.
-      function run() {
-        if (running) return;
-        var job = waiting.shift();
-        if (!job) return;
-        if (job.cancelled) return run();
-        running = true; activeUploads++;
-        job.onProgress(0);
-        sendFile(job).then(function () {
-          job.onProgress(1);
-          job.done('Sent', 'sent');
-          sentBlock.style.display = '';
-          sentList.insertBefore(sentRow({ name: job.file.name, size: job.file.size, by: job.name, at: new Date().toISOString() }), sentList.firstChild);
-        }, function (e) {
-          // Link turned off or password changed mid-upload: start over from the top.
-          if (e.status === 401 || e.status === 404) { waiting.length = 0; setTimeout(load, 0); return; }
-          job.done(uploadError(e), e.code === 'cancelled' ? 'cancelled' : 'failed');
-        }).then(function () { running = false; activeUploads--; run(); });
-      }
+      function enqueue(files) { u.enqueue(files, null); input.value = ''; }
 
       input.addEventListener('change', function () { if (input.files.length) enqueue(input.files); });
       ['dragenter', 'dragover'].forEach(function (t) {
@@ -590,9 +639,9 @@
       });
       zone.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files.length) enqueue(e.dataTransfer.files); });
 
-      add(sec, el('div', { class: 'drop-wrap' }, name, zone, err, queue));
+      add(sec, el('div', { class: 'drop-wrap' }, u.name, zone, u.err, u.queue));
     }
-    add(sec, sentBlock);
+    add(sec, u.sentBlock);
     return sec;
   }
 

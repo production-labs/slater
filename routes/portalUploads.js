@@ -61,7 +61,7 @@ function cleanContentType(v) {
   return typeof v === 'string' && v.length <= 100 && /^[\w.+-]+\/[\w.+-]+$/.test(v) ? v.toLowerCase() : 'application/octet-stream';
 }
 
-module.exports = function registerUploads(router, { pool, findPortal, isUnlocked }) {
+module.exports = function registerUploads(router, { pool, findPortal, isUnlocked, buildPayload }) {
   // Shared front door: portal exists, unlocked, uploads configured.
   async function gate(req, res) {
     const portal = await findPortal(req.params.token);
@@ -99,6 +99,12 @@ module.exports = function registerUploads(router, { pool, findPortal, isUnlocked
       if (!filename) return res.status(400).json({ error: 'bad_filename' });
       if (!Number.isSafeInteger(size) || size < 1) return res.status(400).json({ error: 'bad_size' });
       if (size > transfers.MAX_FILE_BYTES) return res.status(413).json({ error: 'too_large', max_bytes: transfers.MAX_FILE_BYTES });
+      // Optional: sent for a "Waiting on you" item. Same rule as Approve: it
+      // must be one the client can see waiting right now.
+      const item = typeof b.item === 'string' && b.item ? b.item : null;
+      if (item && !buildPayload(portal, {}).waiting.some(w => w.uuid === item)) {
+        return res.status(409).json({ error: 'not_waiting' });
+      }
 
       const held = (await pool.query(
         `SELECT COUNT(*)::int AS n, COALESCE(SUM(size_bytes), 0)::bigint AS bytes FROM portal_files
@@ -113,9 +119,9 @@ module.exports = function registerUploads(router, { pool, findPortal, isUnlocked
       const key = transfers.newKey(portal.project_id);
       const uploadId = await transfers.startUpload(key, contentType);
       const row = (await pool.query(
-        `INSERT INTO portal_files (project_id, owner_id, filename, content_type, size_bytes, r2_key, upload_id, uploaded_by_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [portal.project_id, portal.owner_id, filename, contentType, size, key, uploadId, name])).rows[0];
+        `INSERT INTO portal_files (project_id, owner_id, filename, content_type, size_bytes, r2_key, upload_id, uploaded_by_name, wb_item_uuid)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [portal.project_id, portal.owner_id, filename, contentType, size, key, uploadId, name, item])).rows[0];
       res.json({ id: row.id, part_bytes: transfers.PART_BYTES, parts: transfers.partCount(size) });
     } catch (err) { fail(res, 'start', err); }
   });
@@ -185,7 +191,7 @@ module.exports = function registerUploads(router, { pool, findPortal, isUnlocked
 // For the portal payload: files this project's clients have sent, still kept.
 module.exports.loadSent = async function loadSent(pool, projectId) {
   const r = await pool.query(
-    `SELECT filename, size_bytes, uploaded_by_name, ready_at FROM portal_files
+    `SELECT filename, size_bytes, uploaded_by_name, ready_at, wb_item_uuid FROM portal_files
       WHERE project_id = $1 AND status = 'ready' AND expires_at > NOW()
       ORDER BY ready_at DESC LIMIT 50`, [projectId]);
   return r.rows;

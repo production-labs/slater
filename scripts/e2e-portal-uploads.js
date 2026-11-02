@@ -111,7 +111,9 @@ function startFakeS3() {
       if (req.method === 'GET') {
         const o = fake.objects.get(key);
         if (!o) return xml(res, 404, '<Error><Code>NoSuchKey</Code></Error>');
-        res.writeHead(200, { 'Content-Length': o.length }); return res.end(o);
+        const headers = { 'Content-Length': o.length, 'Content-Type': 'application/octet-stream' };
+        if (q.get('response-content-disposition')) headers['Content-Disposition'] = q.get('response-content-disposition');
+        res.writeHead(200, headers); return res.end(o);
       }
       xml(res, 405, '<Error><Code>MethodNotAllowed</Code></Error>');
     });
@@ -121,12 +123,21 @@ function startFakeS3() {
 
 async function main() {
   await startFakeS3();
-  const hash = await bcrypt.hash('e2e-pass-' + STAMP, 10);
+  const PASS = 'e2e-pass-' + STAMP;
+  const EMAIL = 'portalup-e2e-' + STAMP + '@example.invalid';
+  const OTHER = 'portalup-e2e-other-' + STAMP + '@example.invalid';
+  const hash = await bcrypt.hash(PASS, 10);
   const mkUser = async (email, name) => { const id = (await db.query(`INSERT INTO users (email, password_hash, name) VALUES ($1,$2,$3) RETURNING id`, [email, hash, name])).rows[0].id; userIds.push(id); return id; };
-  const userId = await mkUser('portalup-e2e-' + STAMP + '@example.invalid', 'Uploads Tester');
-  const mkProject = async (key, title) => (await db.query(`INSERT INTO projects (key, label, data, owner_id) VALUES ($1,$2,$3,$4) RETURNING id`,
-    [key, title, { project_title: title, client_company: 'Acme' }, userId])).rows[0].id;
-  const projectId = await mkProject('cs_up_' + STAMP, 'Uploads Test');
+  const userId = await mkUser(EMAIL, 'Uploads Tester');
+  await mkUser(OTHER, 'Other Producer');
+  const rel = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  const wb = (uuid, item, extra) => Object.assign({ uuid, item, owner: 'Client', mode: 'manual', manual_date: rel(3), status: 'Not Started', internal: false }, extra || {});
+  const mkProject = async (key, title, more) => (await db.query(`INSERT INTO projects (key, label, data, owner_id) VALUES ($1,$2,$3,$4) RETURNING id`,
+    [key, title, Object.assign({ project_title: title, client_company: 'Acme' }, more || {}), userId])).rows[0].id;
+  const KEY = 'cs_up_' + STAMP;
+  const projectId = await mkProject(KEY, 'Uploads Test', {
+    wb_items: [wb('u-release', 'Return talent releases'), wb('u-secret', 'Internal legal check', { internal: true })],
+  });
   const lockedId = await mkProject('cs_up_locked_' + STAMP, 'Locked Uploads');
   const TOKEN = crypto.randomBytes(32).toString('base64url');
   const LOCKED = crypto.randomBytes(32).toString('base64url');
@@ -229,7 +240,7 @@ async function main() {
 
   await step('Choosing files without a name asks for the name, sends nothing', async () => {
     await page.$eval('.drop-name', n => { n.value = ''; });
-    const input = await page.$('.drop-input');
+    const input = await page.$('.drop .drop-input');
     await input.uploadFile(small);
     await page.waitForFunction(() => /add your name/.test(document.querySelector('.drop-wrap .err').textContent), { timeout: 3000 });
     assert((await page.$$('.up-row')).length === 0, 'rows appeared');
@@ -239,7 +250,7 @@ async function main() {
   await step('Sends two files (one in 3 parts) straight to storage; both show "Sent"', async () => {
     await page.type('.drop-name', 'Pat Client');
     const putsBefore = fake.log.filter(l => l.method === 'PUT').length;
-    const input = await page.$('.drop-input');
+    const input = await page.$('.drop .drop-input');
     await input.uploadFile(small, big);
     await page.waitForFunction(() => document.querySelectorAll('.up-row.sent').length === 2, { timeout: 30000 });
     const puts = fake.log.filter(l => l.method === 'PUT').slice(putsBefore);
@@ -286,7 +297,7 @@ async function main() {
     assert(/40 MB/.test(meta) && /Pat Client/.test(meta), meta);
     assert((await page.$$('.sent a')).length === 0, 'download link on client side');
     const p = await payload();
-    assert(p.sent.every(f => JSON.stringify(Object.keys(f).sort()) === '["at","by","name","size"]'), 'sent keys ' + JSON.stringify(p.sent[0]));
+    assert(p.sent.every(f => JSON.stringify(Object.keys(f).sort()) === '["at","by","item","name","size"]'), 'sent keys ' + JSON.stringify(p.sent[0]));
     assert(!/portal\/\d+\/|r2_key|upload_id|X-Amz/.test(JSON.stringify(p)), 'storage details in the payload');
     assert(await page.$eval('.drop-name', n => n.value) === 'Pat Client', 'name not remembered');
   });
@@ -294,7 +305,7 @@ async function main() {
   await step('Cancel mid-upload: row shows Cancelled; storage upload aborted; no db row', async () => {
     fake.putDelayMs = 4000;
     const before = (await rows()).length;
-    const input = await page.$('.drop-input');
+    const input = await page.$('.drop .drop-input');
     await input.uploadFile(big);
     await until(() => fake.mpus.size === 1 && fake.log.some(l => l.method === 'OPTIONS' || l.method === 'PUT'), 8000, 'upload to start');
     await until(async () => (await rows()).length === before + 1, 5000, 'pending row');
@@ -307,7 +318,7 @@ async function main() {
   await step('Storage hiding the ETag (bucket CORS wrong): clear message, nothing left behind', async () => {
     fake.exposeEtag = false;
     const before = (await rows()).length;
-    const input = await page.$('.drop-input');
+    const input = await page.$('.drop .drop-input');
     await input.uploadFile(small);
     await page.waitForFunction(() => { const r = document.querySelector('.up-row:last-child'); return r && r.classList.contains('failed'); }, { timeout: 10000 });
     const msg = await page.$eval('.up-row:last-child .up-status', n => n.textContent);
@@ -387,7 +398,152 @@ async function main() {
     assert(again.ok, 'retry ' + again.status);
   });
 
+  // ── Files for a "Waiting on you" item ─────────────────────────────────────
+  await step('Sending for an item that is not waiting (internal, unknown) is refused', async () => {
+    const a = await call('POST', '/uploads', { filename: 'a.pdf', size: 10, name: 'Pat', item: 'u-secret' });
+    const b = await call('POST', '/uploads', { filename: 'a.pdf', size: 10, name: 'Pat', item: 'nope' });
+    assert(a.status === 409 && b.status === 409, a.status + ',' + b.status);
+  });
+
+  await step('Client sends a file from the waiting item; it is tagged to that item', async () => {
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('.action-send-files', { timeout: 5000 });
+    const sentBefore = (await page.$$('.up-row.sent')).length;
+    const [chooser] = await Promise.all([page.waitForFileChooser({ timeout: 3000 }), page.click('.action-send-files')]);
+    await chooser.accept([small]);
+    await page.waitForFunction(n => document.querySelectorAll('.up-row.sent').length === n + 1, { timeout: 15000 }, sentBefore);
+    const forLine = await page.$eval('.up-row.sent:last-child .up-for', n => n.textContent);
+    assert(forLine === 'For "Return talent releases"', forLine);
+    const note = await page.$eval('.action-files-count', n => n.textContent);
+    assert(/You sent 1 file for this/.test(note), note);
+    const r = (await rows()).filter(x => x.wb_item_uuid === 'u-release');
+    assert(r.length === 1 && r[0].status === 'ready' && r[0].filename === 'Script notes v2.txt', JSON.stringify(r));
+  });
+
+  await step('After a reload the item still says what was sent; "You sent" names the item', async () => {
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('.action-files-count', { timeout: 5000 });
+    assert(/You sent 1 file for this/.test(await page.$eval('.action-files-count', n => n.textContent)), 'count lost');
+    const fors = await page.$$eval('.sent-for', ns => ns.map(n => n.textContent));
+    assert(fors.length === 1 && fors[0] === 'For "Return talent releases"', JSON.stringify(fors));
+    const p = await payload();
+    assert(p.waiting.length === 1 && p.waiting[0].files === 1, JSON.stringify(p.waiting));
+    assert(!JSON.stringify(p.sent).includes('u-release'), 'item uuid in sent list');
+  });
+
   await page.screenshot({ path: SHOTS + '/up-portal.png', fullPage: true });
+
+  // ── Producer side ─────────────────────────────────────────────────────────
+  const loginCookie = async (email) => {
+    const r = await fetch(BASE + '/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: PASS }) });
+    return (r.headers.get('set-cookie') || '').split(';')[0];
+  };
+  const ready = async () => (await rows()).filter(x => x.status === 'ready');
+  const pctx = await browser.createBrowserContext();
+  const ppage = await pctx.newPage(); global.__page = ppage;
+  await ppage.setViewport({ width: 1500, height: 1000 });
+  ppage.on('console', m => { if (m.type() === 'error') consoleErrors.push('producer: ' + m.text()); });
+  ppage.on('pageerror', e => consoleErrors.push('producer pageerror: ' + e.message));
+  const DL = path.join(TMP, 'dl-' + STAMP);
+  fs.mkdirSync(DL, { recursive: true });
+  const bcdp = await browser.target().createCDPSession();
+  await bcdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DL, browserContextId: pctx.id });
+  await ppage.goto(BASE + '/login');
+  const login = await ppage.evaluate(async (e, p) => (await fetch('/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e, password: p }) })).status, EMAIL, PASS);
+  assert(login === 200, 'login failed ' + login);
+  await ppage.evaluate(k => localStorage.setItem('slater_last_project', k), KEY);
+  await ppage.goto(BASE + '/', { waitUntil: 'networkidle2' });
+  await ppage.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
+  const panelText = () => ppage.$eval('#portal-admin', el => el.textContent);
+  const fileCard = (name) => ppage.evaluateHandle(n => [...document.querySelectorAll('#portal-admin .pa-file')].find(c => c.querySelector('.pa-file-name').textContent === n), name);
+
+  await step('Project tab lists every file: name, sender, New, 14-day countdown, item', async () => {
+    const n = (await ready()).length;
+    await ppage.waitForFunction(c => document.getElementById('portal-admin').textContent.includes('Files from your client (' + c + ')'), { timeout: 8000 }, n);
+    assert((await ppage.$$('#portal-admin .pa-file')).length === n, 'card count');
+    const t = await panelText();
+    assert(/b-roll selects\.mov/.test(t) && /40 MB/.test(t) && /Pat Client/.test(t), t.slice(0, 300));
+    assert(/Deletes in 14 days/.test(t), 'countdown: ' + (t.match(/Deletes[^·]*/) || [''])[0]);
+    assert((await ppage.$$('#portal-admin .pa-file-tag.new')).length === n, 'not all New');
+    assert(t.includes('For “Return talent releases”'), 'item line missing');
+    await ppage.$eval('#portal-admin', el => el.scrollIntoView());
+    await ppage.screenshot({ path: SHOTS + '/up-producer-panel.png' });
+  });
+
+  await step('Client-typed filenames show as text in the producer app', async () => {
+    assert((await panelText()).includes('<img src=x onerror="window.__xss=1">.png'), 'not shown as text');
+    assert(!(await ppage.$('#portal-admin .pa-file img')), 'img element injected');
+    assert(!(await ppage.evaluate(() => window.__xss)), 'filename ran as code');
+  });
+
+  await step('Download saves the file under its own name, bytes intact; marks it Downloaded', async () => {
+    const card = await fileCard('b-roll selects.mov');
+    const link = await card.$('a[data-pa-file="download"]');
+    await link.click();
+    await until(() => fs.readdirSync(DL).some(f => f === 'b-roll selects.mov'), 15000, 'download to finish');
+    assert(md5(fs.readFileSync(path.join(DL, 'b-roll selects.mov'))) === md5(fs.readFileSync(big)), 'downloaded bytes differ');
+    const get = fake.log.filter(l => l.method === 'GET').pop();
+    assert(/response-content-disposition=attachment/.test(get.query) && /X-Amz-Expires=300/.test(get.query), get.query.slice(0, 200));
+    await ppage.waitForFunction(() => [...document.querySelectorAll('#portal-admin .pa-file')].some(c =>
+      c.querySelector('.pa-file-name').textContent === 'b-roll selects.mov' && c.querySelector('.pa-file-tag.done')), { timeout: 5000 });
+    const row = (await rows()).find(x => x.filename === 'b-roll selects.mov');
+    assert(row.downloaded_at, 'downloaded_at not set');
+    assert(ppage.url().startsWith(BASE), 'page navigated away: ' + ppage.url());
+  });
+
+  await step('Other producers and logged-out visitors get nothing', async () => {
+    const id = (await ready())[0].id;
+    const other = await loginCookie(OTHER);
+    const a = await fetch(BASE + '/api/portal-admin/' + KEY + '/files/' + id + '/download', { headers: { cookie: other }, redirect: 'manual' });
+    const b = await fetch(BASE + '/api/portal-admin/' + KEY + '/files/' + id, { method: 'DELETE', headers: { cookie: other } });
+    const c = await fetch(BASE + '/api/portal-admin/' + KEY + '/files/' + id + '/download', { redirect: 'manual' });
+    assert(a.status === 404 && b.status === 404 && c.status === 401, [a.status, b.status, c.status].join());
+    assert((await ready()).some(x => x.id === id), 'file was deleted');
+  });
+
+  await step("The workback item's edit panel shows the files sent for it", async () => {
+    await ppage.evaluate(() => st('workback'));
+    await ppage.evaluate(() => wbSetView('list'));
+    await sleep(200);
+    await ppage.evaluate(() => wbSelectItem(wbItems.find(w => _wbData[w].uuid === 'u-release')));
+    await ppage.waitForSelector('#wb-edit-panel .pa-file', { timeout: 3000 });
+    const names = await ppage.$$eval('#wb-edit-panel .pa-file-name', ns => ns.map(n => n.textContent));
+    assert(names.length === 1 && names[0] === 'Script notes v2.txt', JSON.stringify(names));
+    await ppage.evaluate(() => st('project'));
+  });
+
+  await step('Delete asks first, then removes the file everywhere', async () => {
+    const victim = (await ready()).find(x => x.filename === 'again.txt');
+    assert(victim && fake.objects.has(victim.r2_key), 'setup');
+    await ppage.evaluate(() => [...document.querySelectorAll('#portal-admin .pa-file')]
+      .find(c => c.querySelector('.pa-file-name').textContent === 'again.txt')
+      .querySelector('[data-pa-file="delete"]').click());
+    await ppage.waitForSelector('#modal-overlay.open', { timeout: 3000 });
+    assert(/again\.txt/.test(await ppage.$eval('#modal-msg', n => n.textContent)), 'modal text');
+    await ppage.click('#modal-ok');
+    await ppage.waitForFunction(() => ![...document.querySelectorAll('#portal-admin .pa-file-name')].some(n => n.textContent === 'again.txt'), { timeout: 5000 });
+    assert(!(await rows()).some(x => x.id === victim.id), 'row kept');
+    assert(!fake.objects.has(victim.r2_key), 'object kept');
+  });
+
+  await step('Expired files leave the list and can no longer be downloaded', async () => {
+    const f = (await ready()).find(x => x.filename === '.._.._etc_passwd.txt');
+    await db.query(`UPDATE portal_files SET expires_at = NOW() - INTERVAL '1 minute' WHERE id = $1`, [f.id]);
+    await ppage.evaluate(() => PortalAdmin.onProjectLoaded());
+    await ppage.waitForFunction(() => !document.getElementById('portal-admin').textContent.includes('etc_passwd'), { timeout: 5000 });
+    const status = await ppage.evaluate(async u => (await fetch(u, { redirect: 'manual' })).status,
+      '/api/portal-admin/' + KEY + '/files/' + f.id + '/download');
+    assert(status === 404, 'status ' + status);
+  });
+
+  await step('An item hidden from the client is no longer named on the portal', async () => {
+    const data = (await db.query('SELECT data FROM projects WHERE id=$1', [projectId])).rows[0].data;
+    data.wb_items[0].internal = true;
+    await db.query('UPDATE projects SET data=$1 WHERE id=$2', [data, projectId]);
+    const p = await payload();
+    assert(!JSON.stringify(p).includes('Return talent releases'), 'hidden item name still in the payload');
+    assert(p.sent.some(f => f.name === 'Script notes v2.txt' && f.item === ''), 'file should stay, untagged');
+  });
   if (/Error/.test(serverLog)) console.log('\nServer log (errors):\n' + serverLog.split('\n').filter(l => /Error/i.test(l)).join('\n'));
   if (serverLog.includes(TOKEN)) { fails.push('token in server log'); console.log('  FAIL portal token appeared in the server log'); }
 }

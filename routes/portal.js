@@ -234,6 +234,11 @@ function buildPayload(row, extra) {
     .map(u => Object.assign(u, { name: u.name || new URL(u.url).hostname }));
   const links = sharedLinks.map(u => ({ name: u.name, url: u.url, notes: u.notes }));
 
+  // Files the client sent (step 6b). The item a file was sent for is named
+  // only if the client can still see that item; its uuid is never sent here.
+  const itemName = new Map(items.filter(i => i.uuid).map(i => [i.uuid, i.item]));
+  const sentFiles = extra.sent || [];
+
   const waiting = items
     .filter(i => i.client && !i.done)
     .sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : 0)
@@ -243,6 +248,7 @@ function buildPayload(row, extra) {
         uuid: i.uuid, item: i.item, due: i.due,
         links: i.uuid ? sharedLinks.filter(u => u.wb === i.uuid).map(u => ({ name: u.name, url: u.url })) : [],
         response: r && !r.acknowledged_at ? { kind: r.kind, at: r.created_at } : null,
+        files: i.uuid ? sentFiles.filter(f => f.wb_item_uuid === i.uuid).length : 0,
       };
     });
 
@@ -284,8 +290,9 @@ function buildPayload(row, extra) {
     uploads: transfers.isConfigured()
       ? { enabled: true, max_bytes: transfers.MAX_FILE_BYTES, keep_days: transfers.RETENTION_DAYS }
       : { enabled: false },
-    sent: (extra.sent || []).map(f => ({
+    sent: sentFiles.map(f => ({
       name: str(f.filename, 255), size: Number(f.size_bytes) || 0, by: str(f.uploaded_by_name, 200), at: f.ready_at,
+      item: (f.wb_item_uuid && itemName.get(f.wb_item_uuid)) || '',
     })),
   };
 }
@@ -394,7 +401,7 @@ router.post('/:token/respond', respondLimiter, async (req, res) => {
   }
 });
 
-registerUploads(router, { pool, findPortal, isUnlocked });
+registerUploads(router, { pool, findPortal, isUnlocked, buildPayload });
 
 module.exports = router;
 module.exports.buildPayload = buildPayload;
