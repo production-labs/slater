@@ -387,11 +387,56 @@
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────
-  // Every redraw also refreshes the Portal menu count.
+  // Every redraw also refreshes the Portal menu count and the URLs-tab card.
   function render() {
     renderPanel();
     updateNavBadge();
+    renderUrlCard();
   }
+
+  // ── URLs tab: read-only "Client portal" card ─────────────────────────────
+  // Same look as a URL card (app.js addUrl), but not one of data.urls: it's
+  // drawn from the portal status, can't be edited or removed here, and is
+  // gone while the portal is off. The Portal tab is where it's managed.
+  var urlCardOpen = true;
+  function renderUrlCard() {
+    var box = document.getElementById('url-portal-card');
+    if (!box) return;
+    if (!key() || !state || forKey !== key() || state.error || !state.enabled || !state.token) { box.innerHTML = ''; return; }
+    box.innerHTML =
+      '<div class="url-card url-card-portal">' +
+        '<div class="url-top-row">' +
+          '<button class="url-toggle' + (urlCardOpen ? ' open' : '') + '" data-pu="toggle" title="Expand/collapse">' + (typeof icon === 'function' ? icon('chevron-right') : '&rsaquo;') + '</button>' +
+          '<button class="url-open" data-pu="open" title="Open in new window">&#x1F517; Client portal</button>' +
+          '<span class="url-portal-tag">Portal</span>' +
+        '</div>' +
+        '<div class="url-fields' + (urlCardOpen ? '' : ' collapsed') + '">' +
+          '<input type="text" readonly value="' + esc(link()) + '" aria-label="Client portal link" data-pu="field">' +
+          '<div class="url-portal-note">' + (state.has_password ? 'Password protected. Send the password separately.' : 'No password: the link alone opens it.') + '</div>' +
+          '<div class="url-portal-btns">' +
+            '<button class="lb" data-pu="copy">Copy link</button>' +
+            '<button class="lb" data-pu="settings">Portal settings</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pu]');
+    if (!b) return;
+    var a = b.getAttribute('data-pu');
+    if (a === 'toggle') { urlCardOpen = !urlCardOpen; renderUrlCard(); }
+    else if (a === 'open') window.open(link(), '_blank', 'noopener,noreferrer');
+    else if (a === 'settings') st('portal');
+    else if (a === 'field') b.select();
+    else if (a === 'copy') {
+      var url = link();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () { toast('Portal link copied.', 'ok'); }, function () {
+          var f = document.querySelector('#url-portal-card [data-pu="field"]'); if (f) { f.focus(); f.select(); } toast('Press Cmd+C to copy the link.', 'ok');
+        });
+      }
+    }
+  });
   function renderPanel() {
     if (!root) return;
     var k = key();

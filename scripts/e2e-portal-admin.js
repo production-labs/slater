@@ -114,6 +114,7 @@ async function main() {
   await step('Portal tab shows the portal as off with a turn-on button', async () => {
     await waitText(/Turn on client portal/);
     assert(!(await portalRow()), 'portal row exists already');
+    assert(await page.$eval('#url-portal-card', e => e.innerHTML === ''), 'URLs-tab portal card shown while the portal is off');
   });
 
   let token1;
@@ -130,6 +131,27 @@ async function main() {
     await sleep(300);
     await page.$eval('#portal-admin', el => el.scrollIntoView());
     await page.screenshot({ path: SHOTS + '/pa-on.png' });
+  });
+
+  await step('URLs tab shows the portal link as a read-only card (not one of the saved URLs)', async () => {
+    await page.evaluate(() => st('urls'));
+    await page.waitForSelector('#url-portal-card .url-card-portal', { timeout: 3000 });
+    const c = await page.$eval('#url-portal-card', e => ({
+      open: e.querySelector('[data-pu="open"]').textContent,
+      link: e.querySelector('[data-pu="field"]').value,
+      ro: e.querySelector('[data-pu="field"]').readOnly,
+      remove: !!e.querySelector('.rb'),
+      note: e.querySelector('.url-portal-note').textContent,
+    }));
+    assert(/Client portal/.test(c.open) && c.link === BASE + '/portal/' + token1 && c.ro && !c.remove, JSON.stringify(c));
+    assert(/No password/.test(c.note), 'note ' + c.note);
+    assert(!(await page.$('#url-list .url-card-portal')), 'portal card mixed in with saved URLs');
+    await page.$eval('#url-portal-card', e => e.scrollIntoView());
+    await page.screenshot({ path: SHOTS + '/pa-url-card.png' });
+    await page.click('#url-portal-card [data-pu="settings"]');
+    assert(await page.$eval('#tab-portal', e => e.classList.contains('active')), '"Portal settings" did not open the Portal tab');
+    const urls = (await serverData()).urls || [];
+    assert(!urls.some(u => /\/portal\//.test(u.url || '')), 'portal link saved into the project URLs');
   });
 
   await step('Posting an update shows it here and on the client portal', async () => {
@@ -171,6 +193,8 @@ async function main() {
     const row = await portalRow();
     assert(row.password_hash && await bcrypt.compare('letmein99', row.password_hash), 'hash wrong');
     assert((await portalStatus(token1)) === 401, 'portal not locked');
+    const note = await page.$eval('#url-portal-card .url-portal-note', e => e.textContent);
+    assert(/Password protected/.test(note) && !/letmein99/.test(await page.$eval('#url-portal-card', e => e.textContent)), 'URLs card password note: ' + note);
   });
 
   await step('The status API never sends the password hash', async () => {
@@ -263,6 +287,7 @@ async function main() {
     await confirmModal();
     await waitText(/Turn on client portal/);
     assert(!(await portalRow()), 'row still there');
+    assert(await page.$eval('#url-portal-card', e => e.innerHTML === ''), 'URLs-tab card still shown after turning the portal off');
     assert((await portalStatus(token2)) === 404, 'link still works');
     assert(/earlier update is kept/.test(await panel()), 'kept-updates note missing');
     await click('enable');

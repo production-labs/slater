@@ -745,6 +745,12 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .portal-admin .pa-danger-zone{display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border)}
 .portal-admin .lb[disabled]{opacity:.5;cursor:default}
 .url-portal{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer}
+/* Read-only "Client portal" card at the top of the URLs tab (portal-admin.js) */
+.url-card-portal .url-top-row .url-open{flex:0 1 auto}
+.url-portal-tag{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);border:1px solid var(--border);border-radius:9px;padding:1px 7px}
+.url-card-portal input[readonly]{color:var(--text-muted);cursor:text}
+.url-portal-note{font-size:12px;color:var(--text-muted)}
+.url-portal-btns{display:flex;gap:6px;flex-wrap:wrap}
 .url-wb-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);flex-wrap:wrap}
 .url-wb-row .select-wrap{flex:1;min-width:180px;max-width:100%}
 .url-wb-row select{padding:6px 28px 6px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit;background-color:var(--surface);color:var(--text-primary)}
