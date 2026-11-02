@@ -199,8 +199,12 @@ function buildPayload(row, extra) {
     if (!day || !isoDate(day.date_iso)) return;
     const id = day.id || 'day_' + i;
     if (pinHidden(id)) return;
-    const loc = locById.get(Number(day.location_id));
-    const locName = loc ? str(loc.name, 200) : str(day.loc_name, 200);
+    // "Client attends in person" unticked (client_remote): the client isn't
+    // expected there (e.g. a studio broadcast they watch remotely), so no
+    // location, address or venue for this day. Crew-side data is untouched.
+    const remote = day.client_remote === true;
+    const loc = remote ? null : locById.get(Number(day.location_id));
+    const locName = remote ? '' : loc ? str(loc.name, 200) : str(day.loc_name, 200);
     const end = isoDate(day.end_date_iso);
     pins.push({
       id: 'day:' + pins.length,  // not the internal day id
@@ -210,9 +214,11 @@ function buildPayload(row, extra) {
       time: str(day.golive, 40),   // go-live time only; crew call times stay internal
       location: locName,
     });
-    if (loc && !seenVenue.has(loc.id)) {
+    const cityLine = loc ? [str(loc.city, 100), [str(loc.state, 50), str(loc.zip, 20)].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '';
+    // Only real places become a venue (with a Maps link): a saved location
+    // with no address, like "Teams Meeting", shows by name on the schedule only.
+    if (loc && (str(loc.address, 300) || cityLine) && !seenVenue.has(loc.id)) {
       seenVenue.add(loc.id);
-      const cityLine = [str(loc.city, 100), [str(loc.state, 50), str(loc.zip, 20)].filter(Boolean).join(' ')].filter(Boolean).join(', ');
       venues.push({ name: str(loc.name, 200), address: str(loc.address, 300), city_line: cityLine });
     }
   });

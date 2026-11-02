@@ -122,6 +122,26 @@ async function main() {
     assert(JSON.stringify(Object.keys(payload).sort()) === JSON.stringify(['client', 'key_date', 'links', 'producer', 'project', 'schedule', 'sent', 'team', 'timeline', 'updates', 'uploads', 'venues', 'waiting']), 'top-level keys ' + Object.keys(payload).sort());
   });
 
+  await step('client not attending in person: no location or venue; address-less locations are never venues', async () => {
+    const { buildPayload } = require(APP + '/routes/portal');
+    const studio = { id: 1, name: 'Studio A', address: '1 Studio Way', city: 'Seattle', state: 'WA', zip: '98101' };
+    const teams = { id: 2, name: 'Teams Meeting', address: '', city: '', state: '', zip: '' };
+    const p = buildPayload({ data: {
+      project_title: 'Mixed', schedule_days: [
+        { id: 'a', date_iso: rel(3), label: 'Rehearsal', location_id: 1 },                       // in person (no flag: old days)
+        { id: 'b', date_iso: rel(4), label: 'Broadcast', location_id: 1, client_remote: true },  // client watches remotely
+        { id: 'c', date_iso: rel(5), label: 'Review call', location_id: 2 },                    // no address
+        { id: 'd', date_iso: rel(6), label: 'Wrap call', loc_name: 'Zoom', client_remote: true },// typed-in name, remote
+      ] }, label: 'Mixed' }, { locations: [studio, teams] });
+    const loc = l => p.schedule.find(s => s.label === l).location;
+    assert(loc('Rehearsal') === 'Studio A', 'in-person day lost its location');
+    assert(loc('Broadcast') === '' && loc('Wrap call') === '', 'remote day shows a location: ' + loc('Broadcast') + ' / ' + loc('Wrap call'));
+    assert(loc('Review call') === 'Teams Meeting', 'address-less location name should still show on the schedule');
+    assert(JSON.stringify(p.venues.map(v => v.name)) === '["Studio A"]', 'venues ' + JSON.stringify(p.venues));
+    const onlyRemote = buildPayload({ data: { schedule_days: [{ id: 'b', date_iso: rel(4), label: 'Broadcast', location_id: 1, client_remote: true }] }, label: 'x' }, { locations: [studio] });
+    assert(onlyRemote.venues.length === 0 && !JSON.stringify(onlyRemote).includes('Studio Way'), 'studio address leaked when the client is remote');
+  });
+
   await step('payload has what the client should see', async () => {
     const p = payload;
     assert(p.project.title === 'Q4 Summit' && p.project.type === 'Live Broadcast', 'project ' + JSON.stringify(p.project));

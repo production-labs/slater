@@ -87,6 +87,24 @@ async function main() {
     assert(!(await page.$eval('#tab-project', e => e.classList.contains('active'))), 'Project tab still shown');
   });
 
+  await step('Schedule day: "Client attends in person" starts ticked and saves when unticked', async () => {
+    await page.evaluate(() => st('schedule'));
+    const cb = '#tab-schedule input[id$="_client_in_person"]';
+    await page.waitForSelector(cb, { timeout: 3000 });
+    assert(await page.$eval(cb, e => e.checked), 'should start ticked');
+    const saved = async want => {
+      for (let i = 0; i < 20; i++) { await sleep(250); if (((await serverData()).schedule_days[0] || {}).client_remote === want) return true; }
+      return false;
+    };
+    await page.click(cb);
+    await page.evaluate(() => autosaveNow());
+    assert(await saved(true), 'client_remote not saved: ' + JSON.stringify((await serverData()).schedule_days));
+    await page.click(cb);
+    await page.evaluate(() => autosaveNow());
+    assert(await saved(false), 'ticking again did not save');
+    await page.evaluate(() => st('portal'));
+  });
+
   const panel = () => page.$eval('#portal-admin', el => el.innerText);
   const click = async (a) => { await page.click('#portal-admin [data-pa="' + a + '"]'); };
   const confirmModal = async () => { await page.waitForSelector('#modal-overlay.open', { timeout: 3000 }); await page.click('#modal-ok'); };

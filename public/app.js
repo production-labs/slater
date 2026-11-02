@@ -1114,6 +1114,27 @@ function addScheduleDay(data, insertAfterDayId) {
   excludeWrap.appendChild(excludeCb); excludeWrap.appendChild(excludeLbl);
   excludeCb.onchange = function() { autosaveTrigger(); };
 
+  // Client portal: unticked = the client isn't expected at this day's location
+  // (e.g. a studio broadcast they watch remotely), so the portal shows no
+  // address or venue for it. Crew and call sheets are unaffected. Saved as
+  // client_remote, so days saved before this existed count as "in person".
+  var inPersonWrap = document.createElement("div");
+  inPersonWrap.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0";
+  var inPersonCb = document.createElement("input");
+  inPersonCb.type = "checkbox"; inPersonCb.id = dayId+"_client_in_person";
+  inPersonCb.checked = !data.client_remote;
+  inPersonCb.style.cssText = "width:14px;height:14px;accent-color:var(--accent);cursor:pointer";
+  var inPersonLbl = document.createElement("label");
+  inPersonLbl.htmlFor = dayId+"_client_in_person";
+  inPersonLbl.textContent = "Client attends in person";
+  inPersonLbl.title = "Untick if the client won't come to this location (for example, they watch a studio broadcast remotely). The client portal then won't show this day's address.";
+  inPersonLbl.style.cssText = "font-size:12px;color:var(--text-primary);font-weight:600;cursor:pointer;user-select:none";
+  inPersonWrap.appendChild(inPersonCb); inPersonWrap.appendChild(inPersonLbl);
+  inPersonCb.onchange = function() { autosaveTrigger(); };
+  var checksRight = document.createElement("div");
+  checksRight.style.cssText = "display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end";
+  checksRight.appendChild(inPersonWrap); checksRight.appendChild(excludeWrap);
+
   var checkRow = document.createElement("div");
   checkRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:6px 16px;background:var(--border);border-bottom:1px solid var(--border)";
 
@@ -1122,7 +1143,7 @@ function addScheduleDay(data, insertAfterDayId) {
   crewLeft.appendChild(editStaffLink); crewLeft.appendChild(staffCountEl);
 
   checkRow.appendChild(crewLeft);
-  checkRow.appendChild(excludeWrap);
+  checkRow.appendChild(checksRight);
   el.appendChild(checkRow);
 
   const body = document.createElement("div");
@@ -1949,6 +1970,7 @@ function getScheduleDays() {
       loc_notes:    v(dayId+"_loc_notes"),
       show_blacks:       (document.getElementById(dayId+"_show_blacks")||{}).checked||false,
       exclude_callsheet: (document.getElementById(dayId+"_exclude_callsheet")||{}).checked||false,
+      client_remote: (document.getElementById(dayId+"_client_in_person")||{checked:true}).checked === false,
       excluded_crew: getDayExcludedCrew(dayId),
       excluded_talent: getDayExcludedTalent(dayId),
       excluded_kp: getDayExcludedKP(dayId),
