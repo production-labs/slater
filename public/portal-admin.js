@@ -126,7 +126,9 @@
     var dis = busy ? ' disabled' : '';
     return '<div class="pa-file">' +
       '<div class="pa-file-head"><span class="pa-file-name">' + esc(f.filename) + '</span>' +
-        (f.downloaded_at ? '<span class="pa-file-tag done" title="First downloaded ' + esc(when(f.downloaded_at)) + '">Downloaded</span>' : '<span class="pa-file-tag new">New</span>') +
+        (f.downloaded_at
+          ? '<span class="pa-file-tag done" title="First downloaded ' + esc(when(f.downloaded_at)) + '">Downloaded' + (f.downloaded_by ? ' by ' + esc(f.downloaded_by) : '') + '</span>'
+          : '<span class="pa-file-tag new">New</span>') +
       '</div>' +
       '<div class="pa-file-meta">' + esc(fmtSize(f.size_bytes)) + ' &middot; ' + esc(f.uploaded_by_name || 'Client') + ' &middot; ' + esc(when(f.ready_at)) +
         ' &middot; <span class="pa-file-left' + (left.soon ? ' soon' : '') + '">' + left.text + '</span></div>' +
@@ -144,6 +146,43 @@
       '<p class="pa-note pa-small">Download what you need: each file is deleted 14 days after it arrives.</p>' +
       list.map(function (f) { return fileHtml(f, 'panel'); }).join('') + '</div>';
   }
+  // ── email recipients ─────────────────────────────────────────────────────
+  // Key Personnel cards with an email, read live from the form (gather() in
+  // app.js), so a new card or a changed address shows without a reload.
+  function kpWithEmail() {
+    var out = [], seen = {};
+    var own = String(state && state.owner_email || '').toLowerCase();
+    try {
+      (gather().kp_cards || []).forEach(function (k) {
+        var e = String(k.email || '').trim().toLowerCase();
+        if (!/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/.test(e) || seen[e] || e === own) return;
+        seen[e] = true;
+        out.push({ email: e, name: String(k.name || '').trim(), role: String(k.role || '').trim() });
+      });
+    } catch (e) {}
+    return out;
+  }
+  function emailsBlock() {
+    var dis = busy ? ' disabled' : '';
+    var picked = (state.recipients || []);
+    var kps = kpWithEmail();
+    var h = '<div class="pa-block pa-emails"><div class="pa-label">Emails</div>' +
+      '<p class="pa-note pa-small">When your client sends files, approves, or asks for changes, Slater emails a summary with download links. ' +
+      'Several at once come as one email, about 10 minutes after the last.</p>' +
+      '<label class="pa-rcpt"><input type="checkbox" checked disabled> You <span class="pa-rcpt-sub">' + esc(state.owner_email || '') + ' &middot; always</span></label>';
+    kps.forEach(function (k) {
+      h += '<label class="pa-rcpt"><input type="checkbox" data-pa-rcpt="' + esc(k.email) + '"' + (picked.indexOf(k.email) > -1 ? ' checked' : '') + dis + '> ' +
+        esc(k.name || k.email) + ' <span class="pa-rcpt-sub">' + esc([k.role, k.email].filter(Boolean).join(' · ')) + '</span></label>';
+    });
+    if (!kps.length) h += '<p class="pa-note pa-small">To include your producer or others, add them with an email under Key Personnel on this tab.</p>';
+    return h + '</div>';
+  }
+  function saveRecipients() {
+    var emails = [];
+    root.querySelectorAll('[data-pa-rcpt]').forEach(function (b) { if (b.checked) emails.push(b.getAttribute('data-pa-rcpt')); });
+    return act('PUT', '/recipients', { emails: emails }, 'Email list saved.');
+  }
+
   function deleteFile(id) {
     var f = openFiles().filter(function (x) { return String(x.id) === String(id); })[0];
     if (!f) return;
@@ -347,6 +386,7 @@
       '<button class="lb" data-pa="open"' + dis + '>Open</button></div>';
     h += responsesBlock();
     h += filesBlock();
+    h += emailsBlock();
 
     // Password
     h += '<div class="pa-block"><div class="pa-label">Password</div>';
@@ -475,6 +515,11 @@
     root = document.getElementById('portal-admin');
     if (!root) return;
     root.addEventListener('click', onClick);
+    root.addEventListener('change', function (e) { if (e.target.hasAttribute('data-pa-rcpt')) saveRecipients(); });
+    // Key Personnel edited: refresh the Emails list (names, addresses).
+    document.addEventListener('change', function (e) {
+      if (e.target && /^kp_\d+_/.test(e.target.id || '') && state && state.enabled && forKey === key()) render();
+    });
     root.addEventListener('input', function (e) { if (e.target.id === 'pa-update') draft = e.target.value; });
     root.addEventListener('keydown', function (e) {
       if (e.target.id === 'pa-pw' && e.key === 'Enter') { e.preventDefault(); var s = root.querySelector('[data-pa="pw-save"]'); if (s) s.click(); }

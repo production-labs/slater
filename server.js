@@ -48,7 +48,8 @@ pool.query('SELECT 1').then(async () => {
 app.use((req, res, next) => {
   // Client portal links are the password for portals without one: keep the
   // token out of the logs.
-  console.log(req.method, req.path.replace(/(\/portal\/)[^/]+/, '$1[token]'));
+  // Same for the download links in producer emails (/f/<token>).
+  console.log(req.method, req.path.replace(/(\/portal\/)[^/]+/, '$1[token]').replace(/^(\/f\/)[^/]+/, '$1[token]'));
   next();
 });
 
@@ -70,6 +71,12 @@ app.use('/api/v2', requireAuth, require('./routes/v2'));
 app.use('/api/portal', require('./routes/portal'));
 // Client portal, PRODUCER controls (on/off, link, password, updates).
 app.use('/api/portal-admin', requireAuth, require('./routes/portalAdmin'));
+// Client files: download links in producer emails (no login; signed per file
+// and recipient) + the every-minute job that emails producers and deletes
+// files after 14 days. See routes/portalNotify.js.
+const portalNotify = require('./routes/portalNotify');
+app.use('/f', portalNotify.linkRouter);
+portalNotify.start();
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', version: '0.1.0' });

@@ -19,6 +19,11 @@
 //   GET    /:key/files/:id/download  302 to a 5-minute R2 link (saves as a file);
 //                                    marks the file downloaded
 //   DELETE /:key/files/:id      deletes a client's file now (R2 object + row)
+//   PUT    /:key/recipients     { emails: [...] } Key Personnel who also get the
+//                               emails (files, approvals, change requests). The
+//                               account owner always does. Only addresses on a
+//                               KP card of the project are mailed (checked at
+//                               send time, routes/portalNotify.js).
 //
 // Client files (step 6b) are in the status as `files`: ready, not expired,
 // newest first. filename / uploaded_by_name are client-typed: plain text only.
@@ -35,6 +40,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { Pool } = require('pg');
 const transfers = require('./transfers');
+const { MAX_RECIPIENTS, EMAIL_RE } = require('./portalNotify');
 
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -49,15 +55,17 @@ async function findProject(req) {
 }
 
 async function status(projectId, ownerId) {
-  const [p, u, r, f] = await Promise.all([
+  const [p, u, r, f, rc, me] = await Promise.all([
     pool.query('SELECT token, password_hash IS NOT NULL AS has_password, created_at FROM portals WHERE project_id = $1 AND owner_id = $2', [projectId, ownerId]),
     pool.query('SELECT id, author_name, body, created_at FROM portal_updates WHERE project_id = $1 AND owner_id = $2 ORDER BY created_at DESC, id DESC', [projectId, ownerId]),
     pool.query(`SELECT id, wb_item_uuid, kind, responder_name, note, created_at FROM portal_responses
                  WHERE project_id = $1 AND owner_id = $2 AND acknowledged_at IS NULL ORDER BY created_at DESC, id DESC`, [projectId, ownerId]),
-    pool.query(`SELECT id, filename, size_bytes, uploaded_by_name, wb_item_uuid, ready_at, expires_at, downloaded_at
+    pool.query(`SELECT id, filename, size_bytes, uploaded_by_name, wb_item_uuid, ready_at, expires_at, downloaded_at, downloaded_by
                   FROM portal_files
                  WHERE project_id = $1 AND owner_id = $2 AND status = 'ready' AND expires_at > NOW()
                  ORDER BY ready_at DESC, id DESC`, [projectId, ownerId]),
+    pool.query('SELECT email FROM portal_recipients WHERE project_id = $1 AND owner_id = $2 ORDER BY email', [projectId, ownerId]),
+    pool.query('SELECT email FROM users WHERE id = $1', [ownerId]),
   ]);
   const row = p.rows[0];
   return {
@@ -69,6 +77,8 @@ async function status(projectId, ownerId) {
     responses: r.rows,
     files: f.rows.map(x => Object.assign(x, { size_bytes: Number(x.size_bytes) })),
     uploads_enabled: transfers.isConfigured(),
+    owner_email: me.rows[0] ? me.rows[0].email : '',
+    recipients: rc.rows.map(x => x.email),
   };
 }
 
@@ -194,7 +204,11 @@ router.get('/:key/files/:id/download', async (req, res) => {
     if (!file) return res.status(404).json({ error: 'not_found' });
     if (!transfers.isConfigured()) return res.status(503).json({ error: 'uploads_unavailable' });
     const url = await transfers.signDownload(file.r2_key, file.filename);
-    await pool.query('UPDATE portal_files SET downloaded_at = COALESCE(downloaded_at, NOW()) WHERE id = $1', [file.id]);
+    const me = (await pool.query('SELECT name FROM users WHERE id = $1', [req.session.userId])).rows[0] || {};
+    await pool.query(
+      `UPDATE portal_files SET downloaded_at = COALESCE(downloaded_at, NOW()),
+              downloaded_by = COALESCE(downloaded_by, $2) WHERE id = $1`,
+      [file.id, String(me.name || 'Producer').slice(0, 200)]);
     res.set('Cache-Control', 'no-store');
     res.redirect(302, url);
   } catch (err) {
@@ -202,6 +216,29 @@ router.get('/:key/files/:id/download', async (req, res) => {
     if (!res.headersSent) res.status(502).json({ error: 'download_failed' });
   }
 });
+
+// Replace the project's extra email recipients. The list is whatever boxes
+// are ticked now; addresses are checked against KP cards when sending.
+router.put('/:key/recipients', withProject(async (req, res, project) => {
+  const raw = req.body && Array.isArray(req.body.emails) ? req.body.emails : null;
+  if (!raw || raw.length > MAX_RECIPIENTS) { res.status(400).json({ error: 'bad_recipients', max: MAX_RECIPIENTS }); return false; }
+  const emails = [...new Set(raw.map(e => (typeof e === 'string' ? e.trim().toLowerCase() : '')))];
+  if (!emails.every(e => e.length <= 254 && EMAIL_RE.test(e))) { res.status(400).json({ error: 'bad_recipients' }); return false; }
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    await c.query('DELETE FROM portal_recipients WHERE project_id = $1 AND owner_id = $2', [project.id, req.session.userId]);
+    for (const e of emails) {
+      await c.query('INSERT INTO portal_recipients (project_id, owner_id, email) VALUES ($1, $2, $3)', [project.id, req.session.userId, e]);
+    }
+    await c.query('COMMIT');
+  } catch (err) {
+    await c.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    c.release();
+  }
+}));
 
 // Delete now instead of waiting for day 14. If R2 can't be reached, the row
 // still goes and the bucket's 14-day lifecycle rule removes the object.

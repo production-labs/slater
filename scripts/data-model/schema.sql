@@ -501,7 +501,8 @@ CREATE TABLE IF NOT EXISTS portal_responses (
   responder_name   TEXT,                -- as typed by the client
   note             TEXT CHECK (note IS NULL OR length(note) <= 5000),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  acknowledged_at  TIMESTAMPTZ
+  acknowledged_at  TIMESTAMPTZ,
+  notified_at      TIMESTAMPTZ          -- included in a producer email (step 6b)
 );
 
 CREATE INDEX IF NOT EXISTS portal_responses_project_idx
@@ -548,7 +549,9 @@ CREATE TABLE IF NOT EXISTS portal_files (
   ready_at          TIMESTAMPTZ,
   expires_at        TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '14 days'),
   downloaded_at     TIMESTAMPTZ,
+  downloaded_by     TEXT,                -- who first downloaded: producer or a Key Personnel name
   upload_id         TEXT,                -- R2 multipart upload id while 'pending', NULL once ready
+  notified_at       TIMESTAMPTZ,         -- included in a producer email
   CONSTRAINT portal_files_size_cap CHECK (size_bytes IS NULL OR size_bytes <= 5368709120)
 );
 
@@ -556,4 +559,21 @@ CREATE INDEX IF NOT EXISTS portal_files_project_idx
   ON portal_files (project_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS portal_files_expires_idx
   ON portal_files (expires_at);
+
+
+-- ------------------------------------------------------------
+-- PORTAL_RECIPIENTS: Key Personnel who also get the producer
+-- emails (files arrived, approvals, change requests). The account
+-- owner always gets them and isn't listed here. Stored by email
+-- because Key Personnel cards have no lasting id; an address only
+-- gets mail while it is still on one of the project's KP cards.
+-- Existing databases: added by scripts/migrate-portal-files-transfer.js.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS portal_recipients (
+  project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  owner_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email       TEXT NOT NULL CHECK (email = lower(email) AND length(email) BETWEEN 3 AND 254),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (project_id, email)
+);
 

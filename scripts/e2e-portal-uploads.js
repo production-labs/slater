@@ -50,76 +50,10 @@ async function until(fn, ms, what) {
 }
 const md5 = b => crypto.createHash('md5').update(b).digest('hex');
 
-// ── Fake S3 (just what the app + browser use) ───────────────────────────────
-const fake = { mpus: new Map(), objects: new Map(), log: [], exposeEtag: true, putDelayMs: 0 };
-function xml(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/xml' }); res.end('<?xml version="1.0" encoding="UTF-8"?>' + body); }
-function startFakeS3() {
-  s3server = http.createServer((req, res) => {
-    const u = new URL(req.url, S3);
-    const origin = req.headers.origin;
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      if (fake.exposeEtag) res.setHeader('Access-Control-Expose-Headers', 'ETag');
-    }
-    if (req.method === 'OPTIONS') {
-      res.setHeader('Access-Control-Allow-Methods', 'PUT');
-      if (req.headers['access-control-request-headers']) res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers']);
-      res.writeHead(204); return res.end();
-    }
-    const chunks = [];
-    req.on('data', c => chunks.push(c));
-    req.on('end', async () => {
-      const body = Buffer.concat(chunks);
-      const prefix = '/' + BUCKET + '/';
-      const key = u.pathname.startsWith(prefix) ? decodeURIComponent(u.pathname.slice(prefix.length)) : null;
-      fake.log.push({ method: req.method, path: u.pathname, query: u.search, origin: origin || '', bytes: body.length });
-      if (!key) return xml(res, 400, '<Error><Code>InvalidBucketName</Code></Error>');
-      const q = u.searchParams;
-      if (req.method === 'POST' && q.has('uploads')) {
-        const id = 'mpu-' + crypto.randomBytes(8).toString('hex');
-        fake.mpus.set(id, { key, parts: new Map(), contentType: req.headers['content-type'] });
-        return xml(res, 200, `<InitiateMultipartUploadResult><Bucket>${BUCKET}</Bucket><Key>${key}</Key><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`);
-      }
-      if (req.method === 'PUT' && q.has('partNumber')) {
-        const mpu = fake.mpus.get(q.get('uploadId'));
-        if (!mpu || mpu.key !== key) return xml(res, 404, '<Error><Code>NoSuchUpload</Code></Error>');
-        if (fake.putDelayMs) await sleep(fake.putDelayMs);
-        const etag = '"' + md5(body) + '"';
-        mpu.parts.set(Number(q.get('partNumber')), { body, etag });
-        res.writeHead(200, { ETag: etag }); return res.end();
-      }
-      if (req.method === 'POST' && q.has('uploadId')) {
-        const mpu = fake.mpus.get(q.get('uploadId'));
-        if (!mpu || mpu.key !== key) return xml(res, 404, '<Error><Code>NoSuchUpload</Code></Error>');
-        const text = body.toString();
-        const listed = [...text.matchAll(/<PartNumber>(\d+)<\/PartNumber>\s*<ETag>([^<]*)<\/ETag>|<ETag>([^<]*)<\/ETag>\s*<PartNumber>(\d+)<\/PartNumber>/g)]
-          .map(m => ({ n: Number(m[1] || m[4]), etag: (m[2] || m[3]).replace(/&quot;/g, '"') }));
-        for (const p of listed) {
-          const have = mpu.parts.get(p.n);
-          if (!have || have.etag !== p.etag) return xml(res, 400, '<Error><Code>InvalidPart</Code></Error>');
-        }
-        fake.objects.set(key, Buffer.concat(listed.sort((a, b) => a.n - b.n).map(p => mpu.parts.get(p.n).body)));
-        fake.mpus.delete(q.get('uploadId'));
-        return xml(res, 200, `<CompleteMultipartUploadResult><Bucket>${BUCKET}</Bucket><Key>${key}</Key><ETag>"done"</ETag></CompleteMultipartUploadResult>`);
-      }
-      if (req.method === 'DELETE' && q.has('uploadId')) { fake.mpus.delete(q.get('uploadId')); res.writeHead(204); return res.end(); }
-      if (req.method === 'DELETE') { fake.objects.delete(key); res.writeHead(204); return res.end(); }
-      if (req.method === 'HEAD') {
-        const o = fake.objects.get(key);
-        res.writeHead(o ? 200 : 404, o ? { 'Content-Length': o.length } : {}); return res.end();
-      }
-      if (req.method === 'GET') {
-        const o = fake.objects.get(key);
-        if (!o) return xml(res, 404, '<Error><Code>NoSuchKey</Code></Error>');
-        const headers = { 'Content-Length': o.length, 'Content-Type': 'application/octet-stream' };
-        if (q.get('response-content-disposition')) headers['Content-Disposition'] = q.get('response-content-disposition');
-        res.writeHead(200, headers); return res.end(o);
-      }
-      xml(res, 405, '<Error><Code>MethodNotAllowed</Code></Error>');
-    });
-  });
-  return new Promise(r => s3server.listen(S3_PORT, r));
-}
+// ── Fake S3 (scripts/e2e-fake-s3.js) ─────────────────────────────────────────
+const fakeS3 = require("./e2e-fake-s3").create(S3_PORT, BUCKET);
+const fake = fakeS3.state;
+function startFakeS3() { s3server = fakeS3.server; return fakeS3.listen(); }
 
 async function main() {
   await startFakeS3();
@@ -171,7 +105,7 @@ async function main() {
   fs.writeFileSync(big, crypto.randomBytes(40 * 1024 * 1024)); // 3 parts of 16 MiB
 
   const env = Object.assign({}, process.env, {
-    PORT: String(PORT),
+    PORT: String(PORT), PORTAL_JOBS: "off",
     R2_TRANSFER_ENDPOINT: S3, R2_TRANSFER_BUCKET: BUCKET,
     R2_TRANSFER_ACCESS_KEY_ID: 'e2e-key', R2_TRANSFER_SECRET_ACCESS_KEY: 'e2e-secret',
   });
@@ -436,6 +370,9 @@ async function main() {
   // ── Producer side ─────────────────────────────────────────────────────────
   const loginCookie = async (email) => {
     const r = await fetch(BASE + '/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: PASS }) });
+    // Read the whole reply: express-session finishes saving the session just
+    // before the last byte, so using the cookie on headers alone can race.
+    await r.text();
     return (r.headers.get('set-cookie') || '').split(';')[0];
   };
   const ready = async () => (await rows()).filter(x => x.status === 'ready');

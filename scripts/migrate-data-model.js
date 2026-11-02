@@ -43,7 +43,7 @@ const EXPECTED_NEW_COLUMNS = {
 
 const NEW_TABLES = ['roles', 'organizations', 'contacts', 'contact_roles', 'locations', 'deleted_records',
   // Client portal (V1.5, 2026-10-28)
-  'portals', 'portal_updates', 'portal_responses', 'portal_files'];
+  'portals', 'portal_updates', 'portal_responses', 'portal_files', 'portal_recipients'];
 const NEW_TRIGGERS = ['roles_touch', 'organizations_touch', 'contacts_touch', 'contact_roles_touch', 'locations_touch',
   'portals_touch', 'portal_updates_touch'];
 
