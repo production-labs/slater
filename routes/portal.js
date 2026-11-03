@@ -33,6 +33,7 @@ const { Pool } = require('pg');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const transfers = require('./transfers');
 const registerUploads = require('./portalUploads');
+const { clientItemStates } = require('../public/client-readiness');
 
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -91,7 +92,7 @@ async function findPortal(token) {
   const r = await pool.query(
     `SELECT po.project_id, po.owner_id, po.token, po.password_hash,
             p.label, p.data, p.updated_at, p.client_org_id, p.agency_org_id,
-            u.name AS user_name, u.dba AS user_dba, u.is_suspended
+            u.name AS user_name, u.dba AS user_dba, u.timezone AS user_timezone, u.is_suspended
        FROM portals po
        JOIN projects p ON p.id = po.project_id AND p.owner_id = po.owner_id
        JOIN users u ON u.id = po.owner_id
@@ -166,6 +167,18 @@ function isClientOwner(owner, client) {
 }
 function isDone(status) { return status === 'Complete'; }
 
+// Today in the producer's timezone (users.timezone: PT, ET, ...): "has this
+// shoot day arrived yet" is answered on the producer's calendar.
+const TZ_IANA = {
+  PT: 'America/Los_Angeles', ET: 'America/New_York', CT: 'America/Chicago',
+  MT: 'America/Denver', AKT: 'America/Anchorage', HT: 'Pacific/Honolulu',
+  GMT: 'Europe/London', CET: 'Europe/Paris',
+};
+function todayIn(tz) {
+  // en-CA formats as YYYY-MM-DD.
+  return new Date().toLocaleDateString('en-CA', { timeZone: TZ_IANA[tz] || TZ_IANA.PT });
+}
+
 // row: findPortal() row. extra: { clientOrg, agencyOrg, locations, updates, responses, sent }
 function buildPayload(row, extra) {
   const data = (row.data && typeof row.data === 'object') ? row.data : {};
@@ -176,14 +189,21 @@ function buildPayload(row, extra) {
   const pinHidden = (id) => !!internalPins['pin_' + id];
 
   // Workback items the client may see: not internal, not N/A, dated.
-  const items = (Array.isArray(data.wb_items) ? data.wb_items : [])
-    .filter(i => i && str(i.item) && !i.internal && i.status !== 'N/A')
-    .map(i => ({
+  // ready: a client item whose step before it is done (public/client-readiness.js).
+  // Only ready items are "Waiting on you"; the rest show as coming up.
+  const today = isoDate(extra.today) || todayIn(row.user_timezone);
+  const wbAll = Array.isArray(data.wb_items) ? data.wb_items : [];
+  const states = clientItemStates(data, clientName, today);
+  const items = wbAll
+    .map((i, n) => ({ i, st: states[n] }))
+    .filter(({ i }) => i && str(i.item) && !i.internal && i.status !== 'N/A')
+    .map(({ i, st }) => ({
       uuid: str(i.uuid, 100),
       item: str(i.item, 300),
       due: isoDate(i.due) || (i.mode === 'manual' ? isoDate(i.manual_date) : ''),
       client: isClientOwner(i.owner, clientName),
       done: isDone(i.status),
+      ready: !!(st && st.ready),
     }))
     .filter(i => i.due);
 
@@ -246,7 +266,7 @@ function buildPayload(row, extra) {
   const sentFiles = extra.sent || [];
 
   const waiting = items
-    .filter(i => i.client && !i.done)
+    .filter(i => i.client && !i.done && i.ready)
     .sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : 0)
     .map(i => {
       const r = respByUuid.get(i.uuid);
@@ -259,7 +279,7 @@ function buildPayload(row, extra) {
     });
 
   const timeline = pins.map(p => ({ date: p.date, label: p.label, kind: 'milestone' }))
-    .concat(items.map(i => ({ date: i.due, label: i.item, kind: i.client ? 'client' : 'ours', done: i.done })))
+    .concat(items.map(i => ({ date: i.due, label: i.item, kind: i.client ? 'client' : 'ours', done: i.done, ready: i.client && i.ready })))
     .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 
   const team = (Array.isArray(data.kp_cards) ? data.kp_cards : [])
@@ -285,7 +305,7 @@ function buildPayload(row, extra) {
     timeline,
     schedule: pins.map(p => ({ date: p.date, end_date: p.end_date, label: p.label, time: p.time, location: p.location }))
       .concat(items.filter(i => i.client).map(i => ({
-        date: i.due, end_date: '', label: i.item, time: '', location: '', client_item: true, done: i.done,
+        date: i.due, end_date: '', label: i.item, time: '', location: '', client_item: true, done: i.done, ready: i.ready,
       })))
       .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0),
     team,

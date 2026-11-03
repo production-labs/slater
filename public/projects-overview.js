@@ -74,7 +74,13 @@
     var open = wb.items.filter(function (i) { return i.status !== 'Complete' && i.status !== 'N/A'; });
     var doneCount = wb.items.length - open.length;
     var overdue = open.filter(function (i) { return i.due && i.due < today; });
-    var waiting = open.filter(function (i) { return isClientOwner(i.owner, client); });
+    // Client items: with the client (their turn now), coming up (the step
+    // before isn't done), held up by us (that step is ours and due or late).
+    // Same rule as the portal's "Waiting on you": public/client-readiness.js.
+    var cs = window.SlaterReadiness.clientItemStates(data, client, today).filter(Boolean);
+    var withClient = cs.filter(function (x) { return x.ready; }).length;
+    var comingUp = cs.length - withClient;
+    var heldUp = cs.filter(function (x) { return x.heldUp; }).length;
     var nextTask = open.filter(function (i) { return i.due; })
       .sort(function (a, b) { return a.due < b.due ? -1 : a.due > b.due ? 1 : 0; })[0] || null;
     var nextPin = wb.pins.filter(function (p) { return p.date_iso >= today; })
@@ -109,7 +115,7 @@
     var unconfirmedSoon = soon ? (crew.total - crew.c) + (talent.total - talent.c) : 0;
     var dbl = conflicts || { red: [], amber: [] };
     var status = (overdue.length || dbl.red.length) ? 'red'
-      : (unconfirmedSoon || dbl.amber.length) ? 'yellow' : 'green';
+      : (unconfirmedSoon || dbl.amber.length || heldUp) ? 'yellow' : 'green';
 
     // Closeout: four saved flags plus derived "Workback complete".
     // null = not applicable (no pill), true = done, false = still open.
@@ -131,7 +137,7 @@
       past: !!keyDate && keyDate < today,
       items: wb.items, pins: wb.pins,
       pct: wb.items.length ? Math.round(doneCount / wb.items.length * 100) : null,
-      overdue: overdue.length, waiting: waiting.length, nextTask: nextTask, nextPin: nextPin,
+      overdue: overdue.length, waiting: withClient, comingUp: comingUp, heldUp: heldUp, nextTask: nextTask, nextPin: nextPin,
       crew: crew, talent: talent, unconfirmedSoon: unconfirmedSoon, conflicts: dbl, status: status,
       expense: expense, reimb: reimb, savedAt: data.savedAt || 0,
       closeout: closeout, loose: loose
@@ -332,10 +338,12 @@
     var next7 = all.filter(function (p) {
       return p.pins.some(function (pin) { return pin.date_iso >= today && pin.date_iso <= in7; });
     }).length;
-    var overdueTasks = 0, overdueProjects = 0, waitItems = 0, waitProjects = 0, unconf = 0;
+    var overdueTasks = 0, overdueProjects = 0, waitItems = 0, waitProjects = 0, comingUp = 0, held = 0, heldProjects = 0, unconf = 0;
     all.forEach(function (p) {
       overdueTasks += p.overdue; if (p.overdue) overdueProjects++;
       waitItems += p.waiting; if (p.waiting) waitProjects++;
+      comingUp += p.comingUp;
+      held += p.heldUp; if (p.heldUp) heldProjects++;
       unconf += p.unconfirmedSoon;
     });
 
@@ -353,7 +361,9 @@
       kpi('calendar-clock', 'Next 7 days', next7, 'events or deliveries', next7 ? 'caution' : '') +
       kpi('alert-circle', 'Overdue', overdueTasks, overdueTasks ? 'tasks across ' + plural(overdueProjects, 'project') : 'nothing overdue', overdueTasks ? 'warn' : '') +
       kpi('user-x', 'Unconfirmed', unconf, 'crew + talent, date within 7 days', unconf ? 'caution' : '') +
-      kpi('hourglass', 'Waiting on clients', waitItems, waitItems ? 'items across ' + plural(waitProjects, 'project') : 'nothing with clients') +
+      kpi('hourglass', 'With clients', waitItems,
+        (waitItems ? 'across ' + plural(waitProjects, 'project') : 'nothing with clients') + (comingUp ? ', ' + comingUp + ' coming up' : '')) +
+      kpi('octagon-pause', 'Held up by us', held, held ? 'client steps across ' + plural(heldProjects, 'project') : 'nothing holding clients up', held ? 'warn' : '') +
       '</div>';
 
     h += '<div class="po-sec-h"><div class="po-sec-t">Portfolio timeline</div><div class="po-sec-r">' +
@@ -397,7 +407,8 @@
     dblFlag(p.conflicts.amber, 'yellow', 'possible double booking');
     if (p.overdue) flags.push('<span class="po-flag red">' + ic('alert-circle') + p.overdue + ' overdue</span>');
     if (p.unconfirmedSoon) flags.push('<span class="po-flag yellow">' + ic('user-x') + p.unconfirmedSoon + ' unconfirmed, date soon</span>');
-    if (p.waiting) flags.push('<span class="po-flag yellow">' + ic('hourglass') + p.waiting + ' waiting on client</span>');
+    if (p.heldUp) flags.push('<span class="po-flag red" title="A client step can\'t start until our step before it is done">' + ic('octagon-pause') + p.heldUp + ' client ' + (p.heldUp === 1 ? 'step' : 'steps') + ' held up by us</span>');
+    if (p.waiting) flags.push('<span class="po-flag yellow">' + ic('hourglass') + p.waiting + ' with client</span>');
     if (!flags.length) flags.push('<span class="po-flag ok">' + ic('check-circle-2') + 'On track</span>');
     if (p.savedAt) flags.push('<span class="po-flag ok">' + ic('activity') + 'Updated ' + esc(ago(p.savedAt)) + '</span>');
 

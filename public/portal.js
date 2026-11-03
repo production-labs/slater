@@ -154,7 +154,9 @@
 
   function dueLabel(due, today) {
     var n = daysBetween(today, due);
-    if (n < 0) return { text: 'Overdue', cls: '' };
+    // Never "Overdue": an item only shows here once it's the client's turn,
+    // and if our step ran late, the date passing isn't on them.
+    if (n < 0) return { text: 'Ready for you', cls: '' };
     if (n === 0) return { text: 'Due today', cls: '' };
     if (n === 1) return { text: 'Tomorrow', cls: '' };
     if (n < 7) return { text: 'Due ' + DOW[parse(due).getDay()], cls: '' };
@@ -286,7 +288,7 @@
     });
     var legend = el('div', { class: 'tl-legend' },
       el('div', { class: 'lg' }, el('span', { class: 'lg-dot ms' }), 'Key date'),
-      el('div', { class: 'lg' }, el('span', { class: 'lg-dot client' }), 'Needs you'),
+      el('div', { class: 'lg' }, el('span', { class: 'lg-dot client' }), 'Your steps'),
       el('div', { class: 'lg' }, el('span', { class: 'lg-dot' }), 'Our work'));
 
     function draw() {
@@ -339,7 +341,7 @@
       var x = pct(n.date);
       var past = n.date < today || n.done;
       var cls = 'tl-node ' + (n.kind === 'milestone' ? 'milestone' : n.kind === 'client' ? 'client' : '') + (past ? ' done' : '');
-      var note = n.kind === 'milestone' ? 'Key date' : n.kind === 'client' ? (n.done ? 'Done' : 'Needs you') : 'Our work';
+      var note = n.kind === 'milestone' ? 'Key date' : n.kind === 'client' ? (n.done ? 'Done' : n.ready ? 'Needs you' : 'Coming up for you') : 'Our work';
       var node = el('div', { class: cls, style: 'left:' + x + '%', tabindex: '0', 'aria-label': n.label + ', ' + fmt(n.date) + ', ' + note });
       node.addEventListener('mouseenter', function () {
         tip.textContent = '';
@@ -378,7 +380,10 @@
       var d = parse(s.date);
       var past = (s.end_date || s.date) < today;
       var detail = [s.end_date ? 'Through ' + DOW[parse(s.end_date).getDay()] + ' ' + fmt(s.end_date) : '', s.location, s.time].filter(Boolean).join('  ·  ');
-      var tag = s.client_item ? (s.done ? el('div', { class: 'sched-tag done' }, 'Complete') : el('div', { class: 'sched-tag you' }, 'Waiting on you')) : null;
+      var tag = !s.client_item ? null
+        : s.done ? el('div', { class: 'sched-tag done' }, 'Complete')
+        : s.ready ? el('div', { class: 'sched-tag you' }, 'Waiting on you')
+        : el('div', { class: 'sched-tag soon' }, 'Coming up');
       return el('div', { class: 'sched-row' + (past && !(s.client_item && !s.done) ? ' is-past' : '') },
         el('div', { class: 'sched-date' },
           el('div', { class: 'sched-mon' }, MON[d.getMonth()]),

@@ -53,6 +53,9 @@ async function main() {
     schedule_days: [{ id: 'sday_1', date_iso: rel(12), label: 'Shoot Day' }],
     wb_items: [
       wb('u-script', 'Approve script', 'Client'),
+      // Casting has its own finished step before it, so it's the client's
+      // turn now (without it, it would wait on the script approval above).
+      wb('u-tapes', 'Send casting tapes', 'Producer', { status: 'Complete' }),
       wb('u-cast', 'Approve casting', 'acme'),
       wb('u-ours', 'Edit cut 1', 'Producer'),
       wb('u-secret', 'Internal review', 'Client', { internal: true }),

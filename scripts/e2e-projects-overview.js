@@ -58,7 +58,13 @@ async function main() {
     [K.post]: {
       project_type: 'post_production', project_title: 'Motion Package', label: 'Motion Package', client_company: 'CSA',
       video_due_date_iso: rel(20),
-      wb_items: [{ uuid: 'p1', item: 'V2 drafts', owner: 'Kevin', mode: 'manual', manual_date: rel(18), status: 'Not Started' }],
+      wb_items: [
+        // First item, no kickoff: nothing before it, so it's with the client now.
+        { uuid: 'p0', item: 'Approve storyboards', owner: 'Client', mode: 'manual', manual_date: rel(16), status: 'Not Started' },
+        { uuid: 'p1', item: 'V2 drafts', owner: 'Kevin', mode: 'manual', manual_date: rel(18), status: 'Not Started' },
+        // After our V2 drafts, not due yet: coming up, not held up.
+        { uuid: 'p2', item: 'Approve V2 drafts', owner: 'Client', mode: 'sequential', seq_anchor_uuid: 'p1', due: rel(19), status: 'Not Started' },
+      ],
     },
     [K.wrapped]: {
       project_type: 'webinar', project_title: 'Town Hall', label: 'Town Hall', client_company: 'Microsoft',
@@ -109,11 +115,12 @@ async function main() {
     await page.screenshot({ path: SHOTS + '/po-upcoming.png' });
   });
 
-  await step('upcoming card: overdue, waiting on client (owner = client name), crew, open role, expenses', async () => {
+  await step('upcoming card: overdue, client step held up by us (owner = client name), crew, open role, expenses', async () => {
     const t = await card(K.shoot);
     assert(t, 'shoot card missing');
     assert(/1 overdue/.test(t), 'overdue: ' + t);
-    assert(/1 waiting on client/.test(t), 'waiting: ' + t);
+    // Approve Script V2 follows Script V1, which is ours and overdue.
+    assert(/1 client step held up by us/.test(t) && !/with client/.test(t), 'held up: ' + t);
     assert(/1\/3/.test(t), 'crew 1/3 (declined left out): ' + t);
     assert(/Open: A2/.test(t), 'open role: ' + t);
     assert(/\$150/.test(t) && /\$100 reimbursable/.test(t), 'expenses: ' + t);
@@ -126,7 +133,12 @@ async function main() {
 
   await step('upcoming KPIs add up across projects', async () => {
     const k = await page.$$eval('#po-root .po-kpi', els => els.map(e => e.querySelector('.po-kpi-v').innerText));
-    assert(JSON.stringify(k) === JSON.stringify(['2', '1', '1', '2', '1']), 'kpis ' + JSON.stringify(k));
+    // Active, Next 7 days, Overdue, Unconfirmed, With clients, Held up by us
+    assert(JSON.stringify(k) === JSON.stringify(['2', '1', '1', '2', '1', '1']), 'kpis ' + JSON.stringify(k));
+    const sub = await page.$$eval('#po-root .po-kpi', els => els[4].querySelector('.po-kpi-s').textContent);
+    assert(sub === 'across 1 project, 2 coming up', 'with clients sub (coming up includes the held-up one): ' + sub);
+    const post = await card(K.post);
+    assert(/1 with client/.test(post) && !/held up/.test(post), 'post card: ' + post);
   });
 
   await step('portfolio timeline has a lane per upcoming project; range chips work', async () => {

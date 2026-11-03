@@ -27,7 +27,7 @@
 .po-scroll{flex:1;overflow-y:auto;padding:22px 26px 40px}
 .po-empty{color:var(--text-muted);padding:22px 4px;font-size:13px}
 
-.po-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+.po-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px}
 .po-kpis.po-kpis-4{grid-template-columns:repeat(4,1fr)}
 .po-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
 .po-kpi-l{font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:6px}

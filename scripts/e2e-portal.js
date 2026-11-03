@@ -142,6 +142,21 @@ async function main() {
     assert(onlyRemote.venues.length === 0 && !JSON.stringify(onlyRemote).includes('Studio Way'), 'studio address leaked when the client is remote');
   });
 
+  await step("only items whose step before is done are waiting; the rest are coming up", async () => {
+    const { buildPayload } = require(APP + '/routes/portal');
+    const today = '2026-11-10';
+    const p = buildPayload({ data: { client_company: 'Acme', wb_items: [
+      { uuid: 'e1', item: 'Video Edit', owner: 'Editor', mode: 'manual', manual_date: '2026-11-10', status: 'In Progress', internal: true },
+      { uuid: 'r1', item: 'Review cut', owner: 'Client', mode: 'sequential', seq_anchor_uuid: 'e1', due: '2026-11-12', status: 'Not Started' },
+      { uuid: 'e2', item: 'Graphics', owner: 'Designer', mode: 'manual', manual_date: '2026-11-20', status: 'Complete' },
+      { uuid: 'r2', item: 'Review graphics', owner: 'acme', mode: 'manual', manual_date: '2026-12-01', status: 'Not Started' },
+    ] }, label: 'x' }, { today });
+    assert(JSON.stringify(p.waiting.map(w => w.item)) === '["Review graphics"]', 'waiting ' + JSON.stringify(p.waiting));
+    const sched = Object.fromEntries(p.schedule.map(x => [x.label, x.ready]));
+    assert(sched['Review cut'] === false && sched['Review graphics'] === true, 'schedule ready ' + JSON.stringify(sched));
+    assert(!JSON.stringify(p).includes('Video Edit'), 'internal step leaked');
+  });
+
   await step('payload has what the client should see', async () => {
     const p = payload;
     assert(p.project.title === 'Q4 Summit' && p.project.type === 'Live Broadcast', 'project ' + JSON.stringify(p.project));
