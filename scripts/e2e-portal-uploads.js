@@ -397,7 +397,7 @@ async function main() {
 
   await step('Project tab lists every file: name, sender, New, 14-day countdown, item', async () => {
     const n = (await ready()).length;
-    await ppage.waitForFunction(c => document.getElementById('portal-admin').textContent.includes('Files from your client (' + c + ')'), { timeout: 8000 }, n);
+    await ppage.waitForFunction(c => document.querySelectorAll('#portal-admin .pa-file').length === c && document.getElementById('portal-admin').textContent.includes(c + ' new'), { timeout: 8000 }, n);
     assert((await ppage.$$('#portal-admin .pa-file')).length === n, 'card count');
     const t = await panelText();
     assert(/b-roll selects\.mov/.test(t) && /40 MB/.test(t) && /Pat Client/.test(t), t.slice(0, 300));

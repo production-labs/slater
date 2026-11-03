@@ -175,7 +175,7 @@ async function main() {
   await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
   await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
   await page.evaluate(() => st('portal'));
-  try { await page.waitForFunction(() => /Client responses \(2\)/.test(document.getElementById('portal-admin').textContent), { timeout: 5000 }); }
+  try { await page.waitForFunction(() => document.querySelectorAll('#portal-admin .pa-resp').length === 2 && (document.querySelector('#portal-admin .pa-count.attn') || {}).textContent === '2', { timeout: 5000 }); }
   catch (e) { console.log('PANEL HTML: ' + await page.$eval('#portal-admin', el => el.innerHTML)); console.log('ERRORS: ' + consoleErrors.join(' | ')); throw e; }
 
   await step('Project tab panel lists both responses; client text stays text', async () => {
@@ -269,7 +269,7 @@ async function main() {
     const r = await respond({ uuid: 'u-cast', kind: 'approved', name: 'Pat Client', note: '' });
     assert(r.status === 200, 'respond ' + r.status);
     await page.evaluate(() => PortalAdmin.poll(true));
-    await page.waitForFunction(() => /Client responses \(1\)/.test(document.getElementById('portal-admin').textContent), { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelectorAll('#portal-admin .pa-resp').length === 1, { timeout: 5000 });
     await page.waitForFunction(() => /Client responses \(1\)/.test(document.getElementById('daily-body').textContent), { timeout: 5000 });
   });
 

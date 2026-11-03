@@ -165,8 +165,10 @@ async function main() {
 
   await step('A half-written update survives other panel actions', async () => {
     await page.type('#pa-update', 'draft text');
+    await page.click('#portal-admin [data-pa="tab"][data-tab="password"]');
     await click('pw-open');
     await click('pw-cancel');
+    await page.click('#portal-admin [data-pa="tab"][data-tab="emails"]');
     assert((await page.$eval('#pa-update', el => el.value)) === 'draft text', 'draft lost');
     await page.$eval('#pa-update', el => { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); });
   });
@@ -181,6 +183,8 @@ async function main() {
   });
 
   await step('Too-short password is refused; a real one locks the portal', async () => {
+    await page.click('#portal-admin [data-pa="tab"][data-tab="password"]');
+    await waitText(/None\. The link alone/);
     await click('pw-open');
     await page.type('#pa-pw', 'abc');
     await click('pw-save');
@@ -222,7 +226,9 @@ async function main() {
     const j = await (await fetch(BASE + '/api/portal/' + token1)).json();
     assert(j.links.length === 1 && j.links[0].name === 'Review link', JSON.stringify(j.links));
     await page.evaluate(() => st('portal'));
+    await page.click('#portal-admin [data-pa="tab"][data-tab="links"]');
     await waitText(/1 link shared/);
+    await waitText(/Links list only/);
   });
 
   await step('Review link: workback dropdown shows only when shared, lists portal items, and puts the link beside the item', async () => {
@@ -246,6 +252,9 @@ async function main() {
     const w = j.waiting.find(x => x.item === 'Approve rough cut');
     assert(w && JSON.stringify(w.links) === JSON.stringify([{ name: 'Review link', url: 'https://example.com/review' }]), 'waiting ' + JSON.stringify(j.waiting));
     await page.evaluate(() => st('portal'));
+    await page.click('#portal-admin [data-pa="tab"][data-tab="links"]');
+    await waitText(/Beside .Approve rough cut./);
+    await page.click('#portal-admin [data-pa="tab"][data-tab="emails"]');
   });
 
   await step('Checkbox state survives reloading the project', async () => {

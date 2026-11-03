@@ -730,7 +730,6 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .portal-admin .pa-note{color:var(--text-muted);margin:0 0 10px;line-height:1.5}
 .portal-admin .pa-small{font-size:12px;margin-top:8px}
 .portal-admin .pa-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;line-height:1.5}
-.portal-admin .pa-on{font-weight:600;margin-bottom:8px}
 .portal-admin .pa-dot{width:8px;height:8px;border-radius:50%;background:#3a9a5b;display:inline-block}
 .portal-admin .pa-link-row{display:flex;gap:6px;align-items:center}
 .portal-admin .pa-link,.portal-admin .pa-text{flex:1;min-width:0;width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--surface)}
@@ -742,7 +741,33 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .portal-admin .pa-update{background:var(--tape);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
 .portal-admin .pa-update-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-muted)}
 .portal-admin .pa-update-body{white-space:pre-wrap;margin-top:4px;line-height:1.5}
-.portal-admin .pa-danger-zone{display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border)}
+.portal-admin .pa-danger-zone{margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+.portal-admin .pa-danger-zone .pa-note{margin:0 0 8px}
+/* Portal tab layout: header, link card, then two columns (main + settings) */
+.portal-admin .pa-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px}
+.portal-admin .pa-head-text{color:var(--text-muted);line-height:1.5}
+.portal-admin .pa-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(58,154,91,.12);border:1px solid rgba(58,154,91,.35);color:#5cc183;font-size:12px;font-weight:600;white-space:nowrap}
+.portal-admin .pa-card{background:var(--tape);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px}
+.portal-admin .pa-card-attn{border-color:rgba(224,160,48,.45)}
+.portal-admin .pa-card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.portal-admin .pa-card-title{font-size:14px;font-weight:600;color:var(--text-primary)}
+.portal-admin .pa-count{font-size:11px;font-weight:700;padding:1px 8px;border-radius:9px;white-space:nowrap}
+.portal-admin .pa-count.attn{background:rgba(224,160,48,.15);color:#E0A030}
+.portal-admin .pa-count.new{background:rgba(74,143,217,.18);color:#6aa8eb}
+.portal-admin .pa-card .pa-small{margin-top:0}
+.portal-admin .pa-empty{color:var(--text-muted);padding:8px 0 2px}
+.portal-admin .pa-strong{color:var(--text-primary);font-weight:600}
+.portal-admin .pa-cols{display:flex;flex-wrap:wrap;align-items:flex-start;gap:0 12px}
+.portal-admin .pa-main{flex:999 1 420px;min-width:0}
+.portal-admin .pa-side{flex:1 1 280px;min-width:0}
+.portal-admin .pa-tabs{display:flex;gap:4px;padding:3px;margin:4px 0 12px;background:var(--surface);border:1px solid var(--border);border-radius:7px}
+.portal-admin .pa-tab{flex:1 1 0;padding:6px 8px;border:0;border-radius:5px;background:transparent;color:var(--text-muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.portal-admin .pa-tab:hover{color:var(--text-primary)}
+.portal-admin .pa-tab.on{background:var(--surface-3);color:var(--text-primary)}
+.portal-admin .pa-actions-left{justify-content:flex-start;gap:6px;flex-wrap:wrap}
+.portal-admin .pa-shared{border-top:1px solid var(--border);padding:8px 0;min-width:0}
+.portal-admin .pa-shared-name{font-weight:600;overflow-wrap:anywhere}
+.portal-admin .pa-shared-url,.portal-admin .pa-shared-where{font-size:12px;color:var(--text-muted);overflow-wrap:anywhere}
 .portal-admin .lb[disabled]{opacity:.5;cursor:default}
 .url-portal{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer}
 /* Read-only "Client portal" card at the top of the URLs tab (portal-admin.js) */

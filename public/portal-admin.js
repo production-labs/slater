@@ -23,6 +23,7 @@
   var forKey = null;      // which project `state` belongs to
   var busy = false;
   var showPw = false;     // password form open
+  var settingsTab = 'emails'; // Settings card: 'emails' | 'links' | 'password'
   var draft = '';         // unposted update text, survives re-renders
   var pendingAll = [];    // unconfirmed responses across all projects (Rundown)
   var pendingSig = '';
@@ -42,10 +43,6 @@
   function link() { return state && state.token ? window.location.origin + '/portal/' + state.token : ''; }
   function key() { return (typeof currentSheetKey !== 'undefined') ? currentSheetKey : null; }
   function toast(m, t) { if (typeof setStatus === 'function') setStatus(m, t || 'ok'); }
-  function sharedLinkCount() {
-    try { return getUrls().filter(function (u) { return u.visible_to_client === true; }).length; }
-    catch (e) { return 0; }
-  }
 
   // ── client responses ──────────────────────────────────────────────────────
   function wbIdForUuid(uuid) {
@@ -166,7 +163,7 @@
     var dis = busy ? ' disabled' : '';
     var picked = (state.recipients || []);
     var kps = kpWithEmail();
-    var h = '<div class="pa-block pa-emails"><div class="pa-label">Emails</div>' +
+    var h = '<div class="pa-emails">' +
       '<p class="pa-note pa-small">When your client sends files, approves, or asks for changes, Slater emails a summary with download links. ' +
       'Several at once come as one email, about 10 minutes after the last.</p>' +
       '<label class="pa-rcpt"><input type="checkbox" checked disabled> You <span class="pa-rcpt-sub">' + esc(state.owner_email || '') + ' &middot; always</span></label>';
@@ -463,39 +460,58 @@
         responsesBlock() + filesBlock();
       return;
     }
-    var n = sharedLinkCount();
     var h = '';
-    h += '<div class="pa-row pa-on"><span class="pa-dot"></span> Portal is on. Anyone with this link' + (state.has_password ? ' and the password' : '') + ' can see it.</div>';
-    h += '<div class="pa-link-row"><input type="text" id="pa-link" class="pa-link" readonly value="' + esc(link()) + '">' +
-      '<button class="lb" data-pa="copy"' + dis + '>Copy link</button>' +
-      '<button class="lb" data-pa="open"' + dis + '>Open</button></div>';
-    h += responsesBlock();
-    h += filesBlock();
-    h += emailsBlock();
 
-    // Password
-    h += '<div class="pa-block"><div class="pa-label">Password</div>';
-    if (showPw) {
-      h += '<div class="pa-link-row"><input type="password" id="pa-pw" class="pa-link" placeholder="At least 6 characters" autocomplete="new-password" maxlength="200">' +
-        '<button class="lb primary" data-pa="pw-save"' + dis + '>Save</button>' +
-        '<button class="lb" data-pa="pw-cancel"' + dis + '>Cancel</button></div>' +
-        '<p class="pa-note pa-small">Send it to your client separately from the link.' + (state.has_password ? ' Changing it signs out anyone already viewing.' : '') + '</p>';
-    } else if (state.has_password) {
-      h += '<div class="pa-row">On. Your client enters it once per browser (remembered 30 days). ' +
-        '<button class="lb" data-pa="pw-open"' + dis + '>Change</button> <button class="lb danger" data-pa="pw-remove"' + dis + '>Remove</button></div>';
-    } else {
-      h += '<div class="pa-row">None. The link alone opens the portal. <button class="lb" data-pa="pw-open"' + dis + '>Set a password</button></div>';
-    }
-    h += '</div>';
+    // Header: status + who can open it, then the link (Copy/Open only; the
+    // link-breaking buttons live at the bottom of Settings).
+    h += '<div class="pa-head">' +
+      '<div class="pa-head-text">' + (state.has_password
+        ? 'Anyone with the link and the password can see this portal.'
+        : 'Anyone with the link can see this portal.') + '</div>' +
+      '<span class="pa-pill"><span class="pa-dot"></span> Portal is on</span></div>';
+    h += '<div class="pa-card pa-share"><div class="pa-label">Portal link</div>' +
+      '<div class="pa-link-row"><input type="text" id="pa-link" class="pa-link" readonly value="' + esc(link()) + '">' +
+      '<button class="lb primary" data-pa="copy"' + dis + '>Copy link</button>' +
+      '<button class="lb" data-pa="open"' + dis + '>Open</button></div></div>';
 
-    // Shared links
-    h += '<div class="pa-block"><div class="pa-label">Links</div><div class="pa-row">' +
-      (n ? n + ' link' + (n === 1 ? '' : 's') + ' shared.' : 'No links shared.') +
-      ' Tick "Show on client portal" on a card in the URLs tab to share it. <button class="lb" data-pa="urls">Go to URLs</button></div></div>';
+    // Two columns: what needs you + updates on the left, settings on the right.
+    h += '<div class="pa-cols"><div class="pa-main">';
+    h += responsesCard();
+    h += filesCard();
+    h += updatesCard(dis);
+    h += '</div><div class="pa-side">';
+    h += settingsCard(dis);
+    h += '</div></div>';
 
-    // Updates
-    h += '<div class="pa-block"><div class="pa-label">Updates</div>' +
-      '<textarea id="pa-update" class="pa-text" rows="3" maxlength="10000" placeholder="Write an update for your client. The newest one shows at the top of the portal.">' + esc(draft) + '</textarea>' +
+    root.innerHTML = h;
+  }
+
+  function cardHead(title, countHtml) {
+    return '<div class="pa-card-head"><h3 class="pa-card-title">' + title + '</h3>' + (countHtml || '') + '</div>';
+  }
+
+  function responsesCard() {
+    var list = openResponses();
+    if (!list.length) return '';
+    return '<div class="pa-card pa-card-attn">' + cardHead('Client responses', '<span class="pa-count attn">' + list.length + '</span>') +
+      list.map(function (r) { return responseHtml(r, 'panel'); }).join('') + '</div>';
+  }
+
+  function filesCard() {
+    var list = openFiles();
+    var fresh = list.filter(function (f) { return !f.downloaded_at; }).length;
+    return '<div class="pa-card">' + cardHead('Files from your client', fresh ? '<span class="pa-count new">' + fresh + ' new</span>' : '') +
+      '<p class="pa-note pa-small">Download what you need. Each file is deleted 14 days after it arrives.</p>' +
+      (list.length
+        ? list.map(function (f) { return fileHtml(f, 'panel'); }).join('')
+        : '<p class="pa-empty">No files from your client yet.</p>') +
+      '</div>';
+  }
+
+  function updatesCard(dis) {
+    var h = '<div class="pa-card">' + cardHead('Updates for your client') +
+      '<p class="pa-note pa-small">The newest one shows at the top of the portal.</p>' +
+      '<textarea id="pa-update" class="pa-text" rows="3" maxlength="10000" aria-label="Write an update" placeholder="Write an update for your client.">' + esc(draft) + '</textarea>' +
       '<div class="pa-actions"><button class="lb primary" data-pa="post"' + dis + '>Post update</button></div>';
     if (state.updates.length) {
       h += '<div class="pa-updates">' + state.updates.map(function (u, i) {
@@ -505,14 +521,60 @@
           '<div class="pa-update-body">' + esc(u.body) + '</div></div>';
       }).join('') + '</div>';
     }
+    return h + '</div>';
+  }
+
+  function sharedLinks() {
+    try { return getUrls().filter(function (u) { return u.visible_to_client === true; }); }
+    catch (e) { return []; }
+  }
+
+  function settingsCard(dis) {
+    var tabs = [['emails', 'Emails'], ['links', 'Links'], ['password', 'Password']];
+    var h = '<div class="pa-card">' + cardHead('Settings') +
+      '<div class="pa-tabs" role="tablist" aria-label="Portal settings">' +
+      tabs.map(function (t) {
+        var on = settingsTab === t[0];
+        return '<button type="button" role="tab" class="pa-tab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-pa="tab" data-tab="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') + '</div><div class="pa-tabpanel" role="tabpanel">';
+
+    if (settingsTab === 'emails') {
+      h += emailsBlock();
+    } else if (settingsTab === 'links') {
+      var links = sharedLinks();
+      h += '<p class="pa-note"><strong class="pa-strong">' + (links.length ? links.length + ' link' + (links.length === 1 ? '' : 's') + ' shared.' : 'No links shared.') + '</strong> ' +
+        'To share one, tick &ldquo;Show on client portal&rdquo; on its card in the URLs tab.</p>';
+      links.forEach(function (l) {
+        var wid = l.wb_item_uuid ? wbIdForUuid(l.wb_item_uuid) : null;
+        var item = wid && _wbData[wid] ? (_wbData[wid].item || '(untitled)') : '';
+        h += '<div class="pa-shared">' +
+          '<div class="pa-shared-name">' + esc(l.name || l.url) + '</div>' +
+          (l.name && l.url ? '<div class="pa-shared-url">' + esc(l.url) + '</div>' : '') +
+          '<div class="pa-shared-where">' + (item ? 'Beside &ldquo;' + esc(item) + '&rdquo;' : 'Links list only') + '</div></div>';
+      });
+      h += '<div class="pa-actions pa-actions-left"><button class="lb" data-pa="urls">Go to URLs</button></div>';
+    } else {
+      if (showPw) {
+        h += '<div class="pa-link-row"><input type="password" id="pa-pw" class="pa-link" placeholder="At least 6 characters" autocomplete="new-password" maxlength="200">' +
+          '<button class="lb primary" data-pa="pw-save"' + dis + '>Save</button>' +
+          '<button class="lb" data-pa="pw-cancel"' + dis + '>Cancel</button></div>' +
+          '<p class="pa-note pa-small">Send it to your client separately from the link.' + (state.has_password ? ' Changing it signs out anyone already viewing.' : '') + '</p>';
+      } else if (state.has_password) {
+        h += '<p class="pa-note"><strong class="pa-strong">On.</strong> Your client enters it once per browser (remembered 30 days).</p>' +
+          '<div class="pa-actions pa-actions-left"><button class="lb" data-pa="pw-open"' + dis + '>Change</button> <button class="lb danger" data-pa="pw-remove"' + dis + '>Remove</button></div>';
+      } else {
+        h += '<p class="pa-note"><strong class="pa-strong">None.</strong> The link alone opens the portal.</p>' +
+          '<div class="pa-actions pa-actions-left"><button class="lb" data-pa="pw-open"' + dis + '>Set a password</button></div>';
+      }
+    }
     h += '</div>';
 
-    // Link management
-    h += '<div class="pa-block pa-danger-zone">' +
-      '<button class="lb" data-pa="regen"' + dis + '>Make a new link</button>' +
-      '<button class="lb danger" data-pa="disable"' + dis + '>Turn off portal</button></div>';
-
-    root.innerHTML = h;
+    // Link management: both break the link the client already has.
+    h += '<div class="pa-danger-zone">' +
+      '<p class="pa-note pa-small">Both stop the current link from working.</p>' +
+      '<div class="pa-actions pa-actions-left"><button class="lb" data-pa="regen"' + dis + '>Make a new link</button>' +
+      '<button class="lb danger" data-pa="disable"' + dis + '>Turn off portal</button></div></div>';
+    return h + '</div>';
   }
 
   // ── actions ───────────────────────────────────────────────────────────────
@@ -531,7 +593,8 @@
       return;
     }
     if (a === 'open') { window.open(link(), '_blank', 'noopener,noreferrer'); return; }
-    if (a === 'pw-open') { showPw = true; render(); var pw = document.getElementById('pa-pw'); if (pw) pw.focus(); return; }
+    if (a === 'tab') { settingsTab = b.getAttribute('data-tab'); render(); return; }
+    if (a === 'pw-open') { showPw = true; settingsTab = 'password'; render(); var pw = document.getElementById('pa-pw'); if (pw) pw.focus(); return; }
     if (a === 'pw-cancel') { showPw = false; render(); return; }
     if (a === 'pw-save') {
       var v = (document.getElementById('pa-pw') || {}).value || '';
