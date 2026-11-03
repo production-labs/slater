@@ -13,3 +13,6 @@ pre-cutover-*.sql*
 pre-restore-*.sql*
 slater-20*.sql*
 *.dump
+
+# Design mockups shared for review (not part of the app)
+Mockups/
