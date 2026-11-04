@@ -271,7 +271,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 ### Client Portal (V1.5, LIVE)
 - Own Portal tab on the Project record (`public/portal-admin.js`), plus the public-facing portal itself (`public/portal.js/.css`, `routes/portal.js`)
 - Unique URL per project (token), optional password (remembered 30 days per browser)
-- Layout: status line + "Portal is on" pill, link card (Copy/Open), left column (Client responses / Files / Updates), right column tabbed Settings (Emails / Links / Password) + separate "Link management" card (Make a new link / Turn off portal)
+- Layout: status line + "Portal is on" pill, link card (Copy/Open), left column (Client responses / Files / Updates), right column tabbed Settings (Emails / Links / Password) + separate "Portal management" card (Make a new link / Turn off portal)
 - Workback view with client-friendly timeline (zoom: 2/4/6 weeks/Whole project); schedule view
 - Producer updates (newest shown first, latest 10 on the portal)
 - Approvals: client items get Approve / Request changes; a workback item is "the client's" if its free-text Owner is "Client" or the project's client org name (case-insensitive) — see docs/v1.5-client-portal-plan.md for known gaps in this detection

@@ -463,7 +463,7 @@
     var h = '';
 
     // Header: status + who can open it, then the link (Copy/Open only; the
-    // link-breaking buttons live in their own Link management card below Settings).
+    // link-breaking buttons live in their own Portal management card below Settings).
     h += '<div class="pa-head">' +
       '<div class="pa-head-text">' + (state.has_password
         ? 'Anyone with the link and the password can see this portal.'
@@ -574,7 +574,7 @@
 
   function linkManagementCard(dis) {
     // Both of these break the link the client already has.
-    return '<div class="pa-card">' + cardHead('Link management') +
+    return '<div class="pa-card">' + cardHead('Portal management') +
       '<p class="pa-note pa-small">Both stop the current link from working.</p>' +
       '<div class="pa-actions pa-actions-left pa-actions-fill"><button class="lb" data-pa="regen"' + dis + '>Make a new link</button>' +
       '<button class="lb danger" data-pa="disable"' + dis + '>Turn off portal</button></div></div>';
