@@ -119,21 +119,22 @@ async function main() {
     return { status: r.status, json: await r.json().catch(() => null) };
   }, method, '/api/portal-admin/' + KEY + p, body);
 
-  await step('Emails block: Key Personnel with an email, no owner row, defaulted to selected', async () => {
+  await step('Emails block: every Key Personnel card with an email (including the owner\'s own), defaulted to selected', async () => {
     // Nothing was saved yet, so the panel seeds "everyone" as the default
     // and persists it (not just a visual default).
-    await until(async () => (await db.query('SELECT COUNT(*)::int AS n FROM portal_recipients WHERE project_id=$1', [projectId])).rows[0].n === 2, 5000, 'default recipients seeded');
+    await until(async () => (await db.query('SELECT COUNT(*)::int AS n FROM portal_recipients WHERE project_id=$1', [projectId])).rows[0].n === 3, 5000, 'default recipients seeded');
     const rows = await page.$$eval('#portal-admin .pa-rcpt', ls => ls.map(l => ({ t: l.textContent.trim(), on: l.querySelector('input').checked, off: l.querySelector('input').disabled })));
-    assert(rows.length === 2, JSON.stringify(rows));
-    assert(/Sam Producer/.test(rows[0].t) && rows[0].on && !rows[0].off, 'Sam row ' + JSON.stringify(rows[0]));
-    assert(/Lee Coord/.test(rows[1].t) && rows[1].on && !rows[1].off, 'Lee row ' + JSON.stringify(rows[1]));
+    assert(rows.length === 3, JSON.stringify(rows));
+    assert(/Jo Owner/.test(rows[0].t) && rows[0].on && !rows[0].off, 'owner row ' + JSON.stringify(rows[0]));
+    assert(/Sam Producer/.test(rows[1].t) && rows[1].on && !rows[1].off, 'Sam row ' + JSON.stringify(rows[1]));
+    assert(/Lee Coord/.test(rows[2].t) && rows[2].on && !rows[2].off, 'Lee row ' + JSON.stringify(rows[2]));
     await page.$eval('#portal-admin .pa-emails', el => el.scrollIntoView());
     await page.screenshot({ path: SHOTS + '/nt-emails-block.png' });
   });
 
   await step('Unticking Lee drops him from the saved list; it survives a reload', async () => {
     await page.click(`#portal-admin [data-pa-rcpt="${LEE}"]`);
-    await until(async () => (await db.query('SELECT email FROM portal_recipients WHERE project_id=$1', [projectId])).rows.map(r => r.email).join() === SAM, 5000, 'saved');
+    await until(async () => (await db.query('SELECT email FROM portal_recipients WHERE project_id=$1', [projectId])).rows.map(r => r.email).sort().join() === [EMAIL, SAM].sort().join(), 5000, 'saved');
     await page.evaluate(() => PortalAdmin.onProjectLoaded());
     await page.waitForFunction(e => { const b = document.querySelector('#portal-admin [data-pa-rcpt="' + e + '"]'); return b && !b.checked; }, { timeout: 5000 }, LEE);
   });
@@ -143,7 +144,7 @@ async function main() {
     const b = await api('PUT', '/recipients', { emails: Array.from({ length: 11 }, (_, i) => 'a' + i + '@example.invalid') });
     const c = await api('PUT', '/recipients', { emails: ['not an email'] });
     assert([a, b, c].every(x => x.status === 400), [a, b, c].map(x => x.status).join());
-    assert((await db.query('SELECT COUNT(*)::int AS n FROM portal_recipients WHERE project_id=$1', [projectId])).rows[0].n === 1, 'list changed');
+    assert((await db.query('SELECT COUNT(*)::int AS n FROM portal_recipients WHERE project_id=$1', [projectId])).rows[0].n === 2, 'list changed');
   });
 
   // ── One email per batch ───────────────────────────────────────────────────

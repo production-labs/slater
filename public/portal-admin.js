@@ -145,14 +145,17 @@
   }
   // ── email recipients ─────────────────────────────────────────────────────
   // Key Personnel cards with an email, read live from the form (gather() in
-  // app.js), so a new card or a changed address shows without a reload.
+  // app.js), so a new card or a changed address shows without a reload. The
+  // account owner's own card is included like any other (if ticked, the
+  // server still only sends them the one owner-style email: see
+  // kpRecipients() in routes/portalNotify.js, which skips the owner's
+  // address there to avoid a duplicate).
   function kpWithEmail() {
     var out = [], seen = {};
-    var own = String(state && state.owner_email || '').toLowerCase();
     try {
       (gather().kp_cards || []).forEach(function (k) {
         var e = String(k.email || '').trim().toLowerCase();
-        if (!/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/.test(e) || seen[e] || e === own) return;
+        if (!/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/.test(e) || seen[e]) return;
         seen[e] = true;
         out.push({ email: e, name: String(k.name || '').trim(), role: String(k.role || '').trim() });
       });
