@@ -741,8 +741,6 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .portal-admin .pa-update{background:var(--tape);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
 .portal-admin .pa-update-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-muted)}
 .portal-admin .pa-update-body{white-space:pre-wrap;margin-top:4px;line-height:1.5}
-.portal-admin .pa-danger-zone{margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
-.portal-admin .pa-danger-zone .pa-note{margin:0 0 8px}
 /* Portal tab layout: header, link card, then two columns (main + settings) */
 .portal-admin .pa-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px}
 .portal-admin .pa-head-text{color:var(--text-muted);line-height:1.5}
