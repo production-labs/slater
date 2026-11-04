@@ -159,17 +159,21 @@
     } catch (e) {}
     return out;
   }
+  // Nothing saved yet for this project: default every Key Personnel card (with
+  // an email) to selected, rather than leaving the list empty.
+  function recipientChecked(picked, email) { return picked.length ? picked.indexOf(email) > -1 : true; }
   function emailsBlock() {
     var dis = busy ? ' disabled' : '';
     var picked = (state.recipients || []);
     var kps = kpWithEmail();
     var h = '<div class="pa-emails">' +
       '<p class="pa-note pa-small">When your client sends files, approves, or asks for changes, Slater emails a summary with download links. ' +
-      'Several at once come as one email, about 10 minutes after the last.</p>' +
-      '<label class="pa-rcpt"><input type="checkbox" checked disabled> You <span class="pa-rcpt-sub">' + esc(state.owner_email || '') + ' &middot; always</span></label>';
+      'Several at once come as one email, about 10 minutes after the last.</p>';
     kps.forEach(function (k) {
-      h += '<label class="pa-rcpt"><input type="checkbox" data-pa-rcpt="' + esc(k.email) + '"' + (picked.indexOf(k.email) > -1 ? ' checked' : '') + dis + '> ' +
-        esc(k.name || k.email) + ' <span class="pa-rcpt-sub">' + esc([k.role, k.email].filter(Boolean).join(' · ')) + '</span></label>';
+      h += '<label class="pa-rcpt"><input type="checkbox" data-pa-rcpt="' + esc(k.email) + '"' + (recipientChecked(picked, k.email) ? ' checked' : '') + dis + '>' +
+        '<span class="pa-rcpt-info"><span class="pa-rcpt-name">' + esc(k.name || k.email) + '</span>' +
+        (k.role ? '<span class="pa-rcpt-sub">' + esc(k.role) + '</span>' : '') +
+        '<span class="pa-rcpt-sub">' + esc(k.email) + '</span></span></label>';
     });
     if (!kps.length) h += '<p class="pa-note pa-small">To include your producer or others, add them with an email under Key Personnel on the Project tab.</p>';
     return h + '</div>';
@@ -178,6 +182,15 @@
     var emails = [];
     root.querySelectorAll('[data-pa-rcpt]').forEach(function (b) { if (b.checked) emails.push(b.getAttribute('data-pa-rcpt')); });
     return act('PUT', '/recipients', { emails: emails }, 'Email list saved.');
+  }
+  // First time this project's panel loads with nothing saved, persist the
+  // all-selected default so it actually takes effect (not just how it looks)
+  // without the producer having to touch a checkbox. Caps match the server's
+  // MAX_RECIPIENTS; the server also enforces this.
+  function seedDefaultRecipients() {
+    if (busy || !state || state.error || (state.recipients || []).length) return;
+    var emails = kpWithEmail().map(function (k) { return k.email; }).slice(0, 10);
+    if (emails.length) act('PUT', '/recipients', { emails: emails });
   }
 
   function deleteFile(id) {
@@ -654,6 +667,7 @@
     var j = await call('GET', '');
     if (k !== key()) return; // switched projects meanwhile
     if (j && j.error) { state = j; forKey = k; }
+    else seedDefaultRecipients();
     render();
     refreshWorkback();
     if (selectAfterLoad && selectAfterLoad.key === k) {

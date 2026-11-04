@@ -805,9 +805,11 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .pa-file-left.soon{color:#E05A4F;font-weight:600}
 .pa-file-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .pa-file-btns a.lb{text-decoration:none;display:inline-flex;align-items:center}
-.pa-rcpt{display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--text-primary);padding:4px 0;cursor:pointer}
-.pa-rcpt input{position:relative;top:1px}
+.pa-rcpt{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-primary);padding:6px 0;cursor:pointer}
+.pa-rcpt input{position:relative;top:3px}
 .pa-rcpt input:disabled{cursor:default}
+.pa-rcpt-info{display:flex;flex-direction:column;gap:1px}
+.pa-rcpt-name{color:var(--text-primary)}
 .pa-rcpt-sub{font-size:12px;color:var(--text-muted)}
 .daily-section-title.client-resp{color:#3a9a5b}
 .pa-rd-kind{font-size:11px;font-weight:600;color:#3a9a5b;margin-top:1px}

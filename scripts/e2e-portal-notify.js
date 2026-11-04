@@ -119,20 +119,23 @@ async function main() {
     return { status: r.status, json: await r.json().catch(() => null) };
   }, method, '/api/portal-admin/' + KEY + p, body);
 
-  await step('Emails block: you (always), then Key Personnel with an email, nobody ticked', async () => {
+  await step('Emails block: Key Personnel with an email, no owner row, defaulted to selected', async () => {
+    // Nothing was saved yet, so the panel seeds "everyone" as the default
+    // and persists it (not just a visual default).
+    await until(async () => (await db.query('SELECT COUNT(*)::int AS n FROM portal_recipients WHERE project_id=$1', [projectId])).rows[0].n === 2, 5000, 'default recipients seeded');
     const rows = await page.$$eval('#portal-admin .pa-rcpt', ls => ls.map(l => ({ t: l.textContent.trim(), on: l.querySelector('input').checked, off: l.querySelector('input').disabled })));
-    assert(rows.length === 3, JSON.stringify(rows));
-    assert(/^You/.test(rows[0].t) && rows[0].on && rows[0].off && rows[0].t.includes(EMAIL), 'owner row ' + JSON.stringify(rows[0]));
-    assert(/Sam Producer/.test(rows[1].t) && !rows[1].on && /Lee Coord/.test(rows[2].t) && !rows[2].on, JSON.stringify(rows));
+    assert(rows.length === 2, JSON.stringify(rows));
+    assert(/Sam Producer/.test(rows[0].t) && rows[0].on && !rows[0].off, 'Sam row ' + JSON.stringify(rows[0]));
+    assert(/Lee Coord/.test(rows[1].t) && rows[1].on && !rows[1].off, 'Lee row ' + JSON.stringify(rows[1]));
     await page.$eval('#portal-admin .pa-emails', el => el.scrollIntoView());
     await page.screenshot({ path: SHOTS + '/nt-emails-block.png' });
   });
 
-  await step('Ticking Sam saves him; the list survives a reload', async () => {
-    await page.click(`#portal-admin [data-pa-rcpt="${SAM}"]`);
+  await step('Unticking Lee drops him from the saved list; it survives a reload', async () => {
+    await page.click(`#portal-admin [data-pa-rcpt="${LEE}"]`);
     await until(async () => (await db.query('SELECT email FROM portal_recipients WHERE project_id=$1', [projectId])).rows.map(r => r.email).join() === SAM, 5000, 'saved');
     await page.evaluate(() => PortalAdmin.onProjectLoaded());
-    await page.waitForFunction(e => { const b = document.querySelector('#portal-admin [data-pa-rcpt="' + e + '"]'); return b && b.checked; }, { timeout: 5000 }, SAM);
+    await page.waitForFunction(e => { const b = document.querySelector('#portal-admin [data-pa-rcpt="' + e + '"]'); return b && !b.checked; }, { timeout: 5000 }, LEE);
   });
 
   await step('Recipient list is validated (not a list, too many, not an email)', async () => {
