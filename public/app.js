@@ -3420,15 +3420,33 @@ function noteCmd(cmd) {
 
 let noteEditingId = null; // id of note being edited, or null for new
 
+// Shared by noteSave() and any automatic note (e.g. client portal feedback,
+// portal-admin.js) so timestamps look the same regardless of source.
+function notesFormatTs(d) {
+  const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return days[d.getDay()]+" "+months[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear()
+    +" — "+d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+}
+
+// Appends an automatic note from a non-editor source. `html` must already
+// be fully escaped/sanitized by the caller (this does not touch it).
+// `source` tags the entry for distinct styling in renderNotes() (see
+// "note-entry--client" in styles.css) and round-trips via notesGetData().
+// Caller is responsible for persisting (autosaveNow()) afterward.
+function notesAddAuto(html, source) {
+  const entry = {ts: notesFormatTs(new Date()), content: html, id: ++_uid, source: source};
+  noteEntries.unshift(entry);
+  renderNotes();
+  return entry;
+}
+
 function noteSave() {
   const editor = document.getElementById("note-editor");
   const content = editor.innerHTML.trim();
   if (!content || content === "<br>") return;
   const now = new Date();
-  const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const ts = days[now.getDay()]+" "+months[now.getMonth()]+" "+now.getDate()+", "+now.getFullYear()
-    +" — "+now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  const ts = notesFormatTs(now);
 
   if (noteEditingId !== null) {
     // Update existing note
@@ -3485,9 +3503,17 @@ function renderNotes() {
   ticker.innerHTML = "";
   noteEntries.forEach(function(e) {
     const div = document.createElement("div");
-    div.className = "note-entry"; div.id = "note-entry-" + e.id;
+    div.className = "note-entry" + (e.source === "client_feedback" ? " note-entry--client" : "");
+    div.id = "note-entry-" + e.id;
     const tsDiv = document.createElement("div"); tsDiv.className = "note-ts";
+    const tsLeft = document.createElement("div"); tsLeft.style.cssText = "display:flex;gap:8px;align-items:center";
+    if (e.source === "client_feedback") {
+      const tag = document.createElement("span");
+      tag.className = "note-client-tag"; tag.textContent = "Client feedback";
+      tsLeft.appendChild(tag);
+    }
     const tsSpan = document.createElement("span"); tsSpan.textContent = e.ts;
+    tsLeft.appendChild(tsSpan);
     const btnWrap = document.createElement("div"); btnWrap.style.cssText = "display:flex;gap:4px";
     const editBtn = document.createElement("button");
     editBtn.title = "Edit note"; editBtn.innerHTML = "&#9998;";
@@ -3502,7 +3528,7 @@ function renderNotes() {
     delBtn.onmouseleave = function() { this.style.color="#ccc"; };
     delBtn.onclick = (function(id) { return function() { noteDeleteById(id); }; })(e.id);
     btnWrap.appendChild(editBtn); btnWrap.appendChild(delBtn);
-    tsDiv.appendChild(tsSpan); tsDiv.appendChild(btnWrap);
+    tsDiv.appendChild(tsLeft); tsDiv.appendChild(btnWrap);
     const bodyDiv = document.createElement("div"); bodyDiv.className = "note-body";
     bodyDiv.innerHTML = e.content;
     div.appendChild(tsDiv); div.appendChild(bodyDiv);
@@ -3522,7 +3548,7 @@ function noteDelete(i) {
   renderNotes();
 }
 
-function notesGetData() { return noteEntries.map(e => ({ts:e.ts, content:e.content})); }
+function notesGetData() { return noteEntries.map(e => e.source ? {ts:e.ts, content:e.content, source:e.source} : {ts:e.ts, content:e.content}); }
 function notesLoadData(arr) {
   noteEntries = (arr||[]).map((e,i) => ({...e, id:++_uid}));
   renderNotes();

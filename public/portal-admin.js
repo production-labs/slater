@@ -87,6 +87,30 @@
     return h;
   }
 
+  // Past responses on this item that are already dealt with (acknowledged):
+  // the read-only thread shown under the live response box in the workback
+  // edit panel. The still-open one (if any) stays in responseFor()/responseHtml
+  // above so it isn't shown twice. Survives "Got it" forever (server never
+  // deletes portal_responses rows); only disappears if the workback item
+  // itself is deleted, since there's nowhere left to show it (the Notes tab
+  // copy, written at ack time, is the permanent record).
+  function historyFor(uuid) {
+    return (state && forKey === key() && !state.error && state.history) ?
+      state.history.filter(function (r) { return r.wb_item_uuid === uuid && r.acknowledged_at; }) : [];
+  }
+  function historyEntryHtml(r) {
+    return '<div class="pa-hist-entry ' + (r.kind === 'approved' ? 'ok' : 'chg') + '">' +
+      '<div class="pa-hist-head"><span class="pa-hist-kind">' + kindLabel(r.kind) + '</span>' +
+      '<span class="pa-hist-meta">' + esc(r.responder_name || 'Client') + ' &middot; ' + esc(when(r.created_at)) + '</span></div>' +
+      (r.note ? '<div class="pa-hist-note">' + esc(r.note) + '</div>' : '') + '</div>';
+  }
+  function historyBlockHtml(uuid) {
+    var list = historyFor(uuid);
+    if (!list.length) return '';
+    return '<details class="pa-hist"><summary>History (' + list.length + ')</summary>' +
+      list.map(historyEntryHtml).join('') + '</details>';
+  }
+
   function responsesBlock() {
     var list = openResponses();
     if (!list.length) return '';
@@ -223,6 +247,21 @@
     try { if (typeof sidebarOpen !== 'undefined' && sidebarOpen && dailyTab === 'pending') refreshSidebar(); } catch (e) {}
   }
 
+  // Builds the escaped HTML logged to Notes when a client response is
+  // acknowledged. Kept distinct from the read-only thread HTML (historyEntryHtml)
+  // since Notes has no buttons and lives on even if the workback item is
+  // later deleted.
+  function feedbackNoteHtml(r) {
+    var wid = wbIdForUuid(r.wb_item_uuid);
+    var d = wid ? _wbData[wid] : null;
+    var itemName = d ? (d.item || '(untitled)') : null;
+    var who = r.responder_name || 'Client';
+    var head = '<strong>' + esc(kindLabel(r.kind)) + '</strong> by ' + esc(who) +
+      (itemName ? ' on &ldquo;' + esc(itemName) + '&rdquo;' : ' <em>(item no longer in the workback)</em>');
+    var body = r.note ? '<div>&ldquo;' + esc(r.note).replace(/\n/g, '<br>') + '&rdquo;</div>' : '';
+    return '<div>' + head + '</div>' + body;
+  }
+
   async function ackResponse(id, completeItem) {
     var r = openResponses().filter(function (x) { return String(x.id) === String(id); })[0];
     if (!r) return;
@@ -238,6 +277,13 @@
     if (j && !j.error) {
       pendingAll = pendingAll.filter(function (x) { return String(x.id) !== String(id); });
       pendingSig = sig(pendingAll);
+      // Preserve the comment on the Notes tab (distinct styling there) now
+      // that it's about to disappear from every pending list. Mutates the
+      // open project's in-memory notes directly, same pattern as the
+      // completeItem status change above, then flushes it right away so it
+      // isn't lost to a later autosave built from stale in-memory data.
+      if (typeof notesAddAuto === 'function') notesAddAuto(feedbackNoteHtml(r), 'client_feedback');
+      if (typeof autosaveNow === 'function') autosaveNow();
     }
     refreshWorkback();
     refreshRundown();
@@ -712,7 +758,9 @@
     editPanelHtml: function (uuid) {
       var r = uuid && responseFor(uuid);
       var files = uuid ? openFiles().filter(function (f) { return f.wb_item_uuid === uuid; }) : [];
+      var hist = uuid ? historyBlockHtml(uuid) : '';
       return (r ? '<div class="ep-sec">' + responseHtml(r, 'item') + '</div>' : '') +
+        (hist ? '<div class="ep-sec">' + hist + '</div>' : '') +
         (files.length ? '<div class="ep-sec pa-files"><div class="pa-label">Files from your client (' + files.length + ')</div>' +
           files.map(function (f) { return fileHtml(f, 'item'); }).join('') + '</div>' : '');
     },

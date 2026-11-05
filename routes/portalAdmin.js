@@ -13,7 +13,8 @@
 //   POST   /:key/updates         { body } posts an update
 //   DELETE /:key/updates/:id     removes an update
 //   POST   /:key/responses/:id/ack   client response seen (confirmed or
-//                                    dismissed); it drops off every list
+//                                    dismissed); it drops off the pending
+//                                    lists but stays in `history` (below)
 //   GET    /responses/pending   unconfirmed client responses, all projects
 //                               (for the Rundown)
 //   GET    /:key/files/:id/download  302 to a 5-minute R2 link (saves as a file);
@@ -31,6 +32,14 @@
 // Client responses (approve / request changes) are written by the PUBLIC
 // side and include text the client typed. The browser must treat
 // responder_name and note as plain text, never HTML.
+// `responses` in the status is only ever unacknowledged ones (panel list,
+// nav badge, Rundown count). `history` is every response ever made on the
+// project, acknowledged or not, oldest first: the browser uses it to show
+// the full thread on a workback item (V1.5 step, 2026-11-04), including
+// ones already dealt with. A response always carries a `wb_item_uuid`
+// (only "Waiting on you" workback items are ever responded to; schedule
+// days and other pins have no response capability), so `history` never
+// needs to handle any other item type.
 //
 // The token is never logged. The password hash never leaves the server;
 // the browser only learns whether one is set.
@@ -55,11 +64,17 @@ async function findProject(req) {
 }
 
 async function status(projectId, ownerId) {
-  const [p, u, r, f, rc, me] = await Promise.all([
+  const [p, u, r, h, f, rc, me] = await Promise.all([
     pool.query('SELECT token, password_hash IS NOT NULL AS has_password, created_at FROM portals WHERE project_id = $1 AND owner_id = $2', [projectId, ownerId]),
     pool.query('SELECT id, author_name, body, created_at FROM portal_updates WHERE project_id = $1 AND owner_id = $2 ORDER BY created_at DESC, id DESC', [projectId, ownerId]),
     pool.query(`SELECT id, wb_item_uuid, kind, responder_name, note, created_at FROM portal_responses
                  WHERE project_id = $1 AND owner_id = $2 AND acknowledged_at IS NULL ORDER BY created_at DESC, id DESC`, [projectId, ownerId]),
+    // Every response ever made on this project, acknowledged or not, oldest
+    // first: the full per-item thread shown on the workback item (never
+    // filtered out, so a response survives being acted on). Capped well
+    // above anything a real project would produce.
+    pool.query(`SELECT id, wb_item_uuid, kind, responder_name, note, created_at, acknowledged_at FROM portal_responses
+                 WHERE project_id = $1 AND owner_id = $2 ORDER BY created_at ASC, id ASC LIMIT 1000`, [projectId, ownerId]),
     pool.query(`SELECT id, filename, size_bytes, uploaded_by_name, wb_item_uuid, ready_at, expires_at, downloaded_at, downloaded_by
                   FROM portal_files
                  WHERE project_id = $1 AND owner_id = $2 AND status = 'ready' AND expires_at > NOW()
@@ -75,6 +90,7 @@ async function status(projectId, ownerId) {
     enabled_at: row ? row.created_at : null,
     updates: u.rows,
     responses: r.rows,
+    history: h.rows,
     files: f.rows.map(x => Object.assign(x, { size_bytes: Number(x.size_bytes) })),
     uploads_enabled: transfers.isConfigured(),
     owner_email: me.rows[0] ? me.rows[0].email : '',
