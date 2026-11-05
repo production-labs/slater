@@ -9,9 +9,10 @@ This folder is not served by the app, so pushing it publishes nothing.
 | `terms.md` | Terms of Service | Includes acceptable use, copyright (DMCA), client portal visitors, billing via Paddle |
 | `privacy.md` | Privacy Policy | Includes cookies, service providers, retention, rights |
 | `refund.md` | Refund Policy | 14 days, aligned with Paddle as Merchant of Record |
+| `cookie.md` | Cookie Policy | Drafted 2026-11-04; expands section 6 of `privacy.md`; no consent banner needed (essential-only cookies) |
 | (later) `dpa.md` | Data Processing Agreement | Before selling to EU/UK businesses |
 
-Drafted 2026-11-02 from how the code actually works (see the facts list below),
+Drafted 2026-11-02 (cookie.md: 2026-11-04) from how the code actually works (see the facts list below),
 with John's decisions:
 - Payments: **Paddle** as Merchant of Record; **monthly and yearly** subscriptions.
 - Refunds: **14 days**, no questions, first purchase.
