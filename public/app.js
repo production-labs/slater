@@ -2117,6 +2117,26 @@ function wbBusinessDaysBefore(eventIso, days) {
   return d.toISOString().slice(0,10);
 }
 
+// The inverse of wbBusinessDaysBefore: how many business days dueIso is
+// before anchorIso (negative = after), counted with the same weekend and
+// holiday rules, so wbBusinessDaysBefore(anchorIso, n) gives dueIso back.
+// A due date on a weekend/holiday rounds to the nearest business day
+// toward the anchor.
+function wbDaysBeforeAnchor(dueIso, anchorIso) {
+  if (!dueIso || !anchorIso || dueIso === anchorIso) return 0;
+  var dir = dueIso < anchorIso ? -1 : 1;
+  var d = new Date(anchorIso + "T12:00:00");
+  var holidays = usHolidays(d.getFullYear());
+  var n = 0;
+  for (var guard = 0; guard < 3000; guard++) {
+    d.setDate(d.getDate() + dir);
+    var iso = d.toISOString().slice(0,10), dow = d.getDay();
+    if (!(dow === 0 || dow === 6 || holidays.has(iso))) n++;
+    if (dir < 0 ? iso <= dueIso : iso >= dueIso) break;
+  }
+  return dir < 0 ? n : -n;
+}
+
 function wbFmtDate(iso) {
   if (!iso) return "";
   const d = new Date(iso + "T12:00:00");
@@ -4925,6 +4945,7 @@ function renderTmplItemRow(i, item) {
 
 function saveTmplEditing() {
   if (!tmplEditing.name.trim()) { alert("Please enter a template name."); return; }
+  tmplEditing.days_before = true; // the editor's column is "Days before": whatever is in it now is meant
   const tmpls = tmplLoad();
   if (tmplEditing.id) {
     const idx = tmpls.findIndex(function(t) { return t.id === tmplEditing.id; });
@@ -4939,15 +4960,40 @@ function saveTmplEditing() {
   renderTmplManager();
 }
 
+// A workback template is a list of items with "Days before" the anchor date
+// (the template editor's own column name; the presets are written that
+// way too). So template items always load in anchor mode, whatever the
+// project type. Before 2026-11-05 they took the project's default mode,
+// which for Post Production is "sequential": that ignored the days and
+// chained items 1 business day apart from kickoff.
+//
+// Exception: templates saved with "Save current as template" from a
+// chained (Post Production) workback before that date stored days=0 for
+// every item, i.e. no anchor information at all. Those still load the old
+// way (mode left to the project default) instead of stacking every item
+// on the anchor date. Templates saved since carry days_before: true.
+//
+// Used by loadTemplate() and the bulk import (project-import.js).
+// Returns plain items for wbAdd(); mode is undefined for that legacy case.
+function wbItemsFromTemplate(tmpl) {
+  var items = (tmpl && tmpl.items) || [];
+  var legacyNoOffsets = !tmpl.days_before && items.length > 1 &&
+    items.every(function(it) { return !it.days; });
+  return items.map(function(it) {
+    return { item: it.item, owner: it.owner || "", days: it.days || 0, status: "Not Started",
+      mode: legacyNoOffsets ? undefined : "anchor" };
+  });
+}
+
 function loadTemplate(tmpl) {
-  wbLoadItems((tmpl.items||[]).map(function(it) { return {item:it.item, owner:it.owner||"", days:it.days||0, status:"Not Started"}; }));
+  wbLoadItems(wbItemsFromTemplate(tmpl));
   wbRecalc();
   setStatus("Loaded template: " + tmpl.name, "ok");
 }
 
 function duplicatePreset(preset) {
   const tmpls = tmplLoad();
-  const copy = {id:"tmpl_"+Date.now(), name:preset.name.replace(" (Preset)"," (Copy)"), items:JSON.parse(JSON.stringify(preset.items))};
+  const copy = {id:"tmpl_"+Date.now(), name:preset.name.replace(" (Preset)"," (Copy)"), days_before:true, items:JSON.parse(JSON.stringify(preset.items))};
   tmpls.push(copy);
   tmplSaveAll(tmpls);
   tmplEditing = copy;
@@ -4960,7 +5006,16 @@ function saveCurrentAsTemplate() {
   const name = prompt("Template name:");
   if (!name || !name.trim()) return;
   const tmpls = tmplLoad();
-  const tmpl = {id:"tmpl_"+Date.now(), name:name.trim(), items:items.map(function(it) { return {item:it.item, owner:it.owner, days:it.days}; })};
+  // Store every item as "days before" the current anchor date, computed
+  // from the date it actually has now, so chained (sequential) and
+  // fixed-date (manual) items keep their spacing when the template loads
+  // in anchor mode. Without dates to go on, an anchor-mode item keeps its
+  // own days and anything else falls back to 0 (the old behavior).
+  const anchorIso = getAnchorIso();
+  const tmpl = {id:"tmpl_"+Date.now(), name:name.trim(), days_before:true, items:items.map(function(it) {
+    var days = (it.due && anchorIso) ? wbDaysBeforeAnchor(it.due, anchorIso) : (it.mode === "anchor" ? (it.days || 0) : 0);
+    return {item:it.item, owner:it.owner, days:days};
+  })};
   tmpls.push(tmpl);
   tmplSaveAll(tmpls);
   setStatus("Saved as template: " + name.trim(), "ok");

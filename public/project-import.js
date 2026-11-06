@@ -94,18 +94,17 @@
     return custom.find(function (t) { return normKey(t.name) === k; }) || null;
   }
 
-  // Mirrors wbAdd()'s own defaults exactly (app.js), including today's
-  // existing behavior where Post Production items default to "sequential"
-  // mode and so ignore the preset's `days` offset in favor of 1-day
-  // spacing from kickoff. That's current app behavior for the "Load
-  // template" button too -- this import intentionally matches it rather
-  // than quietly fixing it.
+  // Same items the "Load template" button makes: wbItemsFromTemplate() in
+  // app.js decides the mode (anchor, i.e. "days before"; or, for a legacy
+  // all-zero template, the project type's default, which wbAdd() would
+  // pick: sequential for Post Production, else anchor). The rest mirrors
+  // wbAdd()'s defaults and wbGetItems()'s saved shape.
   function buildWbItems(tmpl, projectType) {
-    return (tmpl.items || []).map(function (it) {
-      var mode = projectType === 'post_production' ? 'sequential' : 'anchor';
+    return wbItemsFromTemplate(tmpl).map(function (it) {
+      var mode = it.mode || (projectType === 'post_production' ? 'sequential' : 'anchor');
       return {
         item: it.item || '', owner: it.owner || '', uuid: generateWbUuid(),
-        mode: mode, days: it.days === undefined ? 0 : it.days, seq_days: 1,
+        mode: mode, days: it.days, seq_days: 1,
         seq_anchor_uuid: '', manual_date: '',
         status: it.status || 'Not Started', internal: false,
         due: '', dueFmt: '',
@@ -267,11 +266,15 @@
         warnings.push('Workback template "' + tmplName + '" not found -- workback left empty.');
       } else {
         wbItems = buildWbItems(tmpl, projectType || 'location_shoot');
-        if (projectType && projectType !== 'post_production' && !scheduleDay) {
-          warnings.push('No Due / Event Date given, so workback dates will anchor to the Kickoff Date rather than the event date. Add a Due / Event Date (or a schedule day on the Schedule tab), then review workback dates.');
-        }
-        if (!kickoffIso && projectType !== 'post_production' && !scheduleDay) {
-          warnings.push('No Kickoff Date given either -- workback items will show with no computed date until one is set.');
+        // Template items count back from the anchor: the Due Date for Post
+        // Production, the event day for everything else. Without one the
+        // app anchors to Kickoff Date, i.e. counts back from the kickoff.
+        var anchored = projectType === 'post_production' ? !!dueIso : !!scheduleDay;
+        if (projectType && !anchored) {
+          warnings.push(projectType === 'post_production'
+            ? 'No Due Date given, so workback dates will count back from the Kickoff Date. Set the Due Date on the Schedule tab, then review workback dates.'
+            : 'No Due / Event Date given, so workback dates will count back from the Kickoff Date rather than the event date. Add a Due / Event Date (or a schedule day on the Schedule tab), then review workback dates.');
+          if (!kickoffIso) warnings.push('No Kickoff Date given either -- workback items will show with no computed date until one is set.');
         }
       }
     }

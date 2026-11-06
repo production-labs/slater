@@ -227,6 +227,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Pin IDs: `pin_YYYY-MM-DD` for schedule days, `video_due` for post production
 - Changing a schedule day date updates all sequential anchor references
 - Internal only checkbox — hides from Word doc, shows in Rundown
+- Workback templates are "days before" the anchor (Due Date for Post Production, else the selected schedule day). `wbItemsFromTemplate()` always loads them in anchor mode. "Save current as template" converts each item's actual date to days-before (`wbDaysBeforeAnchor()`) and marks the template `days_before: true`. Exception: unmarked templates whose items are all 0 (saved from chained Post Production workbacks before 2026-11-05) load in the project's default mode, as they used to. Before that fix, Post Production ignored template days and chained items 1 day apart from kickoff.
 - All pins sorted by date in live UI
 - `wbRecalc()` handles all date calculations
 
@@ -254,7 +255,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Rule: must not change how Slater works. Runs entirely client-side, never touches the open project, saves each row through the normal `API.saveProject` with data shaped like `gather()`, label from `libLabel()`. No new server route.
 - Due / Event Date: Post Production sets the pinned Due Date + time; other types get one schedule day (`sday_1`, date + go-live time), which also anchors the workback.
 - Orgs: exact name match against `ContactsV2.store` (same as the pickers); no match or ambiguous = left unlinked and flagged, never auto-created. Blank Agency = default agency (and its timezone), like New Project.
-- Workback Template: name match against `WB_PRESETS`, then the user's saved templates (localStorage, which is why the import must run in the browser). No match = empty workback.
+- Workback Template: name match against `WB_PRESETS`, then the user's saved templates (localStorage, which is why the import must run in the browser). No match = empty workback. Items built by `wbItemsFromTemplate()`, the same as "Load template".
 - Crew, talent, KP, extra schedule days: never imported. Duplicates (same label as an existing project or an earlier row) are left unchecked.
 - Excel dates/times are read as raw serials and decoded with `XLSX.SSF.parse_date_code` (time zone safe). Don't switch to `cellDates`.
 
@@ -324,8 +325,6 @@ git push
 ## Known Issues / In Progress
 
 - Mobile bottom nav bar: built 2026-08-17 but untested; all mobile work is on hold for now
-- Loading a workback template on a Post Production project ignores the template's day offsets: `wbAdd()` defaults Post Production items to "sequential" mode, so items chain 1 business day apart from kickoff. Affects the "Load template" button and the bulk import alike (the import matches it on purpose). Found 2026-11-05; not fixed, John to decide.
-
 ---
 
 ## V1.0 Remaining

@@ -213,7 +213,7 @@ async function main() {
     assert(p.agency_org_id === O.alpha && d.timezone === 'ET', 'default agency ' + p.agency_org_id + ', tz ' + d.timezone);
     assert(d.kickoff_date_iso === '2026-12-10' && d.video_due_date_iso === '2027-01-15' && d.video_due_time === '5:00 PM', 'dates ' + d.kickoff_date_iso + ' ' + d.video_due_date_iso + ' ' + d.video_due_time);
     assert(d.schedule_days.length === 0, 'no schedule day for post');
-    assert(d.wb_items.length === 2 && d.wb_items[0].item === 'Assets in' && d.wb_items[0].mode === 'sequential', 'custom template ' + JSON.stringify(d.wb_items));
+    assert(d.wb_items.length === 2 && d.wb_items[0].item === 'Assets in' && d.wb_items[0].mode === 'anchor', 'custom template, "days before" the due date: ' + JSON.stringify(d.wb_items));
     assert(p.label === 'Contoso Client | Highlight Video | 01/15/27', 'label ' + p.label);
   });
 
@@ -248,6 +248,68 @@ async function main() {
     // the "-5" rough cut would land before the shoot.
     assert(s.due.every(x => x[1] && (x[2] >= 0 ? x[1] <= '2026-12-01' : x[1] > '2026-12-01')), 'items relative to the event: ' + JSON.stringify(s.due));
     assert(await page.$eval('#lib-select', s => s.value) === key, 'opened from the list');
+  });
+
+  // ---- Workback templates on Post Production (fixed 2026-11-05): items are
+  // "days before" the Due Date, not chained 1 day apart from kickoff.
+  const openProject = async key => {
+    await page.evaluate(k => { document.getElementById('lib-select').value = k; libSelect(); }, key);
+    await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, key);
+    await sleep(300);
+  };
+  const dues = () => page.evaluate(() => wbItems.map(id => [_wbData[id].item, _wbData[id].due, _wbData[id].mode]));
+
+  await step('templates: imported Post Production project counts back from its Due Date', async () => {
+    await openProject(P('Highlight Video').key);
+    const d = await dues();
+    const want = await page.evaluate(() => [wbBusinessDaysBefore('2027-01-15', 10), wbBusinessDaysBefore('2027-01-15', 5)]);
+    assert(d.length === 2 && d[0][1] === want[0] && d[1][1] === want[1], 'dues ' + JSON.stringify(d) + ' want ' + want);
+  });
+
+  await step('templates: "Load template" on Post Production lands the preset on the Due Date', async () => {
+    const r = await page.evaluate(() => {
+      loadTemplate(WB_PRESETS.post_production);
+      const by = {}; wbItems.forEach(id => { by[_wbData[id].item] = _wbData[id]; });
+      return { final: by['Final delivery'].due, lock: by['Picture lock'].due, kickoff: by['Project kickoff / assets received'].due,
+        want: { lock: wbBusinessDaysBefore('2027-01-15', 6), kickoff: wbBusinessDaysBefore('2027-01-15', 30) },
+        modes: [...new Set(wbItems.map(id => _wbData[id].mode))] };
+    });
+    assert(r.final === '2027-01-15', 'Final delivery on the due date: ' + r.final);
+    assert(r.lock === r.want.lock && r.kickoff === r.want.kickoff, 'offsets: ' + JSON.stringify(r));
+    assert(r.modes.length === 1 && r.modes[0] === 'anchor', 'modes ' + r.modes);
+  });
+
+  await step('templates: saving a chained workback, then loading it, keeps the same dates', async () => {
+    const r = await page.evaluate(() => {
+      // A hand-built chained (sequential) workback, the Post Production default.
+      wbLoadItems([
+        { item: 'Assets in', mode: 'sequential', seq_days: 2 },
+        { item: 'Rough cut', mode: 'sequential', seq_days: 5 },
+        { item: 'Locked on a date', mode: 'manual', manual_date: '2027-01-08' },
+      ]);
+      const before = wbItems.map(id => _wbData[id].due);
+      const origPrompt = window.prompt; window.prompt = () => 'Chained Round Trip';
+      try { saveCurrentAsTemplate(); } finally { window.prompt = origPrompt; }
+      const saved = tmplLoad().find(t => t.name === 'Chained Round Trip');
+      wbLoadItems([]);
+      loadTemplate(saved);
+      return { before, after: wbItems.map(id => _wbData[id].due), saved };
+    });
+    assert(r.saved && r.saved.days_before === true, 'saved template marked days_before: ' + JSON.stringify(r.saved));
+    assert(r.before.every(Boolean) && JSON.stringify(r.before) === JSON.stringify(r.after), 'dates before ' + r.before + ' after ' + r.after);
+  });
+
+  await step('templates: an old all-zero template (saved before the fix) still loads the old way', async () => {
+    const modes = await page.evaluate(() => {
+      loadTemplate({ name: 'Old chained', items: [{ item: 'A', owner: '', days: 0 }, { item: 'B', owner: '', days: 0 }] });
+      return wbItems.map(id => _wbData[id].mode);
+    });
+    assert(JSON.stringify(modes) === '["sequential","sequential"]', 'legacy template on Post Production: ' + modes);
+    const edited = await page.evaluate(() => {
+      loadTemplate({ name: 'Edited', days_before: true, items: [{ item: 'A', days: 0 }, { item: 'B', days: 0 }] });
+      return wbItems.map(id => _wbData[id].due);
+    });
+    assert(JSON.stringify(edited) === '["2027-01-15","2027-01-15"]', 'a days_before template with zeros means "on the due date": ' + edited);
   });
 
   await step('a CSV file imports too (text dates and times)', async () => {
