@@ -49,8 +49,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── project-people-v2.js # Crew/Talent/KP contact + role pickers
 │   ├── booking-conflicts.js # Double-booking warnings across projects
 │   ├── projects-overview.js/.css # V1.5 Projects Overview dashboard + closeout checklist
-│   ├── project-import.js  # Bulk project import from .xlsx/.csv (Import button in the project bar)
-│   ├── lib/               # Vendored libs: vendors.js (docx + JSZip), lucide, xlsx.full.min.js (SheetJS 0.20.3)
+│   ├── lib/               # Vendored libs: vendors.js (docx + JSZip), lucide
 │   ├── login.html         # Login page with forgot password flow
 │   ├── reset-password.html # Password reset page
 │   ├── admin.html         # Admin dashboard
@@ -78,9 +77,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 - **Password hashing:** bcrypt
 - **OCR:** Anthropic Claude Haiku (claude-haiku-4-5-20251001)
 - **Email:** Resend API
-- **Doc generation:** docx.js + JSZip for Word doc patching (vendored in `public/lib/vendors.js`, not a CDN)
-- **Spreadsheet import:** SheetJS 0.20.3 (`public/lib/xlsx.full.min.js`, from cdn.sheetjs.com; do not use the npm `xlsx` package, it is stuck at 0.18.5 with known CVEs)
-- **Fonts:** Geist (Google Fonts)
+- **Doc generation:** docx.js + JSZip for Word doc patching (vendored in `public/lib/vendors.js`, not a CDN)- **Fonts:** Geist (Google Fonts)
 - **Hosting:** Railway (Node.js + PostgreSQL)
 
 ---
@@ -227,7 +224,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Pin IDs: `pin_YYYY-MM-DD` for schedule days, `video_due` for post production
 - Changing a schedule day date updates all sequential anchor references
 - Internal only checkbox — hides from Word doc, shows in Rundown
-- Workback templates are "days before" the anchor (Due Date for Post Production, else the selected schedule day). `wbItemsFromTemplate()` always loads them in anchor mode. "Save current as template" converts each item's actual date to days-before (`wbDaysBeforeAnchor()`) and marks the template `days_before: true`. Exception: unmarked templates whose items are all 0 (saved from chained Post Production workbacks before 2026-11-05) load in the project's default mode, as they used to. Before that fix, Post Production ignored template days and chained items 1 day apart from kickoff.
+- Workback templates are "days before" the anchor (Due Date for Post Production, else the selected schedule day). `wbItemsFromTemplate()` always loads them in anchor mode. "Save current as template" converts each item's actual date to days-before (`wbDaysBeforeAnchor()`) and marks the template `days_before: true`. Exception: unmarked templates whose items are all 0 (saved from chained Post Production workbacks before 2026-11-05) load in the project's default mode, as they used to. Before that fix, Post Production ignored template days and chained items 1 day apart from kickoff. Test: `scripts/e2e-wb-templates.js`.
 - All pins sorted by date in live UI
 - `wbRecalc()` handles all date calculations
 
@@ -248,16 +245,6 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Organizations: agencies and client companies in one list (`is_agency` flag); logo (512px square crop), website, billing contact, invoicing defaults
 - Stored in PostgreSQL tables (see Database Schema), synced per record (`/api/v2/sync`); soft delete via archive
 - Project tab agency + client pickers read Organizations; default agency per user
-
-### Bulk Project Import (`public/project-import.js`, test `scripts/e2e-project-import.js`)
-- Import button in the project bar; upload .xlsx/.xls/.csv, preview with per-row notes, then import. Sample template downloadable from the modal.
-- Columns: Project Title*, Project Type*, Agency, Client Company, Billing Code, Kickoff Date, Due / Event Date, Due / Event Time, Workback Template (headers matched case-insensitively, with synonyms).
-- Rule: must not change how Slater works. Runs entirely client-side, never touches the open project, saves each row through the normal `API.saveProject` with data shaped like `gather()`, label from `libLabel()`. No new server route.
-- Due / Event Date: Post Production sets the pinned Due Date + time; other types get one schedule day (`sday_1`, date + go-live time), which also anchors the workback.
-- Orgs: exact name match against `ContactsV2.store` (same as the pickers); no match or ambiguous = left unlinked and flagged, never auto-created. Blank Agency = default agency (and its timezone), like New Project.
-- Workback Template: name match against `WB_PRESETS`, then the user's saved templates (localStorage, which is why the import must run in the browser). No match = empty workback. Items built by `wbItemsFromTemplate()`, the same as "Load template".
-- Crew, talent, KP, extra schedule days: never imported. Duplicates (same label as an existing project or an earlier row) are left unchecked.
-- Excel dates/times are read as raw serials and decoded with `XLSX.SSF.parse_date_code` (time zone safe). Don't switch to `cellDates`.
 
 ### Client Branding
 - Per-project doc_branding: Agency or Client
@@ -325,6 +312,22 @@ git push
 ## Known Issues / In Progress
 
 - Mobile bottom nav bar: built 2026-08-17 but untested; all mobile work is on hold for now
+- Cloudflare's "Browser Cache TTL" on productionlabs.io is 4 hours and is applied to everything, even 404s. After a deploy, browsers can run old and new JS files side by side for up to 4 hours (fix: hard refresh). Recommended to John 2026-11-05: set it to "Respect Existing Headers" (his Cloudflare account); not done yet. When checking a deploy, don't poll a brand-new file URL through Cloudflare before the deploy is live (Cloudflare caches the 404); add a cache-busting query string.
+
+---
+
+## Backlog (decided, not scheduled)
+
+### Grid view: paste-from-spreadsheet editing (decided 2026-11-05)
+John: "we need to do this, but not right now." An editable spreadsheet-style grid of project/event details inside Slater, where whole rows or columns copied from Excel or Google Sheets can be pasted in.
+- Replaces the .xlsx bulk import, which was built, pushed and then removed on 2026-11-05 (added in 63e7597, removed by the "Remove bulk project import" commit). John's reasons: too many fields are dropdowns (locations, project type, etc.), so he had to keep looking in Slater for the exact values to type into the sheet, and everything the import didn't cover took forever to fill in afterward.
+- Open questions to ask John FIRST when picking this up:
+  1. One row per event day, grouped under its project (suggested), or one row per project?
+  2. Which columns? Starting list: project title, type, client, agency, kickoff, due date, event date, day label/category, location, call time, go-live, wrap. Add/drop (crew status? billing code?)?
+  3. Should the grid create new projects, edit existing ones, or both?
+- Design notes: the clipboard from a spreadsheet is tab-separated text. Dropdown columns match pasted text the way the project pickers do (`project-orgs-v2.js` `byName`: exact after trim/lowercase, active only, ambiguous never auto-links); unmatched cells are highlighted and fixed in place from the real dropdown; a missing client/location could be quick-added. Likely library: Tabulator (MIT, has clipboard paste and dropdown editors). Not Handsontable (needs a commercial license, and Slater is a paid product). Must not clash with the same project open in the form. Desktop only. Rough size: 1 to 2 weeks.
+- Reusable from the removed import (`git show 63e7597:public/project-import.js`): org and template matching, Excel date/time parsing (`XLSX.SSF.parse_date_code` on raw cell values, never `cellDates`, which shifts times in US time zones), building project data in `gather()`'s shape with `libLabel()` labels, the default-agency rule. If a spreadsheet library is needed again, use SheetJS from cdn.sheetjs.com, not the npm `xlsx` package (stuck at 0.18.5 with known CVEs).
+
 ---
 
 ## V1.0 Remaining

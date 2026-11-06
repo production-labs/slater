@@ -4973,7 +4973,6 @@ function saveTmplEditing() {
 // way (mode left to the project default) instead of stacking every item
 // on the anchor date. Templates saved since carry days_before: true.
 //
-// Used by loadTemplate() and the bulk import (project-import.js).
 // Returns plain items for wbAdd(); mode is undefined for that legacy case.
 function wbItemsFromTemplate(tmpl) {
   var items = (tmpl && tmpl.items) || [];
