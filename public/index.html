@@ -83,6 +83,7 @@
           <div class="project-bar-actions" id="lib-action-row">
             <button class="lb accent" onclick="libNew()"><i data-lucide="plus" class="lucide btn-icon"></i> New Project</button>
             <button class="lb" onclick="libSave()"><i data-lucide="save" class="lucide btn-icon"></i> Save</button>
+            <button class="lb" onclick="ProjectImport.open()"><i data-lucide="upload" class="lucide btn-icon"></i> Import</button>
             <button class="lb" id="lib-duplicate" onclick="libDuplicate()" style="display:none"><i data-lucide="copy" class="lucide btn-icon"></i> Duplicate</button>
             <button class="lb danger" id="lib-delete" onclick="libDelete()" style="display:none"><i data-lucide="trash-2" class="lucide btn-icon"></i> Delete</button>
             <span class="autosave-indicator" id="autosave-indicator">Autosaved</span>
@@ -580,6 +581,22 @@
   </div>
 </div>
 
+<!-- Bulk project import -->
+<div class="contacts-modal" id="import-modal">
+  <div class="contacts-box" style="width:720px;max-width:94vw">
+    <div class="contacts-head">
+      <h3>Import Projects</h3>
+      <button class="rb" onclick="ProjectImport.close()" style="font-size:18px">&#x2715;</button>
+    </div>
+    <div class="contacts-body" style="padding:16px 20px;max-height:70vh;overflow-y:auto" id="import-body">
+      <!-- filled in by project-import.js -->
+    </div>
+    <div class="contacts-foot" id="import-foot">
+      <!-- filled in by project-import.js -->
+    </div>
+  </div>
+</div>
+
 <div id="day-staff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeDayStaffModal()">
   <div style="background:var(--surface);border-radius:12px;width:520px;max-width:92vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)">
     <div style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
@@ -679,6 +696,7 @@
 <script src="/connection.js"></script>
 <script src="/lib/lucide.min.js"></script>
 <script src="/lib/vendors.js"></script>
+<script src="/lib/xlsx.full.min.js"></script>
 <script src="/app.js"></script>
 <script src="/regions.js"></script>
 <script src="/contacts-v2.js"></script>
@@ -688,5 +706,6 @@
 <script src="/client-readiness.js"></script>
 <script src="/projects-overview.js"></script>
 <script src="/portal-admin.js"></script>
+<script src="/project-import.js"></script>
 </body>
 </html>

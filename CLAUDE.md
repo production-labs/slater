@@ -49,6 +49,8 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── project-people-v2.js # Crew/Talent/KP contact + role pickers
 │   ├── booking-conflicts.js # Double-booking warnings across projects
 │   ├── projects-overview.js/.css # V1.5 Projects Overview dashboard + closeout checklist
+│   ├── project-import.js  # Bulk project import from .xlsx/.csv (Import button in the project bar)
+│   ├── lib/               # Vendored libs: vendors.js (docx + JSZip), lucide, xlsx.full.min.js (SheetJS 0.20.3)
 │   ├── login.html         # Login page with forgot password flow
 │   ├── reset-password.html # Password reset page
 │   ├── admin.html         # Admin dashboard
@@ -76,7 +78,8 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 - **Password hashing:** bcrypt
 - **OCR:** Anthropic Claude Haiku (claude-haiku-4-5-20251001)
 - **Email:** Resend API
-- **Doc generation:** docx.js (CDN) + JSZip for Word doc patching
+- **Doc generation:** docx.js + JSZip for Word doc patching (vendored in `public/lib/vendors.js`, not a CDN)
+- **Spreadsheet import:** SheetJS 0.20.3 (`public/lib/xlsx.full.min.js`, from cdn.sheetjs.com; do not use the npm `xlsx` package, it is stuck at 0.18.5 with known CVEs)
 - **Fonts:** Geist (Google Fonts)
 - **Hosting:** Railway (Node.js + PostgreSQL)
 
@@ -245,6 +248,16 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Stored in PostgreSQL tables (see Database Schema), synced per record (`/api/v2/sync`); soft delete via archive
 - Project tab agency + client pickers read Organizations; default agency per user
 
+### Bulk Project Import (`public/project-import.js`, test `scripts/e2e-project-import.js`)
+- Import button in the project bar; upload .xlsx/.xls/.csv, preview with per-row notes, then import. Sample template downloadable from the modal.
+- Columns: Project Title*, Project Type*, Agency, Client Company, Billing Code, Kickoff Date, Due / Event Date, Due / Event Time, Workback Template (headers matched case-insensitively, with synonyms).
+- Rule: must not change how Slater works. Runs entirely client-side, never touches the open project, saves each row through the normal `API.saveProject` with data shaped like `gather()`, label from `libLabel()`. No new server route.
+- Due / Event Date: Post Production sets the pinned Due Date + time; other types get one schedule day (`sday_1`, date + go-live time), which also anchors the workback.
+- Orgs: exact name match against `ContactsV2.store` (same as the pickers); no match or ambiguous = left unlinked and flagged, never auto-created. Blank Agency = default agency (and its timezone), like New Project.
+- Workback Template: name match against `WB_PRESETS`, then the user's saved templates (localStorage, which is why the import must run in the browser). No match = empty workback.
+- Crew, talent, KP, extra schedule days: never imported. Duplicates (same label as an existing project or an earlier row) are left unchecked.
+- Excel dates/times are read as raw serials and decoded with `XLSX.SSF.parse_date_code` (time zone safe). Don't switch to `cellDates`.
+
 ### Client Branding
 - Per-project doc_branding: Agency or Client
 - Warning if client selected but no logo on file
@@ -311,6 +324,7 @@ git push
 ## Known Issues / In Progress
 
 - Mobile bottom nav bar: built 2026-08-17 but untested; all mobile work is on hold for now
+- Loading a workback template on a Post Production project ignores the template's day offsets: `wbAdd()` defaults Post Production items to "sequential" mode, so items chain 1 business day apart from kickoff. Affects the "Load template" button and the bulk import alike (the import matches it on purpose). Found 2026-11-05; not fixed, John to decide.
 
 ---
 
