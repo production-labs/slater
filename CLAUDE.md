@@ -312,7 +312,7 @@ git push
 ## Known Issues / In Progress
 
 - Mobile bottom nav bar: built 2026-08-17 but untested; all mobile work is on hold for now
-- Cloudflare's "Browser Cache TTL" on productionlabs.io is 4 hours and is applied to everything, even 404s. After a deploy, browsers can run old and new JS files side by side for up to 4 hours (fix: hard refresh). Recommended to John 2026-11-05: set it to "Respect Existing Headers" (his Cloudflare account); not done yet. When checking a deploy, don't poll a brand-new file URL through Cloudflare before the deploy is live (Cloudflare caches the 404); add a cache-busting query string.
+- Cloudflare "Browser Cache TTL" on productionlabs.io: set to "Respect Existing Headers" by John 2026-11-07 (was 4 hours, applied even to 404s, so browsers could mix old and new JS after a deploy). Verified live: JS/CSS are `public, max-age=0`, 404s carry no cache-control. Still true: when checking a deploy, don't poll a brand-new file URL through Cloudflare before the deploy is live (Cloudflare caches the 404); add a cache-busting query string.
 
 ---
 
