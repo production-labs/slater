@@ -24,6 +24,7 @@
     .toggle-link { text-align: center; margin-top: 20px; font-size: 13px; color: #6E747B; }
     .toggle-link a { color: #F7F5EF; text-decoration: none; font-weight: 500; cursor: pointer; }
     .toggle-link a:hover { text-decoration: underline; }
+    .notice { color: #F7F5EF; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; display: none; }
     .view { display: none; }
     .view.active { display: block; }
   </style>
@@ -38,6 +39,7 @@
       </div>
     </div>
     <div class="error" id="error-msg"></div>
+    <div class="notice" id="deleted-msg">Your account has been deleted. We've sent a confirmation to your email.</div>
 
     <!-- Sign in view -->
     <div class="view active" id="view-login">
@@ -83,6 +85,16 @@
   </div>
 
   <script>
+    if (/[?&]account_deleted=1/.test(location.search)) {
+      document.getElementById('deleted-msg').style.display = 'block';
+      // The deleted account's copies on this device. Also cleared before
+      // leaving the app (public/account.js), but the app writes a few back
+      // (unsaved-change queue, call sheet cache, tab heartbeat) as it unloads.
+      try {
+        Object.keys(localStorage).forEach(function (k) { if (/^slater/i.test(k)) localStorage.removeItem(k); });
+        Object.keys(sessionStorage).forEach(function (k) { if (/^slater/i.test(k)) sessionStorage.removeItem(k); });
+      } catch (e) {}
+    }
     function showView(view) {
       var errEl = document.getElementById('error-msg');
       errEl.style.display = 'none';

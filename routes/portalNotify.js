@@ -323,4 +323,5 @@ function start() {
   setTimeout(runOnce, Math.min(INTERVAL_MS, 15000)).unref();
 }
 
-module.exports = { start, runOnce, linkRouter, kpCards, buildEmail, MAX_RECIPIENTS, EMAIL_RE };
+// deliver is also used by routes/account.js (account-deleted email).
+module.exports = { start, runOnce, linkRouter, kpCards, buildEmail, deliver, MAX_RECIPIENTS, EMAIL_RE };

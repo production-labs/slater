@@ -559,6 +559,25 @@
           <option value="CET">Central European Time</option>
         </select></div>
       </div>
+      <!-- Account: download / delete (public/account.js) -->
+      <div class="acct-sec">
+        <div class="acct-title">Your data</div>
+        <p class="acct-note">A .zip with everything in your account: a backup file Slater can import, spreadsheets (contacts, organizations, locations, projects, expenses), and your receipt images.</p>
+        <button class="lb" id="acct-export-btn" onclick="Account.exportData()">Download my data</button>
+        <span class="acct-status" id="acct-export-status"></span>
+        <div class="acct-del-row"><button class="acct-del-link" id="acct-del-open" onclick="Account.openDelete()">Delete account</button></div>
+        <div class="acct-del" id="acct-del" hidden>
+          <div class="acct-del-title">Delete your account permanently?</div>
+          <p class="acct-note">This deletes all your projects, contacts, organizations, locations, receipts and client portals (their links stop working and client files are deleted), and clears Slater's saved copies and templates from this browser. It can't be undone. Your license key is retired. Copies in our backups expire within 90 days.</p>
+          <p class="acct-note"><strong>Download your data first</strong> if you might need any of it.</p>
+          <div class="fl"><label for="acct-del-pw">Enter your password to confirm</label><input type="password" id="acct-del-pw" autocomplete="current-password" onkeydown="if(event.key==='Enter')Account.confirmDelete()"></div>
+          <div class="acct-err" id="acct-del-err"></div>
+          <div class="acct-del-btns">
+            <button class="lb acct-danger" id="acct-del-go" onclick="Account.confirmDelete()">Delete my account</button>
+            <button class="lb" onclick="Account.closeDelete()">Keep my account</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="contacts-foot">
       <button class="lb primary" onclick="saveMyInfo()">Save</button>
@@ -679,6 +698,7 @@
 <script src="/lib/lucide.min.js"></script>
 <script src="/lib/vendors.js"></script>
 <script src="/app.js"></script>
+<script src="/account.js"></script>
 <script src="/regions.js"></script>
 <script src="/contacts-v2.js"></script>
 <script src="/project-orgs-v2.js"></script>

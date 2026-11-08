@@ -92,8 +92,9 @@ account; section 9 covers them.
 
 ## 5. Pausing, cancelling, and deleting your account
 
-[CONFIRM: these self-serve options must be built before these Terms go live, or this
-section must say "contact us" instead.]
+[CONFIRM: Delete and data export are built (My Info, 2026-11-07). Pause and Cancel
+come with Paddle billing; build them before these Terms go live, or this section must
+say "contact us" for those two.]
 
 You can do any of these from your account settings:
 
@@ -108,8 +109,8 @@ You can do any of these from your account settings:
 - **Delete.** Permanently deletes your account and Your Content right away (after you
   confirm). Any active subscription is cancelled. This can't be undone.
 
-**Before you cancel or delete, export what you need.** [CONFIRM: data export to be
-built.] Deleted data is removed from our live systems within **30 days** and from our
+**Before you cancel or delete, export what you need** with "Download my data" in
+your account settings. Deleted data is removed from our live systems within **30 days** and from our
 backups within **90 days**, as old backups expire. We may keep limited records we're
 legally required to keep. Paddle keeps its own billing records.
 

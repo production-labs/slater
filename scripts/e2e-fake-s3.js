@@ -6,12 +6,13 @@
 //
 //   const s3 = require('./e2e-fake-s3').create(3988, 'slater-e2e');
 //   await s3.listen();   s3.state.objects / .mpus / .log;   s3.close();
-// Knobs on s3.state: exposeEtag (false = bucket CORS missing ETag), putDelayMs.
+// Knobs on s3.state: exposeEtag (false = bucket CORS missing ETag), putDelayMs,
+// failDeletes (true = every DELETE answers 500, i.e. storage down).
 const http = require('http');
 const crypto = require('crypto');
 
 function create(port, bucket) {
-  const state = { mpus: new Map(), objects: new Map(), log: [], exposeEtag: true, putDelayMs: 0 };
+  const state = { mpus: new Map(), objects: new Map(), log: [], exposeEtag: true, putDelayMs: 0, failDeletes: false };
   const base = 'http://localhost:' + port;
   const md5 = b => crypto.createHash('md5').update(b).digest('hex');
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -64,6 +65,7 @@ function create(port, bucket) {
         state.mpus.delete(q.get('uploadId'));
         return xml(res, 200, `<CompleteMultipartUploadResult><Bucket>${bucket}</Bucket><Key>${key}</Key><ETag>"done"</ETag></CompleteMultipartUploadResult>`);
       }
+      if (req.method === 'DELETE' && state.failDeletes) return xml(res, 500, '<Error><Code>InternalError</Code></Error>');
       if (req.method === 'DELETE' && q.has('uploadId')) { state.mpus.delete(q.get('uploadId')); res.writeHead(204); return res.end(); }
       if (req.method === 'DELETE') { state.objects.delete(key); res.writeHead(204); return res.end(); }
       if (req.method === 'HEAD') {

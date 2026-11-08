@@ -5270,10 +5270,12 @@ function getVideoDueData() {
 
 
 // ── JSON Export / Import ──────────────────────────────────────────────────────
-async function exportLibrary() {
-  setStatus("Preparing export...", "ok");
+// Everything "Export backup" saves (also the backup file inside "Download my
+// data", public/account.js). Returns null if the server can't be reached;
+// contacts_v2 is undefined if only the contacts part failed.
+async function buildExportPayload() {
   var projectList = await API.getProjects();
-  if (!projectList) { setStatus("Export failed: could not reach server.", "err"); return; }
+  if (!projectList) return null;
   var projects = {};
   for (var i = 0; i < projectList.length; i++) {
     var key = projectList[i].key;
@@ -5304,7 +5306,6 @@ async function exportLibrary() {
     var rv = await fetch("/api/v2/sync?since=" + encodeURIComponent("1970-01-01T00:00:00.000000Z"), { credentials: "same-origin" });
     if (rv.ok) { contactsV2 = await rv.json(); delete contactsV2.cursor; }
   } catch (e) { /* export the projects anyway */ }
-  if (!contactsV2) setStatus("Contacts couldn't be included in this export (connection problem). Projects were exported.", "warn");
   var templates = JSON.parse(localStorage.getItem("slater_wb_templates")||"[]");
   var defaults  = JSON.parse(localStorage.getItem("slater_wb_defaults")||"{}");
   var payload = {
@@ -5315,6 +5316,14 @@ async function exportLibrary() {
     templates: templates,
     template_defaults: defaults,
   };
+  return payload;
+}
+
+async function exportLibrary() {
+  setStatus("Preparing export...", "ok");
+  var payload = await buildExportPayload();
+  if (!payload) { setStatus("Export failed: could not reach server.", "err"); return; }
+  var projects = payload.projects;
   var json = JSON.stringify(payload, null, 2);
   var blob = new Blob([json], {type:"application/json"});
   var url = URL.createObjectURL(blob);
@@ -5323,7 +5332,8 @@ async function exportLibrary() {
   a.download = "Slater_Backup_" + new Date().toISOString().slice(0,10) + ".json";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  setStatus("Exported " + Object.keys(projects).length + " projects.", "ok");
+  if (!payload.contacts_v2) setStatus("Contacts couldn't be included in this export (connection problem). Projects were exported.", "warn");
+  else setStatus("Exported " + Object.keys(projects).length + " projects.", "ok");
 }
 
 function importLibrary(input) {
@@ -5427,6 +5437,7 @@ var _myInfoAvatarDirty = false;
 
 function openMyInfo() {
   _myInfoAvatarDirty = false;
+  if (window.Account) Account.closeDelete();
   document.getElementById("agency-modal").classList.add("open");
   API.getMe().then(function(data) {
     if (!data) return;

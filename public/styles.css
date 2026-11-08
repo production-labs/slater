@@ -834,3 +834,24 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .pa-rd-kind.chg{color:#E0A030}
 .pa-rd-note{font-size:12px;color:var(--text-primary);white-space:pre-wrap;margin-top:2px;max-height:4.5em;overflow:hidden}
 #modal-msg{white-space:pre-line}
+
+/* My Info > Your data: download + delete account (public/account.js) */
+.acct-sec{margin-top:4px;padding-top:16px;border-top:1px solid var(--border)}
+.acct-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);margin-bottom:6px}
+.acct-note{font-size:12px;line-height:1.5;color:var(--text-muted);margin:0 0 10px}
+.acct-note strong{color:var(--text-primary);font-weight:600}
+.acct-status{display:block;font-size:12px;margin-top:8px;color:var(--text-muted);min-height:1em}
+.acct-status.ok{color:#4CAF77}
+.acct-status.err{color:var(--accent)}
+.acct-del-row{margin-top:18px}
+.acct-del-link{background:none;border:none;padding:0;font:inherit;font-size:12px;color:var(--film-can);text-decoration:underline;cursor:pointer}
+.acct-del-link:hover{color:var(--accent)}
+.acct-del{margin-top:14px;padding:14px;border:1px solid var(--accent);border-radius:8px;background:rgba(255,77,0,.06)}
+.acct-del[hidden]{display:none}
+.acct-del-title{font-size:13px;font-weight:600;color:var(--accent);margin-bottom:8px}
+.acct-del .fl input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text-primary);box-sizing:border-box}
+.acct-err{font-size:12px;color:var(--accent);min-height:1em;margin:8px 0}
+.acct-del-btns{display:flex;gap:8px;flex-wrap:wrap}
+.lb.acct-danger{background:var(--accent);border-color:var(--accent);color:#fff}
+.lb.acct-danger:hover{filter:brightness(1.08);background:var(--accent)}
+.lb.acct-danger:disabled{opacity:.6;cursor:default}

@@ -66,6 +66,7 @@ app.use('/api/ocr', requireAuth, require('./routes/ocr'));
 app.use('/api/licenses', require('./routes/licenses'));
 // Contacts: people, organizations, locations, roles (routes/v2).
 app.use('/api/v2', requireAuth, require('./routes/v2'));
+app.use('/api/account', requireAuth, require('./routes/account'));
 // Client portal, PUBLIC (no requireAuth): access is by link token + optional
 // password. See routes/portal.js before changing anything here.
 app.use('/api/portal', require('./routes/portal'));
@@ -221,13 +222,15 @@ app.patch('/api/admin/users/:id/suspend', requireAdmin, async (req, res) => {
 
 app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
   try {
-    const id = req.params.id;
-    await pool.query('DELETE FROM receipts WHERE owner_id = $1', [id]);
-    await pool.query('DELETE FROM projects WHERE owner_id = $1', [id]);
-    await pool.query("DELETE FROM sessions WHERE sess::jsonb->>'userId' = $1::text", [id]);
-    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    // Same complete delete as "Delete my account" (routes/account.js): portal
+    // files out of storage first, then everything in one transaction.
+    const gone = await require('./routes/account').deleteAccount(req.params.id);
+    if (!gone) return res.status(404).json({ error: 'User not found' });
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    if (err instanceof require('./routes/account').StorageError) return res.status(503).json({ error: 'File storage unavailable; nothing was deleted. Try again.' });
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Read-only view of R2 backups (no restore/delete by design; see docs/RESTORE.md)

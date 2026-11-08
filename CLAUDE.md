@@ -49,6 +49,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── project-people-v2.js # Crew/Talent/KP contact + role pickers
 │   ├── booking-conflicts.js # Double-booking warnings across projects
 │   ├── projects-overview.js/.css # V1.5 Projects Overview dashboard + closeout checklist
+│   ├── account.js         # My Info > Your data: Download my data (.zip) + Delete account
 │   ├── lib/               # Vendored libs: vendors.js (docx + JSZip), lucide
 │   ├── fonts/             # Self-hosted Geist (geist.css + Geist-Variable.woff2 + license)
 │   ├── login.html         # Login page with forgot password flow
@@ -61,6 +62,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── ocr.js             # Receipt OCR via Anthropic API
 │   ├── users.js           # Auth, registration, password reset
 │   ├── licenses.js        # License key validation and device management
+│   ├── account.js         # Delete account (deleteAccount(), also used by admin delete) + export extras
 │   ├── adminBackups.js    # Admin: list/download nightly backups (R2)
 │   └── v2/                # Contacts, organizations, locations, roles, sync
 ├── scripts/               # Tests (test-v2-api, e2e-*), doc-snapshot, migrate-data-model (schema + built-in roles)
@@ -142,6 +144,7 @@ portal_files (id, project_id, owner_id, direction deliverable|client_upload, wb_
 - `/api/v2/roles` — built-in (read-only) + custom roles; delete refused while in use (requireAuth)
 - `/api/v2/sync?since=` — everything changed since a cursor, one snapshot; `/api/v2/settings`, `/api/v2/default-organization` (requireAuth)
 - `/api/licenses` — validate, generate-beta, devices CRUD
+- `/api/account` — GET export-extra (profile + portal history for Download my data), POST delete { password } (requireAuth). Delete = storage files first (refuses with 503 if storage is down, nothing deleted), then one transaction; retires the license key unless another account uses it. Test: `scripts/e2e-account.js`
 - `/admin` — admin dashboard (requireAdmin session)
 - `/admin/login` — admin login
 - `/api/admin/*` — stats, users, licenses, backups (requireAdmin)
