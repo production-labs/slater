@@ -3852,37 +3852,57 @@ function toggleSidebar() {
   if (sidebarOpen) { if (dailyTab === "crew") renderSidebarCrew(); else refreshSidebar(); }
 }
 
+// Rundown date groups, as of `now` (local time). All dates are 'YYYY-MM-DD'.
+//   today     Due Today
+//   weekend   This Weekend: a Saturday/Sunday between today and the next
+//             business day. Only exists on Fridays and Saturdays; on other
+//             days the coming weekend is part of This Week.
+//   tomorrow  Due Tomorrow: the next business day (weekends skipped), so on a
+//             Friday or Saturday it is Monday (heading says "Due Monday").
+//   thisWeek  after that, through Sunday. (On a Sunday, through next Sunday.)
+//   nextWeek  the 7 days after that.
+// Before 2026-11-07 there was no weekend group and "This Week" started two
+// calendar days out, so on a Friday (Saturday) anything due Saturday (Sunday)
+// fell between groups and vanished from the Rundown.
+function rundownRanges(now) {
+  function iso(x) { return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0"); }
+  function plus(n) { var x = new Date(now.getFullYear(), now.getMonth(), now.getDate()); x.setDate(x.getDate() + n); return x; }
+  var t = 1;
+  while (plus(t).getDay() === 0 || plus(t).getDay() === 6) t++;
+  var toSunday = 7 - now.getDay();
+  return {
+    today: iso(plus(0)),
+    tomorrow: iso(plus(t)),
+    tomorrowIsNextDay: t === 1,
+    endOfWeek: iso(plus(toSunday)),
+    endOfNextWeek: iso(plus(toSunday + 7)),
+  };
+}
+// Which Rundown group a due date falls in, or null (past the end of next week).
+function rundownBucket(due, r) {
+  if (due < r.today) return "overdue";
+  if (due === r.today) return "today";
+  if (due < r.tomorrow) return "weekend";
+  if (due === r.tomorrow) return "tomorrow";
+  if (due <= r.endOfWeek) return "this-week";
+  if (due <= r.endOfNextWeek) return "next-week";
+  return null;
+}
+
 function refreshSidebar() {
   if (!sidebarOpen) return;
-  function localDateIso(d) {
-    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-  }
-  var today = localDateIso(new Date());
-  // "Tomorrow" = next business day (skip weekends)
-  var _tomorrowD = new Date(); _tomorrowD.setDate(_tomorrowD.getDate()+1);
-  while (_tomorrowD.getDay() === 0 || _tomorrowD.getDay() === 6) _tomorrowD.setDate(_tomorrowD.getDate()+1);
-  var tomorrow = localDateIso(_tomorrowD);
   var d = new Date();
   var dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   var monNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   document.getElementById("daily-date").textContent = dayNames[d.getDay()]+", "+monNames[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear();
 
-  // Compute date range boundaries for This Week / Next Week
-  var _nowD = new Date();
-  var _todayMidnight = new Date(_nowD.getFullYear(), _nowD.getMonth(), _nowD.getDate());
-  var _dayAfterTomorrow = new Date(_todayMidnight); _dayAfterTomorrow.setDate(_todayMidnight.getDate() + 2);
-  var _endOfWeek = new Date(_todayMidnight); _endOfWeek.setDate(_todayMidnight.getDate() + (7 - _todayMidnight.getDay()));
-  var _startOfNextWeek = new Date(_endOfWeek); _startOfNextWeek.setDate(_endOfWeek.getDate() + 1);
-  var _endOfNextWeek = new Date(_startOfNextWeek); _endOfNextWeek.setDate(_startOfNextWeek.getDate() + 6);
-  var dayAfterTomorrow = localDateIso(_dayAfterTomorrow);
-  var endOfWeek = localDateIso(_endOfWeek);
-  var startOfNextWeek = localDateIso(_startOfNextWeek);
-  var endOfNextWeek = localDateIso(_endOfNextWeek);
+  var ranges = rundownRanges(d);
+  var buckets = {overdue: [], today: [], weekend: [], tomorrow: [], "this-week": [], "next-week": []};
+  var overdue = buckets.overdue, dueToday = buckets.today, weekend = buckets.weekend, dueTomorrow = buckets.tomorrow, thisWeek = buckets["this-week"], nextWeek = buckets["next-week"];
 
   var db = {};
   Object.keys(_allProjectsCache).forEach(function(k) { db[k] = _allProjectsCache[k].data; });
   if (currentSheetKey) db[currentSheetKey] = gather();
-  var overdue = [], dueToday = [], dueTomorrow = [], thisWeek = [], nextWeek = [];
   Object.keys(db).forEach(function(sheetKey) {
     var sheet = db[sheetKey];
     var project = sheet.project_title || sheet.label || "Untitled";
@@ -3893,27 +3913,22 @@ function refreshSidebar() {
       var due = item.due;
       if (!due) return;
       var entry = {project:project, item:item.item, owner:item.owner, due:due, status:item.status, sheetKey:sheetKey, itemName:item.item, itemUuid:item.uuid};
-      if (due < today) overdue.push(entry);
-      else if (due === today) dueToday.push(entry);
-      else if (due === tomorrow) dueTomorrow.push(entry);
-      else if (due >= dayAfterTomorrow && due <= endOfWeek) thisWeek.push(entry);
-      else if (due >= startOfNextWeek && due <= endOfNextWeek) nextWeek.push(entry);
+      var b = rundownBucket(due, ranges);
+      if (b) buckets[b].push(entry);
     });
 
     // Add schedule pins (all pins, including internal-only, since Rundown is a personal producer view)
     wb.pins.forEach(function(pin) {
       var pinDue = pin.date_iso;
       if (!pinDue) return;
-      if (pinDue < today) return; // Past pins auto-complete — shown in Completed tab, never Overdue
+      if (pinDue < ranges.today) return; // Past pins auto-complete — shown in Completed tab, never Overdue
       var pinEntry = {project:project, item:pin.label, owner:"", due:pinDue, status:"pin", sheetKey:sheetKey, itemName:pin.label, isPin:true, call_time:pin.call_time||""};
-      if (pinDue === today) dueToday.push(pinEntry);
-      else if (pinDue === tomorrow) dueTomorrow.push(pinEntry);
-      else if (pinDue >= dayAfterTomorrow && pinDue <= endOfWeek) thisWeek.push(pinEntry);
-      else if (pinDue >= startOfNextWeek && pinDue <= endOfNextWeek) nextWeek.push(pinEntry);
+      var pb = rundownBucket(pinDue, ranges);
+      if (pb) buckets[pb].push(pinEntry);
     });
   });
 
-  [overdue, dueToday, dueTomorrow, thisWeek, nextWeek].forEach(function(arr) {
+  [overdue, dueToday, weekend, dueTomorrow, thisWeek, nextWeek].forEach(function(arr) {
     arr.sort(function(a,b) { return a.project.localeCompare(b.project); });
   });
 
@@ -3993,7 +4008,8 @@ function refreshSidebar() {
         })(entry.sheetKey, entry.itemName));
         openDiv.appendChild(openLink);
         bodyDiv.appendChild(nameDiv);
-        if (entry.isPin && entry.due) {
+        // Pins always show their day; so do weekend tasks (Saturday or Sunday?).
+        if ((entry.isPin || cls === "weekend") && entry.due) {
           var pinDateEl = document.createElement("div");
           pinDateEl.style.cssText = "font-size:11px;color:var(--film-can);margin-top:1px";
           var _pd = new Date(entry.due + "T12:00:00");
@@ -4019,10 +4035,11 @@ function refreshSidebar() {
   if (window.PortalAdmin) PortalAdmin.poll();
   renderSection("Overdue", overdue, "overdue");
   renderSection("Due Today", dueToday, "today");
-  renderSection("Due Tomorrow", dueTomorrow, "tomorrow");
+  renderSection("This Weekend", weekend, "weekend");
+  renderSection(ranges.tomorrowIsNextDay ? "Due Tomorrow" : "Due Monday", dueTomorrow, "tomorrow");
   renderSection("This Week", thisWeek, "this-week");
   renderSection("Next Week", nextWeek, "next-week");
-  if (!_paGroup && !overdue.length && !dueToday.length && !dueTomorrow.length && !thisWeek.length && !nextWeek.length) {
+  if (!_paGroup && !overdue.length && !dueToday.length && !weekend.length && !dueTomorrow.length && !thisWeek.length && !nextWeek.length) {
     var emptyAll = document.createElement("div");
     emptyAll.style.cssText = "color:#bbb;font-size:13px;padding:20px 0;text-align:center;font-style:italic";
     emptyAll.textContent = "Nothing due soon.";
@@ -4046,7 +4063,9 @@ function switchDailyTab(tab) {
 }
 
 function renderCompleted() {
-  var today = new Date().toISOString().slice(0,10);
+  // Local date, same as the Pending tab (toISOString() is UTC: after ~4-5 PM
+  // Pacific it said tomorrow, so today's pins showed here AND under Due Today).
+  var today = rundownRanges(new Date()).today;
   var d = new Date();
   var dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   var monNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];

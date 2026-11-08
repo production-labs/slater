@@ -277,8 +277,80 @@ async function main() {
     await sleep(300);
     const t = await text('#daily-body');
     assert(/Script V1/.test(t), 'overdue item in Rundown: ' + t.slice(0, 300));
-    assert(/Approve Script V2/.test(t), 'due-tomorrow item in Rundown');
+    // Due one calendar day out. On a Friday or Saturday that is a weekend day
+    // (This Weekend); it used to fall between groups and vanish.
+    assert(/Approve Script V2/.test(t), 'due-tomorrow item in Rundown: ' + t.replace(/\s+/g, ' ').slice(0, 300));
     assert(!/Kickoff deck/.test(t), 'complete item left out');
+  });
+
+  await step('Rundown date groups are right on every day of the week (no gaps at weekends)', async () => {
+    // Mon 2026-11-02 .. Sun 2026-11-08, then each date from the day before to
+    // 16 days out. Expected group by hand-written rule, compared to the app's.
+    const bad = await page.evaluate(() => {
+      const iso = x => x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+      const out = [];
+      for (let day = 2; day <= 8; day++) {
+        const now = new Date(2026, 10, day, 15, 30);
+        const r = rundownRanges(now);
+        for (let n = -1; n <= 16; n++) {
+          const due = new Date(2026, 10, day + n), dow = due.getDay(), nowDow = now.getDay();
+          // Hand-written expectation.
+          // Next business day: Monday from a Friday (3 days) or Saturday (2), else 1 day.
+          const nextBiz = nowDow === 5 ? 3 : nowDow === 6 ? 2 : 1;
+          const toSunday = 7 - nowDow; // on a Sunday: next Sunday
+          let want;
+          if (n < 0) want = 'overdue';
+          else if (n === 0) want = 'today';
+          else if (n < nextBiz) want = 'weekend';
+          else if (n === nextBiz) want = 'tomorrow';
+          else if (n <= toSunday) want = 'this-week';
+          else if (n <= toSunday + 7) want = 'next-week';
+          else want = null;
+          if (want === 'weekend' && dow !== 0 && dow !== 6) out.push('test bug: weekday in weekend ' + iso(due));
+          const got = rundownBucket(iso(due), r);
+          if (got !== want) out.push(iso(now) + ' (' + 'SuMoTuWeThFrSa'.substr(nowDow * 2, 2) + ') due ' + iso(due) + ': got ' + got + ', want ' + want);
+          if (n > 0 && n <= 7 && got === null) out.push('GAP ' + iso(now) + ' due ' + iso(due));
+        }
+        // Heading: "Due Tomorrow" Sun-Thu, "Due Monday" Fri/Sat.
+        if (r.tomorrowIsNextDay !== !(now.getDay() === 5 || now.getDay() === 6)) out.push('tomorrowIsNextDay wrong on ' + iso(now));
+      }
+      return out;
+    });
+    assert(bad.length === 0, bad.slice(0, 6).join(' | '));
+  });
+
+  await step('Rundown shows a This Weekend group (with the day) and "Due Monday" when tomorrow is a weekend day', async () => {
+    // Pretend the next calendar day is a weekend day: Approve Script V2 (due in
+    // 1 day) belongs to This Weekend, and the next business day is 2 days out.
+    const t = await page.evaluate(rel => {
+      const real = window.rundownRanges;
+      window.rundownRanges = () => ({ today: rel[0], tomorrow: rel[2], tomorrowIsNextDay: false, endOfWeek: rel[2], endOfNextWeek: rel[9] });
+      try { refreshSidebar(); } finally { window.rundownRanges = real; }
+      const sec = [...document.querySelectorAll('#daily-body .daily-section')].map(s => s.innerText.replace(/\s+/g, ' '));
+      refreshSidebar();
+      return sec;
+    }, Array.from({ length: 10 }, (_, n) => rel(n)));
+    const wk = t.find(s => /^THIS WEEKEND \(1\)/i.test(s));
+    assert(wk && /Approve Script V2/.test(wk), 'weekend group: ' + JSON.stringify(t).slice(0, 400));
+    const d = new Date(rel(1) + 'T12:00:00');
+    const label = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()] + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()] + ' ' + d.getDate();
+    assert(wk.includes(label), 'weekend item shows its day (' + label + '): ' + wk);
+    assert(!t.some(s => /^DUE TOMORROW/i.test(s)), 'still says Due Tomorrow: ' + JSON.stringify(t).slice(0, 300));
+    const order = t.map(s => s.split(' (')[0].toUpperCase());
+    assert(order.indexOf('OVERDUE') < order.indexOf('THIS WEEKEND'), 'order ' + order.join());
+  });
+
+  await step('"Due Monday" heading is used for the next business day after a weekend', async () => {
+    const t = await page.evaluate(rel => {
+      const real = window.rundownRanges;
+      // Pretend the next business day (Approve Script V2, 1 day out) is a Monday after a weekend.
+      window.rundownRanges = () => ({ today: rel[0], tomorrow: rel[1], tomorrowIsNextDay: false, endOfWeek: rel[1], endOfNextWeek: rel[8] });
+      try { refreshSidebar(); } finally { window.rundownRanges = real; }
+      const s = document.getElementById('daily-body').innerText.replace(/\s+/g, ' ');
+      refreshSidebar();
+      return s;
+    }, Array.from({ length: 10 }, (_, n) => rel(n)));
+    assert(/DUE MONDAY \(1\) Approve Script V2/i.test(t), t.slice(0, 300));
   });
 
   await step('New Project starts with an empty closeout', async () => {

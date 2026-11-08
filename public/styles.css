@@ -216,6 +216,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .daily-section-title.overdue{color:var(--accent)}
 .daily-section-title.today{color:#4CAF77}
 .daily-section-title.tomorrow{color:var(--text-muted)}
+.daily-section-title.weekend{color:#D9A441}
 .daily-section-title.this-week{color:#5B9BD5}
 .daily-section-title.next-week{color:var(--film-can)}
 .daily-empty{font-size:12px;color:var(--text-muted);padding:4px 0;font-style:italic}
