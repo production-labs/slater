@@ -265,6 +265,51 @@ async function main() {
     assert(d.wb_items.find(w => w.uuid === 'u-cast').status === 'Not Started', 'dismiss changed the item');
   });
 
+  // ── History: handled answers aren't lost (2026-11-04) ─────────────────────
+  await step('Handling an answer logs it to Notes as "Client feedback", saved, client text escaped', async () => {
+    const notes = ((await serverData()).notes || []).filter(n => n.source === 'client_feedback');
+    assert(notes.length === 2, 'saved client notes: ' + notes.length);
+    const script = notes.find(n => /Approve script/.test(n.content));
+    const cast = notes.find(n => /Approve casting/.test(n.content));
+    assert(script && /Client approved/.test(script.content) && /Pat Client/.test(script.content), 'script note ' + (script && script.content));
+    assert(script.content.includes('&lt;img') && !script.content.includes('<img'), 'client note not escaped in saved data');
+    assert(cast && /Changes requested/.test(cast.content) && /Second choice for the lead/.test(cast.content), 'cast note ' + (cast && cast.content));
+    await page.evaluate(() => st('notes'));
+    const shown = await page.$$eval('#tab-notes .note-entry--client', els => els.map(e => ({ t: e.textContent, tag: !!e.querySelector('.note-client-tag'), img: !!e.querySelector('img') })));
+    assert(shown.length === 2 && shown.every(s => s.tag && !s.img), JSON.stringify(shown));
+    assert(!(await page.evaluate(() => window.__xss)), 'note ran client text');
+    await page.screenshot({ path: SHOTS + '/pr-notes.png' });
+  });
+
+  await step('Workback item keeps a History thread of handled answers, also after a reload', async () => {
+    const histFor = async uuid => {
+      await page.evaluate(() => { st('workback'); wbSetView('list'); });
+      await page.evaluate(u => wbSelectItem(wbItems.find(w => _wbData[w].uuid === u)), uuid);
+      await page.waitForSelector('#wb-edit-panel .pa-hist', { timeout: 5000 });
+      return page.$eval('#wb-edit-panel .pa-hist', el => ({
+        sum: el.querySelector('summary').textContent, n: el.querySelectorAll('.pa-hist-entry').length,
+        t: el.textContent, img: !!el.querySelector('.pa-hist-entry img'),
+      }));
+    };
+    const check = async () => {
+      // Casting: changes requested, replaced by an approval, replaced again, then "Got it" = 3.
+      const c = await histFor('u-cast');
+      assert(c.sum === 'History (3)' && c.n === 3 && /Second choice for the lead/.test(c.t), JSON.stringify(c));
+      const s = await histFor('u-script');
+      assert(s.sum === 'History (1)' && /Pat Client/.test(s.t) && s.t.includes('<img src=x') && !s.img, JSON.stringify(s));
+      assert(!(await page.evaluate(() => window.__xss)), 'history ran client text');
+    };
+    await check();
+    await page.screenshot({ path: SHOTS + '/pr-history.png' });
+    await page.reload({ waitUntil: 'networkidle2' });
+    await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
+    await page.evaluate(() => PortalAdmin.poll(true));
+    await sleep(500);
+    await check();
+    // The reload must not have duplicated the Notes entries either.
+    assert(((await serverData()).notes || []).filter(n => n.source === 'client_feedback').length === 2, 'notes duplicated');
+  });
+
   await step('A new client answer shows up in the open app on the next check', async () => {
     const r = await respond({ uuid: 'u-cast', kind: 'approved', name: 'Pat Client', note: '' });
     assert(r.status === 200, 'respond ' + r.status);

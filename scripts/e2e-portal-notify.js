@@ -62,7 +62,11 @@ async function main() {
   const wb = (uuid, item) => ({ uuid, item, owner: 'Client', mode: 'manual', manual_date: rel(3), status: 'Not Started', internal: false });
   const data = {
     project_title: 'Notify Test', client_company: 'Acme',
-    wb_items: [wb('u-script', 'Approve script'), wb('u-cast', 'Approve casting')],
+    // Both items must be the client's turn (public/client-readiness.js): the
+    // first follows a past kickoff; the second is chained to kickoff too,
+    // otherwise it would wait on "Approve script" above it.
+    kickoff_date_iso: rel(-7),
+    wb_items: [wb('u-script', 'Approve script'), Object.assign(wb('u-cast', 'Approve casting'), { mode: 'sequential', seq_anchor_uuid: 'kickoff' })],
     kp_cards: [
       { role: 'EP', name: 'Jo Owner', email: EMAIL.toUpperCase() },  // the owner's own address: never listed twice
       { role: 'Producer', name: 'Sam Producer', email: SAM },
