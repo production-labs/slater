@@ -236,7 +236,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 
 ### Rundown Sidebar (📋 button)
 - Three tabs: Pending, Completed, Crew
-- Pending categories: Overdue, Due Today, Due Tomorrow, This Week, Next Week
+- Pending categories: Overdue, Due Today, This Weekend, Due Tomorrow, This Week, Next Week. "Due Tomorrow" = next business day (heading reads "Due Monday" on Fri/Sat); "This Weekend" (Fri/Sat only) holds the Sat/Sun in between, items show their day. Groups come from `rundownRanges()` / `rundownBucket()` (no gaps; before 2026-11-07 weekend tasks vanished on Fri/Sat). Test: `scripts/e2e-projects-overview.js`
 - ALL pins visible in Rundown including internal-only
 - Schedule day pins: never Overdue, auto-move to Completed when date passes
 - Completed tab has search/filter
@@ -269,6 +269,9 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 ### Admin Dashboard
 - At `/admin` protected by ADMIN_SECRET
 - Generate keys, manage users and licenses
+
+### Account: Download my data / Delete account (My Info > Your data)
+- Built 2026-11-07 (`public/account.js`, `routes/account.js`). Download = .zip (importable backup JSON, CSVs, receipt images, account.json). Delete = password re-entered; removes everything incl. portal files in R2; retires the license key. Pause / Cancel come with Paddle (not built).
 
 ### Password Reset
 - Forgot password flow via Resend email
@@ -355,6 +358,7 @@ Done:
 
 ## V1.5 — Client Portal
 **Working plan + current status: `docs/v1.5-client-portal-plan.md` (read its PICK UP HERE section first).**
+Status 2026-11-07: ALL LIVE, including everything that doesn't need Paddle (self-hosted fonts, Download my data + Delete account, workback Owner box + "Client review"). Left: Pause / Cancel (with Paddle) and John's legal leftovers.
 Scope (John, 2026-10-27): Client Portal + Project Overview only. Crew portal mockup is tabled, may never be built.
 Mockups: `~/Documents/Production Labs LLC/Slater/Mock-slater_client_portal.html` and `Mock-slater_projects_overview.html`. (The original spec docx at `/mnt/user-data/outputs/...` was a past session's sandbox file and is not on this machine.)
 

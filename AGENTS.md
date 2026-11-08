@@ -51,6 +51,9 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── projects-overview.js/.css # V1.5 Projects Overview dashboard + closeout checklist
 │   ├── portal.js/.css     # Client portal (public-facing)
 │   ├── portal-admin.js    # Client portal (producer-facing admin panel, Project tab)
+│   ├── client-readiness.js # Shared rule: is a workback item the client's, is it their turn, does it need approval
+│   ├── account.js         # My Info > Your data: Download my data (.zip) + Delete account
+│   ├── fonts/             # Self-hosted Geist (geist.css + Geist-Variable.woff2 + license)
 │   ├── login.html         # Login page with forgot password flow
 │   ├── reset-password.html # Password reset page
 │   ├── admin.html         # Admin dashboard
@@ -65,8 +68,9 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── portal.js          # Public client portal (token + password gate)
 │   ├── portalUploads.js   # Client file uploads to R2 (start/sign/complete/cancel)
 │   ├── transfers.js       # R2 client for the slater-transfers bucket
+│   ├── account.js         # Delete account (deleteAccount(), also used by admin delete) + export extras
 │   └── v2/                # Contacts, organizations, locations, roles, sync
-├── scripts/               # Tests (test-v2-api, e2e-*), doc-snapshot, migrate-data-model (schema + built-in roles)
+├── scripts/               # Tests (test-v2-api, test-client-readiness, e2e-*), doc-snapshot, ui-snapshot (before/after screenshots), migrate-data-model
 └── docs/                  # RESTORE.md; v1.5-client-portal-plan.md; archive/data-model-rewrite/ (finished 2026-10-21)
 ```
 
@@ -151,6 +155,7 @@ portal_files (id, project_id, owner_id, wb_item_uuid, filename, content_type, si
 - `/api/v2/roles` — built-in (read-only) + custom roles; delete refused while in use (requireAuth)
 - `/api/v2/sync?since=` — everything changed since a cursor, one snapshot; `/api/v2/settings`, `/api/v2/default-organization` (requireAuth)
 - `/api/licenses` — validate, generate-beta, devices CRUD
+- `/api/account` — GET export-extra (profile + portal history for Download my data), POST delete { password }: storage files first (503 + nothing deleted if storage is down), then one transaction; retires the license key unless another account uses it (requireAuth)
 - `/api/portal-admin/:key` — producer-side portal management (enable/disable, regen token, password, updates, approvals, file downloads/deletes) (requireAuth)
 - `/portal/:token` — public client portal (password-gated if set); file uploads, responses
 - `/admin` — admin dashboard (requireAdmin session)
@@ -244,7 +249,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 
 ### Rundown Sidebar (📋 button)
 - Three tabs: Pending, Completed, Crew
-- Pending categories: Overdue, Due Today, Due Tomorrow, This Week, Next Week
+- Pending categories: Overdue, Due Today, This Weekend, Due Tomorrow, This Week, Next Week. "Due Tomorrow" = next business day (reads "Due Monday" on Fri/Sat); "This Weekend" (Fri/Sat only) holds the Sat/Sun in between. `rundownRanges()` / `rundownBucket()` in app.js
 - ALL pins visible in Rundown including internal-only
 - Schedule day pins: never Overdue, auto-move to Completed when date passes
 - Completed tab has search/filter
@@ -274,7 +279,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Layout: status line + "Portal is on" pill, link card (Copy/Open), left column (Client responses / Files / Updates), right column tabbed Settings (Emails / Links / Password) + separate "Portal management" card (Make a new link / Turn off portal)
 - Workback view with client-friendly timeline (zoom: 2/4/6 weeks/Whole project); schedule view
 - Producer updates (newest shown first, latest 10 on the portal)
-- Approvals: client items get Approve / Request changes; a workback item is "the client's" if its free-text Owner is "Client" or the project's client org name (case-insensitive) — see docs/v1.5-client-portal-plan.md for known gaps in this detection
+- Approvals: a workback item is "the client's" when its Owner is "Client", the client company or the client contact (`SlaterReadiness.isClientOwner`). Owner is a type-or-pick box (client company, client contact, Key Personnel). Only client items with "Client review" ticked (`client_review`; absent = from before 2026-11-07 = approvable) get Approve / Request changes; new tasks start unticked. Test: `scripts/e2e-wb-owner.js`
 - "Waiting on you" follows status, not the calendar: a client item is the client's turn only once the step before it is done (`public/client-readiness.js`, shared with the Overview)
 - File delivery is link-based (URLs tab, "Show on client portal"); client file uploads go through R2 (`slater-transfers` bucket, 14-day retention, 5 GB/file, 200 files / 50 GiB per project cap)
 - Producer panel shows files from the client with download/delete; files also show on the relevant workback item
@@ -346,7 +351,7 @@ git push
 ## Known Issues / In Progress
 
 - Mobile bottom nav bar: built 2026-08-17 but untested; all mobile work is on hold for now
-- `scripts/e2e-portal-notify.js` fails 11/15, pre-existing (not caused by recent portal UI work), cause not yet checked — probably local email/R2 setup
+- (Fixed 2026-11-07: `e2e-portal-notify` failures were stale test data; 15/15.) Cloudflare Browser Cache TTL now "Respect Existing Headers" (2026-11-07).
 
 ---
 
@@ -374,11 +379,10 @@ Scope: Client Portal + Project Overview. Crew portal mockup is tabled, may never
 
 Core feature set is LIVE on production: unique URL per project, password protection, workback view, schedule view, producer updates, approvals, file delivery (link-based deliverables + R2 client uploads), client branding, mobile friendly.
 
-Open design question not yet resolved: how the app should detect a workback item is a client review (currently just string-matches the Owner field against "Client" or the client org name — misses near-misses like "MSFT" and gives every matching item Approve/Request-changes buttons even when that's not appropriate).
+Resolved 2026-11-07: client-review detection (Owner type-or-pick box + "Client review" checkbox). Also built 2026-11-07: self-hosted fonts (Geist everywhere), Download my data + Delete account (My Info), Rundown "This Weekend" group.
 
 Remaining before V1.5 is fully closed out:
-- Self-host fonts (drop Google Fonts; the privacy policy draft assumes this)
-- Pause / Cancel / Delete + data export for user accounts
+- Pause / Cancel for user accounts (with Paddle billing)
 - Legal fact-checks (Resend tracking, R2 bucket location, Railway log retention), DMCA agent registration, lawyer review
 
 Scheduled alongside V1.5 (not part of the client portal spec itself): crew/talent/KP double-booking warnings (LIVE), Project Overview dashboard (LIVE).
