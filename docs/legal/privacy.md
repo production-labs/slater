@@ -143,7 +143,7 @@ Slater uses only what it needs to work, so no cookie banner is needed:
 | Browser storage: portal name and timeline view | Remembers the name a Portal Visitor typed, so they don't retype it, and the timeline zoom they picked | Until they clear it |
 
 We don't use advertising or analytics cookies. Our fonts are served from our own
-server. [CONFIRM: switch from Google Fonts to self-hosted fonts before publishing.]
+server.
 Payment pages run by Paddle may set their own cookies; see Paddle's policy.
 
 ## 7. How long we keep it

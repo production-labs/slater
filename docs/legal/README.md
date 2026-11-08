@@ -27,8 +27,8 @@ with John's decisions:
 1. Lawyer review (John). Items marked **[CONFIRM: ...]** or **[LAWYER: ...]** in the
    text are open questions.
 2. Things the text promises that are **not built yet**: self-serve Pause / Cancel /
-   Delete, data export, Paddle billing, self-hosted fonts (no Google Fonts), DMCA
-   agent registration. Either build them first or soften the text.
+   Delete, data export, Paddle billing, DMCA agent registration. (Self-hosted
+   fonts: built 2026-11-07, no Google Fonts anywhere.) Either build them first or soften the text.
 3. Then: turn each into a page (`/terms`, `/privacy`, `/refunds`), switch the footer
    links, add a Privacy link to the client portal footer, update "Last updated".
 

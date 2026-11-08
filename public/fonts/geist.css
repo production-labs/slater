@@ -1,0 +1,11 @@
+/* Geist (Vercel, SIL Open Font License 1.1: see Geist-LICENSE.txt), served
+   from Slater itself so no page asks Google (or anyone else) for fonts.
+   One variable file covers every weight. From the npm "geist" package 1.9.2,
+   dist/fonts/geist-sans/Geist-Variable.woff2. */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}

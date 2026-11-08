@@ -268,7 +268,7 @@ app.get('/portal/:token', (req, res) => {
   res.set({
     'Content-Security-Policy': [
       "default-src 'none'", "script-src 'self'", ("connect-src 'self' " + portalUploadOrigin).trim(),
-      "style-src 'self' https://fonts.googleapis.com", "font-src https://fonts.gstatic.com",
+      "style-src 'self'", "font-src 'self'",
       "img-src 'self' data:", "base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'",
     ].join('; '),
     'Referrer-Policy': 'no-referrer',

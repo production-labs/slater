@@ -50,6 +50,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 │   ├── booking-conflicts.js # Double-booking warnings across projects
 │   ├── projects-overview.js/.css # V1.5 Projects Overview dashboard + closeout checklist
 │   ├── lib/               # Vendored libs: vendors.js (docx + JSZip), lucide
+│   ├── fonts/             # Self-hosted Geist (geist.css + Geist-Variable.woff2 + license)
 │   ├── login.html         # Login page with forgot password flow
 │   ├── reset-password.html # Password reset page
 │   ├── admin.html         # Admin dashboard
@@ -77,7 +78,8 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 - **Password hashing:** bcrypt
 - **OCR:** Anthropic Claude Haiku (claude-haiku-4-5-20251001)
 - **Email:** Resend API
-- **Doc generation:** docx.js + JSZip for Word doc patching (vendored in `public/lib/vendors.js`, not a CDN)- **Fonts:** Geist (Google Fonts)
+- **Doc generation:** docx.js + JSZip for Word doc patching (vendored in `public/lib/vendors.js`, not a CDN)
+- **Fonts:** Geist, self-hosted from `public/fonts/` (variable woff2 + OFL license; no Google Fonts)
 - **Hosting:** Railway (Node.js + PostgreSQL)
 
 ---
@@ -182,7 +184,7 @@ Project | Schedule | Crew | Talent | Workback | URLs | Notes | Expenses
 ## Brand & Design
 
 - **Colors:** Charcoal `#222222`, Film Can `#9D9D99`, Masking Tape `#E9DFC8`, Paper Aging `#B89F76`, Marker `#181818`, Accent Red `#D94B43`, Background `#f3f0ed`, Tape Light `#F5F0E8`
-- **Font:** Geist only (Google Fonts)
+- **Font:** Geist only, every page (self-hosted: `public/fonts/geist.css`; switched from Inter + Google Fonts 2026-11-07). Never add a third-party font link: the privacy policy says fonts are served from our own server
 - **Logo:** Film can baked in as `const LB64`
 - **NEVER use em-dashes** (`—`) anywhere
 

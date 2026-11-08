@@ -6,12 +6,13 @@
   <title>Slater Admin</title>
   <link rel="icon" type="image/svg+xml" href="/images/SlaterIcon.svg">
   <link rel="icon" type="image/png" href="/images/SlaterIcons/Slater Icon Large@0.5x.png">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/fonts/geist.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Geist', sans-serif;
       background: #111111;
       color: #F7F5EF;
       min-height: 100vh;
@@ -128,7 +129,7 @@
       gap: 6px;
     }
     .key-item {
-      font-family: 'Inter', monospace;
+      font-family: 'Geist', monospace;
       font-size: 13px;
       background: #222222;
       border: 1px solid #2E2E2E;
@@ -182,7 +183,7 @@
     .btn-warn:hover { background: #FFC107; color: #111; }
     .action-btns { display: flex; gap: 6px; }
 
-    .mono { font-family: 'Inter', monospace; letter-spacing: 0.05em; font-size: 12px; }
+    .mono { font-family: 'Geist', monospace; letter-spacing: 0.05em; font-size: 12px; }
 
     .empty-row td { text-align: center; color: #6E747B; padding: 28px; font-size: 13px; }
 

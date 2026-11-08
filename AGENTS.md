@@ -83,7 +83,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 - **Email:** Resend API
 - **File storage:** Cloudflare R2 (nightly backups bucket + `slater-transfers` bucket for portal file delivery, 14-day lifecycle)
 - **Doc generation:** docx.js (CDN) + JSZip for Word doc patching
-- **Fonts:** Geist (Google Fonts — scheduled to be self-hosted, see V1.5 below)
+- **Fonts:** Geist, self-hosted from `public/fonts/` (variable woff2 + OFL license; no Google Fonts)
 - **Hosting:** Railway (Node.js + PostgreSQL)
 
 ---
@@ -196,7 +196,7 @@ Project | Schedule | Crew | Talent | Workback | URLs | Notes | Expenses | Portal
 ## Brand & Design
 
 - **Colors:** Charcoal `#222222`, Film Can `#9D9D99`, Masking Tape `#E9DFC8`, Paper Aging `#B89F76`, Marker `#181818`, Accent Red `#D94B43`, Background `#f3f0ed`, Tape Light `#F5F0E8`
-- **Font:** Geist only (Google Fonts, scheduled to be self-hosted)
+- **Font:** Geist only, every page (self-hosted: `public/fonts/geist.css`). Never add a third-party font link
 - **Logo:** Film can baked in as `const LB64`
 - **NEVER use em-dashes** (`—`) anywhere
 

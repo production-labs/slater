@@ -217,7 +217,7 @@
     // sits above the bottom nav (56px).
     st.textContent =
       '#conn-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:100000;display:none;width:min(760px,calc(100vw - 24px));' +
-        'font-family:Inter,Geist,system-ui,sans-serif;font-size:13px;line-height:1.4;border-radius:10px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.35)}' +
+        'font-family:Geist,system-ui,sans-serif;font-size:13px;line-height:1.4;border-radius:10px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.35)}' +
       '#conn-bar.show{display:block}' +
       '#conn-bar .conn-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;color:#181818;background:#F5F0E8}' +
       '#conn-bar .conn-row + .conn-row{border-top:1px solid #E9DFC8}' +

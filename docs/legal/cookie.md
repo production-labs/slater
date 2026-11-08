@@ -62,9 +62,6 @@ tracking pixels, social media plug-ins, or any cookie or script that follows you
 other websites. We don't buy or sell cookie data.
 
 Slater's fonts are served from our own server, not a third-party font service.
-[CONFIRM: switch from Google Fonts to self-hosted fonts before publishing; the
-current build loads Geist from Google Fonts, which sets no tracking cookie but does
-share your IP address with Google when the font loads.]
 
 ## 6. Your choices
 
