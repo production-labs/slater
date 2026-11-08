@@ -49,7 +49,7 @@ async function main() {
   const KEY = 'cs_pr_' + STAMP;
   const wb = (uuid, item, owner, extra) => Object.assign({ uuid, item, owner, mode: 'manual', manual_date: rel(3), status: 'Not Started', internal: false }, extra || {});
   const data = {
-    project_title: 'Approvals Test', project_type: 'location_shoot', client_company: 'Acme',
+    project_title: 'Approvals Test', project_type: 'location_shoot', client_company: 'Acme', client_name: 'Pat Contact',
     schedule_days: [{ id: 'sday_1', date_iso: rel(12), label: 'Shoot Day' }],
     wb_items: [
       wb('u-script', 'Approve script', 'Client'),
@@ -59,6 +59,10 @@ async function main() {
       wb('u-cast', 'Approve casting', 'acme'),
       wb('u-ours', 'Edit cut 1', 'Producer'),
       wb('u-secret', 'Internal review', 'Client', { internal: true }),
+      // Owned by the client contact, "Client review" off: waiting on the
+      // client, but no Approve / Request changes (2026-11-07).
+      wb('u-prep', 'Prep logo specs', 'Producer', { status: 'Complete' }),
+      wb('u-logos', 'Send logos', 'Pat Contact', { client_review: false }),
     ],
   };
   const projectId = (await db.query(`INSERT INTO projects (key, label, data, owner_id) VALUES ($1,$2,$3,$4) RETURNING id`, [KEY, 'Approvals Test', data, userId])).rows[0].id;
@@ -79,7 +83,8 @@ async function main() {
     const ours = await respond({ uuid: 'u-ours', kind: 'approved', name: 'Pat' });
     const secret = await respond({ uuid: 'u-secret', kind: 'approved', name: 'Pat' });
     const nope = await respond({ uuid: 'nope', kind: 'approved', name: 'Pat' });
-    assert(ours.status === 409 && secret.status === 409 && nope.status === 409, [ours.status, secret.status, nope.status].join());
+    const logos = await respond({ uuid: 'u-logos', kind: 'approved', name: 'Pat' });
+    assert(ours.status === 409 && secret.status === 409 && nope.status === 409 && logos.status === 409, [ours.status, secret.status, nope.status, logos.status].join());
   });
 
   await step('Bad input is refused (kind, missing name, changes without a note, long note)', async () => {
@@ -114,11 +119,17 @@ async function main() {
     await btn.click();
   };
 
-  await step('Portal shows Approve / Request changes on each waiting item', async () => {
+  await step('Portal shows Approve / Request changes on each review item; "Send logos" (no review) just waits', async () => {
     const names = await cpage.$$eval('.action-item .action-name', els => els.map(e => e.textContent));
-    assert(JSON.stringify(names.sort()) === JSON.stringify(['Approve casting', 'Approve script']), JSON.stringify(names));
-    const btns = await cpage.$$eval('.action-item .action-btns button', els => els.map(e => e.textContent));
+    assert(JSON.stringify(names.sort()) === JSON.stringify(['Approve casting', 'Approve script', 'Send logos']), JSON.stringify(names));
+    const btns = await cpage.$$eval('.action-item .action-btns button', els => els.filter(e => e.offsetParent).map(e => e.textContent));
     assert(btns.filter(b => b === 'Approve').length === 2 && btns.filter(b => b === 'Request changes').length === 2, JSON.stringify(btns));
+    const logosRow = await cpage.evaluate(() => { const r = [...document.querySelectorAll('.action-item')].find(x => x.querySelector('.action-name').textContent === 'Send logos'); return { btns: [...r.querySelectorAll('button')].filter(b => b.offsetParent && /Approve|Request/.test(b.textContent)).length, text: r.innerText }; });
+    assert(logosRow.btns === 0 && /Due /.test(logosRow.text), JSON.stringify(logosRow));
+    const p = await payload();
+    const w = p.waiting.find(x => x.uuid === 'u-logos');
+    assert(w && w.review === false && p.waiting.filter(x => x.review).length === 2, 'payload review flags ' + JSON.stringify(p.waiting.map(x => [x.uuid, x.review])));
+    await cpage.screenshot({ path: SHOTS + '/pr-client-waiting.png' });
   });
 
   await step('Client approves with a name and note', async () => {

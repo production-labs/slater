@@ -33,7 +33,7 @@ const { Pool } = require('pg');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const transfers = require('./transfers');
 const registerUploads = require('./portalUploads');
-const { clientItemStates } = require('../public/client-readiness');
+const { clientItemStates, isClientOwner, needsApproval } = require('../public/client-readiness');
 
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -158,13 +158,6 @@ function safeEmail(v) { const s = str(v, 200); return /^[^\s@<>"]+@[^\s@<>"]+\.[
 function safeLogo(v) {
   return typeof v === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(v) ? v : '';
 }
-function isClientOwner(owner, client) {
-  const o = str(owner).toLowerCase();
-  if (!o) return false;
-  if (o === 'client') return true;
-  const c = str(client).toLowerCase();
-  return !!c && o === c;
-}
 function isDone(status) { return status === 'Complete'; }
 
 // Today in the producer's timezone (users.timezone: PT, ET, ...): "has this
@@ -201,7 +194,10 @@ function buildPayload(row, extra) {
       uuid: str(i.uuid, 100),
       item: str(i.item, 300),
       due: isoDate(i.due) || (i.mode === 'manual' ? isoDate(i.manual_date) : ''),
-      client: isClientOwner(i.owner, clientName),
+      client: isClientOwner(i.owner, clientName, data.client_name),
+      // "Client review" ticked: Approve / Request changes. Other client items
+      // just wait on the client (with file upload).
+      review: isClientOwner(i.owner, clientName, data.client_name) && needsApproval(i),
       done: isDone(i.status),
       ready: !!(st && st.ready),
     }))
@@ -271,9 +267,9 @@ function buildPayload(row, extra) {
     .map(i => {
       const r = respByUuid.get(i.uuid);
       return {
-        uuid: i.uuid, item: i.item, due: i.due,
+        uuid: i.uuid, item: i.item, due: i.due, review: i.review,
         links: i.uuid ? sharedLinks.filter(u => u.wb === i.uuid).map(u => ({ name: u.name, url: u.url })) : [],
-        response: r && !r.acknowledged_at ? { kind: r.kind, at: r.created_at } : null,
+        response: i.review && r && !r.acknowledged_at ? { kind: r.kind, at: r.created_at } : null,
         files: i.uuid ? sentFiles.filter(f => f.wb_item_uuid === i.uuid).length : 0,
       };
     });
@@ -400,7 +396,7 @@ router.post('/:token/respond', respondLimiter, async (req, res) => {
     if (note.length > NOTE_MAX) return res.status(400).json({ error: 'bad_note' });
     if (kind === 'changes_requested' && !note) return res.status(400).json({ error: 'note_required' });
     const waiting = buildPayload(portal, {}).waiting;
-    if (!uuid || !waiting.some(w => w.uuid === uuid)) return res.status(409).json({ error: 'not_waiting' });
+    if (!uuid || !waiting.some(w => w.uuid === uuid && w.review)) return res.status(409).json({ error: 'not_waiting' });
 
     const client = await pool.connect();
     try {

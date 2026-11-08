@@ -45,13 +45,9 @@
     var days = Math.round(hrs / 24);
     return days === 1 ? 'yesterday' : days + ' days ago';
   }
-  function isClientOwner(owner, client) {
-    var o = (owner || '').trim().toLowerCase();
-    if (!o) return false;
-    if (o === 'client') return true;
-    var c = (client || '').trim().toLowerCase();
-    return !!c && o === c;
-  }
+  // The shared rule (public/client-readiness.js): "Client", the client
+  // company, or the client contact.
+  function isClientOwner(owner, client, contact) { return window.SlaterReadiness.isClientOwner(owner, client, contact); }
 
   // ── per-project summary ───────────────────────────────────────────────────
   // Everything the cards, KPIs and timeline need, worked out once per render.
@@ -557,7 +553,7 @@
           prev = i.due;
           if (!inRange(s, i.due)) return;
           var l = pct(s), rr = pct(i.due);
-          var col = isClientOwner(i.owner, p.client) ? '#e87ba4' : (typeof wbOwnerColor === 'function' ? wbOwnerColor(i.owner) : '#888');
+          var col = isClientOwner(i.owner, p.client, p.data && p.data.client_name) ? '#e87ba4' : (typeof wbOwnerColor === 'function' ? wbOwnerColor(i.owner) : '#888');
           var doneCls = (i.status === 'Complete' || i.status === 'N/A') ? ' done' : '';
           h += '<div class="po-pt-bar' + doneCls + '" style="left:' + l + '%;width:' + Math.max(rr - l, 0.6) + '%;background:' + col + '" ' +
             'data-tip="' + esc('<b>' + esc(i.item) + '</b><span>' + esc((i.owner || 'No owner') + ' · ' + fmt(s) + ' → ' + fmt(i.due) + ' · ' + i.status) + '</span>') + '"></div>';

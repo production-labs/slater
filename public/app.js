@@ -2165,6 +2165,74 @@ function wbOwnerColor(name) {
   return palette[Math.abs(h) % palette.length];
 }
 
+// ── Workback Owner: suggestions + "Client review" (2026-11-07) ──────────────
+// The Owner box suggests the client company and client contact (Project tab),
+// then every Key Personnel name; anything else can still be typed. A task is
+// the client's when its Owner matches "Client" / company / contact
+// (SlaterReadiness.isClientOwner, the one rule the portal and Overview use).
+// Client tasks get a "Client review" box: ticked = Approve / Request changes on
+// the portal. New tasks start unticked (client_review: false); tasks saved
+// before the box existed have no client_review and stay approvable, as before.
+function wbEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function wbClientNames() {
+  var v = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  return { company: v("client_company"), contact: v("client_name") };
+}
+function wbIsClientOwner(owner) {
+  var c = wbClientNames();
+  return !!window.SlaterReadiness && SlaterReadiness.isClientOwner(owner, c.company, c.contact);
+}
+function wbReviewOn(d) { return !!d && d.client_review !== false; }
+function wbOwnerOptions() {
+  var c = wbClientNames(), out = [], seen = {};
+  function addOpt(value, label) {
+    value = (value || "").trim(); var k = value.toLowerCase();
+    if (!value || seen[k]) return; seen[k] = 1; out.push({ value: value, label: label });
+  }
+  addOpt(c.company, "Client company");
+  addOpt(c.contact, "Client contact" + (c.company ? " · " + c.company : ""));
+  if (!c.company && !c.contact) addOpt("Client", "Client");
+  kp.forEach(function (id) {
+    var n = document.getElementById(id + "_name"), r = document.getElementById(id + "_role");
+    addOpt(n && n.value, "Key Personnel" + (r && r.value.trim() ? " · " + r.value.trim() : ""));
+  });
+  return out;
+}
+// One shared <datalist> for every Owner box (edit panel, table view).
+function wbRefreshOwnerOptions() {
+  var dl = document.getElementById("wb-owner-opts");
+  if (!dl) { dl = document.createElement("datalist"); dl.id = "wb-owner-opts"; document.body.appendChild(dl); }
+  dl.innerHTML = wbOwnerOptions().map(function (o) { return '<option value="' + wbEsc(o.value) + '" label="' + wbEsc(o.label) + '"></option>'; }).join("");
+}
+// Edit panel: typing / picking an owner. Doesn't rebuild the panel (that
+// used to knock the cursor out of the box on every keystroke).
+function wbEpOwnerInput(id, value) {
+  var d = _wbData[id]; if (!d) return;
+  d.owner = value;
+  wbBuildListView();
+  var li = document.getElementById("wb-li-" + id); if (li) li.classList.add("active");
+  var rv = document.getElementById("wb-ep-review");
+  if (rv) rv.style.display = wbIsClientOwner(value) ? "" : "none";
+  autosaveTrigger();
+}
+function wbSetReview(id, on) {
+  var d = _wbData[id]; if (!d) return;
+  d.client_review = !!on;
+  var cb = document.getElementById("wb-ep-review-cb"); if (cb && _wbSelectedId === id) cb.checked = !!on;
+  var cell = document.querySelector("#wb-tr-" + id + " .t-owner"); if (cell) cell.innerHTML = wbTvOwnerHtml(id);
+  autosaveTrigger();
+}
+// Table view owner cell: dot, name, and for client tasks a Review switch.
+function wbTvOwnerHtml(id) {
+  var d = _wbData[id] || {};
+  var html = '<div class="t-owner-dot" style="background:' + wbOwnerColor(d.owner) + '"></div><span class="t-owner-name">' + (d.owner ? wbEsc(d.owner) : "--") + '</span>';
+  if (wbIsClientOwner(d.owner)) {
+    var on = wbReviewOn(d);
+    html += '<button type="button" class="t-review' + (on ? ' on' : '') + '" title="' + (on ? 'Client review: the client can Approve or Request changes on the portal. Click to turn off.' : 'No client review: the client just sees it waiting on them. Click to turn on.') + '" onclick="event.stopPropagation();wbSetReview(\'' + id + '\',' + !on + ')" ondblclick="event.stopPropagation()">Review</button>';
+  }
+  return html;
+}
+
 function wbStatusClass(status) {
   var map = {'Not Started':'not-started','In Progress':'in-progress','Stuck':'stuck','Complete':'complete','N/A':'na'};
   return map[status] || (status||'').toLowerCase().replace(/[^a-z0-9]/g,'-');
@@ -2592,7 +2660,11 @@ function wbAdd(item, afterId) {
     manual_date: item.manual_date||"",
     status: item.status||"Not Started", internal: item.internal||false,
     uuid: item.uuid||generateWbUuid(), due: "",
+    // Saved tasks keep theirs (none = from before the box: stays approvable);
+    // brand-new tasks start unticked.
+    client_review: ("client_review" in item) ? (item.client_review === undefined ? undefined : !!item.client_review) : (item.uuid ? undefined : false),
   };
+  return id;
 }
 
 function wbRemove(id) {
@@ -2622,6 +2694,7 @@ function wbGetItems() {
       seq_anchor_uuid: seq_anchor_uuid,
       manual_date: d.manual_date,
       status: d.status, internal: d.internal,
+      client_review: d.client_review,
       due: d.due, dueFmt: wbFmtDate(d.due),
     };
   }).filter(function(x) { return x && x.item; });
@@ -3015,10 +3088,11 @@ function wbRenderEditPanel(id) {
     '<div class="ep-body">' +
     (window.PortalAdmin ? PortalAdmin.editPanelHtml(d.uuid) : '') +
     '<div class="ep-sec"><div class="ep-lbl">Item name</div><input class="ep-inp" value="' + (d.item||"").replace(/"/g,"&quot;") + '" oninput="_wbData[\'' + id + '\'].item=this.value;var n=document.querySelector(\'#wb-li-' + id + ' .li-name\');if(n)n.textContent=this.value"></div>' +
-    '<div class="ep-grid"><div class="ep-sec" style="margin:0"><div class="ep-lbl">Owner</div><input class="ep-inp" value="' + (d.owner||"").replace(/"/g,"&quot;") + '" oninput="_wbData[\'' + id + '\'].owner=this.value;wbBuildListView();wbSelectItem(\'' + id + '\')"></div>' +
+    '<div class="ep-grid"><div class="ep-sec" style="margin:0"><div class="ep-lbl">Owner</div><input class="ep-inp" list="wb-owner-opts" placeholder="Pick or type a name" value="' + wbEsc(d.owner||"") + '" onfocus="wbRefreshOwnerOptions()" oninput="wbEpOwnerInput(\'' + id + '\',this.value)"></div>' +
     '<div class="ep-sec" style="margin:0"><div class="ep-lbl">Status</div><select class="ep-sel" onchange="wbEpSetStatus(\'' + id + '\',this.value)">' +
     statuses.map(function(s) { return '<option value="' + s + '"' + (d.status===s?' selected':'') + '>' + s + '</option>'; }).join("") +
     '</select></div></div>' +
+    '<div class="ep-sec ep-review" id="wb-ep-review"' + (wbIsClientOwner(d.owner) ? '' : ' style="display:none"') + '><label class="ep-check"><input type="checkbox" id="wb-ep-review-cb"' + (wbReviewOn(d) ? ' checked' : '') + ' onchange="wbSetReview(\'' + id + '\',this.checked)"> Client review</label><div class="ep-hint">The client can Approve or Request changes on the portal. Leave off for tasks like "Send logos": they just show as waiting on the client.</div></div>' +
     '<div class="ep-sec"><div class="ep-lbl">Scheduling mode</div><div class="mode-btns">' +
     ["anchor","sequential","manual"].map(function(m) { return '<button class="mode-btn' + (d.mode===m?' active':'') + '" onclick="wbEpSetMode(\'' + id + '\',\'' + m + '\')">' + m.charAt(0).toUpperCase()+m.slice(1) + '</button>'; }).join("") +
     '</div></div>' + modeCtrl +
@@ -3145,7 +3219,7 @@ function wbBuildTvTaskRow(id, num) {
   tr.innerHTML = '<td><div class="t-drag">&#10783;</div></td>' +
     '<td><div class="t-num">' + num + '</div></td>' +
     '<td ondblclick="wbTvEditLabel(\'' + id + '\',this)"><div class="t-cell"><span class="tv-val-label">' + (d.item||"").replace(/</g,"&lt;") + '</span>' + (window.PortalAdmin ? PortalAdmin.badgeHtml(d.uuid) : '') + '</div></td>' +
-    '<td ondblclick="wbTvEditOwner(\'' + id + '\',this)"><div class="t-owner"><div class="t-owner-dot" style="background:' + color + '"></div><span class="t-owner-name">' + (d.owner||"--") + '</span></div></td>' +
+    '<td ondblclick="wbTvEditOwner(\'' + id + '\',this)"><div class="t-owner">' + wbTvOwnerHtml(id) + '</div></td>' +
     '<td ondblclick="wbTvEditMode(\'' + id + '\',this)"><div class="t-cell"><span class="t-mode ' + d.mode + '">' + d.mode + '</span></div></td>' +
     '<td ondblclick="wbTvEditDays(\'' + id + '\',this)"><div class="t-days tv-val-days">' + (d.mode==="sequential"?d.seq_days:d.mode==="manual"?"--":d.days) + '</div></td>' +
     '<td ondblclick="wbTvEditAfter(\'' + id + '\',this)"><div class="t-cell" style="color:var(--text-muted);font-size:11px"><span class="tv-val-after" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + afterLabel + '</span></div></td>' +
@@ -3208,13 +3282,17 @@ function wbTvEditOwner(id, td) {
   td.classList.add("t-editing");
   var div = td.querySelector(".t-owner");
   var inp = document.createElement("input");
-  inp.value = d.owner||""; inp.placeholder = "Owner name";
+  inp.value = d.owner||""; inp.placeholder = "Pick or type a name";
+  wbRefreshOwnerOptions(); inp.setAttribute("list", "wb-owner-opts");
   inp.style.cssText = "width:100%;background:var(--surface-3);border:none;outline:none;font-size:12px;font-family:inherit;color:var(--text-primary);padding:0 10px;height:34px";
   div.innerHTML = ""; div.appendChild(inp); inp.focus();
+  var done = false;
   var commit = function() {
-    d.owner = inp.value; var color = wbOwnerColor(d.owner);
+    // Enter commits, and replacing the box then fires blur: commit only once.
+    if (done) return; done = true;
+    d.owner = inp.value;
     td.classList.remove("t-editing");
-    div.innerHTML = '<div class="t-owner-dot" style="background:' + color + '"></div><span class="t-owner-name">' + (d.owner||"--") + '</span>';
+    div.innerHTML = wbTvOwnerHtml(id);
     td.ondblclick = function() { wbTvEditOwner(id,td); }; _wbEditingCell=null; autosaveTrigger();
   };
   _wbEditingCell = {td:td, commit:commit};
@@ -3331,8 +3409,9 @@ function wbUpdateStats() {
 function wbAddItem() {
   var lastId = wbItems.length ? wbItems[wbItems.length-1] : null;
   var defMode = (document.getElementById("project_type")||{value:""}).value === "post_production" ? "sequential" : "anchor";
-  wbAdd({mode:defMode, seq_days:1, seq_anchor_id:lastId||""}, null);
-  var newId = wbItems[wbItems.length-1];
+  // Select the task just added (it goes to the top of the list). This used to
+  // select the last task, so with nothing selected the panel opened the wrong one.
+  var newId = wbAdd({mode:defMode, seq_days:1, seq_anchor_id:lastId||""}, null);
   wbRecalc();
   wbRender();
   wbSelectItem(newId);
@@ -4999,7 +5078,7 @@ function wbItemsFromTemplate(tmpl) {
     items.every(function(it) { return !it.days; });
   return items.map(function(it) {
     return { item: it.item, owner: it.owner || "", days: it.days || 0, status: "Not Started",
-      mode: legacyNoOffsets ? undefined : "anchor" };
+      mode: legacyNoOffsets ? undefined : "anchor", client_review: !!it.client_review };
   });
 }
 
@@ -5032,7 +5111,9 @@ function saveCurrentAsTemplate() {
   const anchorIso = getAnchorIso();
   const tmpl = {id:"tmpl_"+Date.now(), name:name.trim(), days_before:true, items:items.map(function(it) {
     var days = (it.due && anchorIso) ? wbDaysBeforeAnchor(it.due, anchorIso) : (it.mode === "anchor" ? (it.days || 0) : 0);
-    return {item:it.item, owner:it.owner, days:days};
+    var t = {item:it.item, owner:it.owner, days:days};
+    if (it.client_review === true || (it.client_review === undefined && wbIsClientOwner(it.owner))) t.client_review = true;
+    return t;
   })};
   tmpls.push(tmpl);
   tmplSaveAll(tmpls);

@@ -191,6 +191,8 @@
   }
 
   // One "Waiting on you" row: Approve / Request changes, or what was sent.
+  // Items without "Client review" (w.review false: "Send logos" and the like)
+  // have no buttons: just the due date, links and Send files.
   function actionRow(w, today, uploader) {
     var due = dueLabel(w.due, today);
     var row = el('div', { class: 'action-item' });
@@ -207,8 +209,9 @@
     var btns = el('div', { class: 'action-btns' },
       el('button', { type: 'button', class: 'action-btn primary', onclick: function () { openForm('approved'); } }, 'Approve'),
       el('button', { type: 'button', class: 'action-btn', onclick: function () { openForm('changes_requested'); } }, 'Request changes'));
+    if (!w.review) btns.style.display = 'none';
     var note;
-    if (w.response) {
+    if (w.review && w.response) {
       btns.style.display = 'none';
       note = el('div', { class: 'action-note sent' },
         (w.response.kind === 'approved' ? 'You approved this ' : 'You asked for changes ') + ago(w.response.at) + '. Your producer will confirm. ',

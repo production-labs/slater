@@ -2,7 +2,7 @@
 // "Waiting on you" (ready), coming up, or held up by us.
 // Run: node scripts/test-client-readiness.js
 const assert = require('assert');
-const { clientItemStates } = require('../public/client-readiness');
+const { clientItemStates, isClientOwner, needsApproval } = require('../public/client-readiness');
 
 const T = '2026-11-10';
 let pass = 0;
@@ -61,5 +61,24 @@ check('client step after another open client step: coming up, not held up by us'
 const s = clientItemStates({ wb_items: [edit('In Progress', T), review({ status: 'Complete' }), { item: '', owner: 'Client' }] }, 'Contoso', T);
 assert.deepStrictEqual(s, [null, null, null], 'ours / done / unnamed should be null: ' + JSON.stringify(s));
 pass++; console.log('  ok  our items, done items and unnamed items have no state');
+
+// Owner rule (2026-11-07): "Client", the client company, or the client contact.
+check('owner matched by the client contact (Project tab "Client name")',
+  { client_name: 'Olga Masek', wb_items: [edit('Complete', T), review({ owner: '  olga masek ' })] }, 1, { ready: true, heldUp: false });
+check('a Key Personnel name is ours, so a client step after it can be held up by us',
+  { client_name: 'Olga Masek', wb_items: [edit('In Progress', T, { owner: 'Shaun Parker' }), review({ owner: 'Olga Masek' })] }, 1, { ready: false, heldUp: true });
+const owners = [
+  ['Client', true], ['CLIENT', true], ['Contoso', true], ['Olga Masek', true],
+  ['MSFT', false], ['Contoso team', false], ['Olga', false], ['', false], [null, false],
+];
+for (const [o, want] of owners) assert.strictEqual(isClientOwner(o, 'Contoso', 'Olga Masek'), want, 'isClientOwner(' + JSON.stringify(o) + ')');
+assert.strictEqual(isClientOwner('Olga Masek', 'Contoso', ''), false, 'no contact set');
+assert.strictEqual(isClientOwner('Contoso', '', ''), false, 'no company set');
+pass++; console.log('  ok  isClientOwner: Client / company / contact match; near misses do not');
+assert.strictEqual(needsApproval({ owner: 'Client' }), true, 'legacy item (no client_review) stays approvable');
+assert.strictEqual(needsApproval({ client_review: true }), true);
+assert.strictEqual(needsApproval({ client_review: false }), false);
+assert.strictEqual(needsApproval(null), false);
+pass++; console.log('  ok  needsApproval: ticked, unticked, and items from before the box');
 
 console.log('\n' + pass + ' passed');

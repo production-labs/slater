@@ -229,6 +229,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Pin IDs: `pin_YYYY-MM-DD` for schedule days, `video_due` for post production
 - Changing a schedule day date updates all sequential anchor references
 - Internal only checkbox — hides from Word doc, shows in Rundown
+- Owner: type-or-pick box (client company, client contact, Key Personnel; anything can be typed). A task is the client's when Owner = "Client" / client company / client contact (`SlaterReadiness.isClientOwner`, `public/client-readiness.js`, the one rule for app, portal, Overview). Client tasks have a "Client review" box (`client_review`; table view: REVIEW switch): ticked = Approve / Request changes on the portal; new tasks start unticked; tasks saved before 2026-11-07 (no field) stay approvable. Test: `scripts/e2e-wb-owner.js`
 - Workback templates are "days before" the anchor (Due Date for Post Production, else the selected schedule day). `wbItemsFromTemplate()` always loads them in anchor mode. "Save current as template" converts each item's actual date to days-before (`wbDaysBeforeAnchor()`) and marks the template `days_before: true`. Exception: unmarked templates whose items are all 0 (saved from chained Post Production workbacks before 2026-11-05) load in the project's default mode, as they used to. Before that fix, Post Production ignored template days and chained items 1 day apart from kickoff. Test: `scripts/e2e-wb-templates.js`.
 - All pins sorted by date in live UI
 - `wbRecalc()` handles all date calculations

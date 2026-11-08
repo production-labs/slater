@@ -27,13 +27,24 @@
   function isoDate(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : ''; }
   function isDone(status) { return status === 'Complete' || status === 'N/A'; }
 
-  function isClientOwner(owner, client) {
+  // A workback item is the client's when its Owner is "Client", the client
+  // company, or the client contact (Project tab "Client name"), ignoring case
+  // and spaces at the ends. The Owner box offers exactly these (plus Key
+  // Personnel), so picking from it never misses. The one rule for the portal
+  // (routes/portal.js), the Projects Overview and this file.
+  function isClientOwner(owner, client, contact) {
     var o = txt(owner).toLowerCase();
     if (!o) return false;
     if (o === 'client') return true;
     var c = txt(client).toLowerCase();
-    return !!c && o === c;
+    if (c && o === c) return true;
+    var k = txt(contact).toLowerCase();
+    return !!k && o === k;
   }
+  // Does a client item get Approve / Request changes? Its "Client review" box
+  // (client_review). Items from before that box existed (no client_review at
+  // all) keep the old behavior: every client item could be approved.
+  function needsApproval(item) { return !!item && item.client_review !== false; }
 
   function itemDue(i) { return isoDate(i.due) || (i.mode === 'manual' ? isoDate(i.manual_date) : ''); }
 
@@ -62,6 +73,7 @@
     var byUuid = {};
     list.forEach(function (i, n) { if (i && txt(i.uuid)) byUuid[txt(i.uuid)] = n; });
     var kickoff = isoDate(data.kickoff_date_iso);
+    var contact = txt(data.client_name);
 
     function prevIndex(n) {
       for (var k = n - 1; k >= 0; k--) if (list[k] && txt(list[k].item)) return k;
@@ -82,16 +94,16 @@
     }
 
     return list.map(function (i, n) {
-      if (!i || !txt(i.item) || !isClientOwner(i.owner, client) || isDone(i.status)) return null;
+      if (!i || !txt(i.item) || !isClientOwner(i.owner, client, contact) || isDone(i.status)) return null;
       var b = before(i, n);
       if (!b) return { ready: true, heldUp: false };
       if (b.date) return { ready: b.date <= today, heldUp: false };
       var p = list[b.item];
       if (isDone(p.status)) return { ready: true, heldUp: false };
       var pDue = itemDue(p);
-      return { ready: false, heldUp: !isClientOwner(p.owner, client) && !!pDue && pDue <= today };
+      return { ready: false, heldUp: !isClientOwner(p.owner, client, contact) && !!pDue && pDue <= today };
     });
   }
 
-  return { clientItemStates: clientItemStates, isClientOwner: isClientOwner };
+  return { clientItemStates: clientItemStates, isClientOwner: isClientOwner, needsApproval: needsApproval };
 });
