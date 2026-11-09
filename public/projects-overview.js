@@ -543,20 +543,18 @@
       h += '<div class="po-pt-lane">' +
         '<div class="po-pt-line" style="right:auto;width:' + tp + '%;background:#444"></div>' +
         '<div class="po-pt-line" style="left:' + tp + '%;background:var(--accent)"></div>';
-      // Each dated workback item becomes a segment from the previous item's
-      // due date (or the project start) to its own, colored by its owner.
-      var prev = p.startDate;
+      // Each dated workback item becomes a bar colored by its owner. Single-day
+      // and chained items start where the Workback tab starts them (wbItemStartIso).
       p.items.filter(function (i) { return i.due; })
         .sort(function (a, b) { return a.due < b.due ? -1 : a.due > b.due ? 1 : 0; })
         .forEach(function (i) {
-          var s = prev && prev < i.due ? prev : addDays(i.due, -1);
-          prev = i.due;
+          var s = i.start && i.start < i.due ? i.start : i.due;
           if (!inRange(s, i.due)) return;
           var l = pct(s), rr = pct(i.due);
           var col = isClientOwner(i.owner, p.client, p.data && p.data.client_name) ? '#e87ba4' : (typeof wbOwnerColor === 'function' ? wbOwnerColor(i.owner) : '#888');
           var doneCls = (i.status === 'Complete' || i.status === 'N/A') ? ' done' : '';
           h += '<div class="po-pt-bar' + doneCls + '" style="left:' + l + '%;width:' + Math.max(rr - l, 0.6) + '%;background:' + col + '" ' +
-            'data-tip="' + esc('<b>' + esc(i.item) + '</b><span>' + esc((i.owner || 'No owner') + ' · ' + fmt(s) + ' → ' + fmt(i.due) + ' · ' + i.status) + '</span>') + '"></div>';
+            'data-tip="' + esc('<b>' + esc(i.item) + '</b><span>' + esc((i.owner || 'No owner') + ' · ' + (s === i.due ? fmt(i.due) : fmt(s) + ' → ' + fmt(i.due)) + ' · ' + i.status) + '</span>') + '"></div>';
         });
       p.pins.forEach(function (x) {
         if (!inRange(x.date_iso, x.date_iso)) return;

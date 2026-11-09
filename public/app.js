@@ -2252,6 +2252,21 @@ function wbCalcDue(id, anchorIso, prevDue) {
   return dir === "forward" ? wbBusinessDaysAfter(anchorIso, days) : wbBusinessDaysBefore(anchorIso, days);
 }
 
+// Where an item's timeline bar starts. The one rule for the Workback timeline
+// and the Overview's Portfolio timeline: Anchor and Manual items are a single
+// day; Sequential items run from whatever they come "After:".
+// pinDates: schedule milestone id -> date. itemDues: other item's id -> due date.
+function wbItemStartIso(mode, anchor, dueIso, kickoffIso, videoDueIso, pinDates, itemDues) {
+  if (mode !== "sequential") return dueIso;
+  var base;
+  if (anchor === "kickoff") base = kickoffIso;
+  else if (anchor === "video_due") base = videoDueIso;
+  else if (anchor && anchor.indexOf("pin_") === 0) base = pinDates[anchor.slice(4)] || kickoffIso;
+  else if (anchor && itemDues[anchor]) base = itemDues[anchor];
+  else base = kickoffIso;
+  return base || dueIso;
+}
+
 function wbDrawTimeline() {
   var container = document.getElementById("wb-timeline");
   if (!container) return;
@@ -2402,20 +2417,7 @@ function wbDrawTimeline() {
     if (!d) return;
     var dueIso = d.due || "";
     if (!dueIso) return;
-    var mode = d.mode || "anchor";
-    var startIso;
-    if (mode === "sequential") {
-      var seqId = d.seq_anchor_id || "";
-      var base;
-      if (seqId === "kickoff") base = kickoffIso;
-      else if (seqId === "video_due") base = videoDueIso;
-      else if (seqId && seqId.indexOf("pin_") === 0) base = _tlMilestoneDates[seqId.slice(4)] || kickoffIso;
-      else if (seqId && dueMap[seqId]) base = dueMap[seqId];
-      else base = kickoffIso;
-      startIso = base || dueIso;
-    } else {
-      startIso = dueIso;
-    }
+    var startIso = wbItemStartIso(d.mode, d.seq_anchor_id, dueIso, kickoffIso, videoDueIso, _tlMilestoneDates, dueMap);
     all.push({type:"task", id:id, label:d.item||"Untitled", owner:d.owner||"", startIso:startIso, endIso:dueIso});
   });
 
@@ -3893,7 +3895,7 @@ function projectWorkbackDates(sheet) {
     }
     var done = item.status === "Complete" || item.status === "N/A";
     if (due && !done) prevDue = due;
-    items.push({item:item.item, owner:item.owner||"", due:due||"", status:item.status||"Not Started", uuid:item.uuid||"", internal:!!item.internal});
+    items.push({item:item.item, owner:item.owner||"", due:due||"", status:item.status||"Not Started", uuid:item.uuid||"", internal:!!item.internal, mode:item.mode||"anchor", seq_anchor_uuid:item.seq_anchor_uuid||""});
   });
   var pins = [];
   if (kickoffIso) pins.push({id:"kickoff", label:"Client Kickoff", date_iso:kickoffIso, call_time:sheet.kickoff_time||""});
@@ -3902,6 +3904,13 @@ function projectWorkbackDates(sheet) {
     pins.push({id:day.id||"day_"+i, label:day.label||"Day "+(i+1), date_iso:day.date_iso, call_time:day.call_time||""});
   });
   if (sheet.video_due_date_iso) pins.push({id:"video_due", label:"Project Due Date", date_iso:sheet.video_due_date_iso, call_time:sheet.video_due_time||""});
+  // Needs every item and pin first: a chained item can point at any of them.
+  var pinDates = {}, duesByUuid = {};
+  pins.forEach(function(p) { pinDates[p.id] = p.date_iso; });
+  items.forEach(function(i) { if (i.uuid) duesByUuid[i.uuid] = i.due; });
+  items.forEach(function(i) {
+    i.start = i.due ? wbItemStartIso(i.mode, i.seq_anchor_uuid, i.due, kickoffIso, sheet.video_due_date_iso||"", pinDates, duesByUuid) : "";
+  });
   return { eventIso: eventIso, kickoffIso: kickoffIso, items: items, pins: pins };
 }
 

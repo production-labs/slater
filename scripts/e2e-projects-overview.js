@@ -150,6 +150,41 @@ async function main() {
     await page.click('#po-root [data-chip="range"][data-val="6w"]');
   });
 
+  await step('portfolio timeline: single-day items are not ranges; chained items run from their "After:"', async () => {
+    const bars = await page.$$eval('#po-root .po-pt-bar', els => els.map(e => ({ tip: e.getAttribute('data-tip'), width: parseFloat(e.style.width) })));
+    const bar = name => bars.find(b => b.tip.includes('<b>' + name + '</b>'));
+    ['Script V1', 'Approve Script V2', 'V2 drafts', 'Approve storyboards'].forEach(n => {
+      const b = bar(n);
+      assert(b, 'bar missing: ' + n);
+      assert(!b.tip.includes('→') && b.width === 0.6, n + ' should be one day: ' + JSON.stringify(b));
+    });
+    const chained = bar('Approve V2 drafts');
+    assert(chained && chained.tip.includes('→') && chained.width > 0.6, 'chained item should be a range: ' + JSON.stringify(chained));
+  });
+
+  await step('bar start rule: chained items resolve every kind of "After:" on a project that is not open', async () => {
+    const got = await page.evaluate(() => {
+      const sheet = {
+        kickoff_date_iso: '2026-11-02', video_due_date_iso: '2026-12-01',
+        schedule_days: [{ id: 'sday_1', date_iso: '2026-11-10' }],
+        wb_items: [
+          { uuid: 'a', item: 'Anchor', mode: 'anchor', due: '2026-11-20' },
+          { uuid: 'm', item: 'Manual', mode: 'manual', manual_date: '2026-11-21', due: '2026-11-21' },
+          { uuid: 'k', item: 'After kickoff', mode: 'sequential', seq_anchor_uuid: 'kickoff', due: '2026-11-04' },
+          { uuid: 'd', item: 'After day', mode: 'sequential', seq_anchor_uuid: 'pin_sday_1', due: '2026-11-12' },
+          { uuid: 'v', item: 'After due', mode: 'sequential', seq_anchor_uuid: 'video_due', due: '2026-12-03' },
+          // Points at an item further down the list.
+          { uuid: 'l', item: 'After later row', mode: 'sequential', seq_anchor_uuid: 'z', due: '2026-11-26' },
+          { uuid: 'z', item: 'Later row', mode: 'manual', manual_date: '2026-11-25', due: '2026-11-25' },
+          { uuid: 'n', item: 'No link', mode: 'sequential', due: '2026-11-05' },
+        ],
+      };
+      return projectWorkbackDates(sheet).items.reduce((o, i) => (o[i.uuid] = i.start, o), {});
+    });
+    const want = { a: '2026-11-20', m: '2026-11-21', k: '2026-11-02', d: '2026-11-10', v: '2026-12-01', l: '2026-11-25', z: '2026-11-25', n: '2026-11-02' };
+    assert(JSON.stringify(got) === JSON.stringify(want), JSON.stringify(got));
+  });
+
   await step('double bookings show on the cards and count as needing attention', async () => {
     // Injected into the in-page cache only (not the database), so the counts
     // the other steps check stay as they are. Removed again at the end.
