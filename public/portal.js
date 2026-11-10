@@ -290,6 +290,7 @@
       } }, c[1]));
     });
     var legend = el('div', { class: 'tl-legend' },
+      nodes.some(function (n) { return n.star; }) ? el('div', { class: 'lg' }, el('span', { class: 'lg-dot star' }), 'Main date') : null,
       el('div', { class: 'lg' }, el('span', { class: 'lg-dot ms' }), 'Key date'),
       el('div', { class: 'lg' }, el('span', { class: 'lg-dot client' }), 'Your steps'),
       el('div', { class: 'lg' }, el('span', { class: 'lg-dot' }), 'Our work'));
@@ -343,7 +344,7 @@
     nodes.forEach(function (n) {
       var x = pct(n.date);
       var past = n.date < today || n.done;
-      var cls = 'tl-node ' + (n.kind === 'milestone' ? 'milestone' : n.kind === 'client' ? 'client' : '') + (past ? ' done' : '');
+      var cls = 'tl-node ' + (n.kind === 'milestone' ? 'milestone' : n.kind === 'client' ? 'client' : '') + (n.star ? ' star' : '') + (past ? ' done' : '');
       var note = n.kind === 'milestone' ? 'Key date' : n.kind === 'client' ? (n.done ? 'Done' : n.ready ? 'Needs you' : 'Coming up for you') : 'Our work';
       var node = el('div', { class: cls, style: 'left:' + x + '%', tabindex: '0', 'aria-label': n.label + ', ' + fmt(n.date) + ', ' + note });
       node.addEventListener('mouseenter', function () {

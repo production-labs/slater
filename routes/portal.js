@@ -229,6 +229,7 @@ function buildPayload(row, extra) {
       end_date: end && end > day.date_iso ? end : '',
       time: str(day.golive, 40),   // go-live time only; crew call times stay internal
       location: locName,
+      star: data.project_type !== 'post_production' && day.main_event === true,
     });
     const cityLine = loc ? [str(loc.city, 100), [str(loc.state, 50), str(loc.zip, 20)].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '';
     // Only real places become a venue (with a Maps link): a saved location
@@ -239,9 +240,10 @@ function buildPayload(row, extra) {
     }
   });
   if (isoDate(data.video_due_date_iso) && !pinHidden('video_due')) {
-    pins.push({ id: 'video_due', label: 'Delivery', date: data.video_due_date_iso, end_date: '', time: '', location: '' });
+    pins.push({ id: 'video_due', label: 'Delivery', date: data.video_due_date_iso, end_date: '', time: '', location: '', star: data.project_type === 'post_production' });
   }
   pins.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const finalPin = pins.find(p => p.star) || pins[pins.length - 1];
 
   // Latest client response per item (approvals arrive in step 5c).
   const respByUuid = new Map();
@@ -274,7 +276,7 @@ function buildPayload(row, extra) {
       };
     });
 
-  const timeline = pins.map(p => ({ date: p.date, label: p.label, kind: 'milestone' }))
+  const timeline = pins.map(p => ({ date: p.date, label: p.label, kind: 'milestone', star: !!p.star }))
     .concat(items.map(i => ({ date: i.due, label: i.item, kind: i.client ? 'client' : 'ours', done: i.done, ready: i.client && i.ready })))
     .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 
@@ -308,7 +310,8 @@ function buildPayload(row, extra) {
     links,
     venues,
     updates: (extra.updates || []).map(u => ({ author: str(u.author_name, 200), body: str(u.body, 10000), at: u.created_at })),
-    key_date: pins.length ? (pins[pins.length - 1].end_date || pins[pins.length - 1].date) : '',
+    // The starred date (Main event / Post Production due date), else the last date.
+    key_date: finalPin ? (finalPin.end_date || finalPin.date) : '',
     uploads: transfers.isConfigured()
       ? { enabled: true, max_bytes: transfers.MAX_FILE_BYTES, keep_days: transfers.RETENTION_DAYS }
       : { enabled: false },

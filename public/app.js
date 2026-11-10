@@ -1037,6 +1037,11 @@ function addScheduleDay(data, insertAfterDayId) {
   titlePencil.title = "Edit day label";
   titlePencil.onclick = function() { titleInp.focus(); };
   titleRow.appendChild(titleInp); titleRow.appendChild(titlePencil);
+  var mainFlag = document.createElement("span");
+  mainFlag.id = dayId+"_main_flag";
+  mainFlag.className = "sday-main-flag";
+  mainFlag.innerHTML = icon('flag') + "Main event";
+  titleRow.appendChild(mainFlag);
   const dateFmtDisplay = document.createElement("div");
   dateFmtDisplay.id = dayId+"_date_display";
   dateFmtDisplay.style.cssText = "font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);font-family:'Geist',sans-serif;margin-top:2px;min-height:0";
@@ -1131,9 +1136,26 @@ function addScheduleDay(data, insertAfterDayId) {
   inPersonLbl.style.cssText = "font-size:12px;color:var(--text-primary);font-weight:600;cursor:pointer;user-select:none";
   inPersonWrap.appendChild(inPersonCb); inPersonWrap.appendChild(inPersonLbl);
   inPersonCb.onchange = function() { autosaveTrigger(); };
+  // The project's big final day (see projectFinalDate). Optional, one per
+  // project, not offered on Post Production (that uses the Project Due Date).
+  var mainWrap = document.createElement("div");
+  mainWrap.id = dayId+"_main_wrap";
+  mainWrap.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0";
+  var mainCb = document.createElement("input");
+  mainCb.type = "checkbox"; mainCb.id = dayId+"_main_event";
+  mainCb.checked = !!data.main_event;
+  mainCb.style.cssText = "width:14px;height:14px;accent-color:var(--accent);cursor:pointer";
+  var mainLbl = document.createElement("label");
+  mainLbl.htmlFor = dayId+"_main_event";
+  mainLbl.textContent = "Main event";
+  mainLbl.title = "The project's big final day. Sets the date on the project name and the Projects Overview.";
+  mainLbl.style.cssText = "font-size:12px;color:var(--text-primary);font-weight:600;cursor:pointer;user-select:none";
+  mainWrap.appendChild(mainCb); mainWrap.appendChild(mainLbl);
+  mainCb.onchange = function() { setMainEvent(dayId, this.checked); };
+
   var checksRight = document.createElement("div");
   checksRight.style.cssText = "display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end";
-  checksRight.appendChild(inPersonWrap); checksRight.appendChild(excludeWrap);
+  checksRight.appendChild(mainWrap); checksRight.appendChild(inPersonWrap); checksRight.appendChild(excludeWrap);
 
   var checkRow = document.createElement("div");
   checkRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:6px 16px;background:var(--border);border-bottom:1px solid var(--border)";
@@ -1540,6 +1562,7 @@ function addScheduleDay(data, insertAfterDayId) {
   }
 
   initMobileCollapse(dayId);
+  refreshMainEventUI();
   refreshWbDaySelector();
   rebuildInsertDividers();
   if (data.category) applyCategoryConfig(dayId, data.category);
@@ -1605,6 +1628,35 @@ function removeScheduleDay(dayId) {
 }
 
 function renumberDays() {}
+
+// Shows or hides the "Main event" tick box and flag on every schedule card.
+function refreshMainEventUI() {
+  var isPost = (document.getElementById("project_type")||{}).value === "post_production";
+  scheduleDays.forEach(function(id) {
+    var wrap = document.getElementById(id+"_main_wrap");
+    var cb = document.getElementById(id+"_main_event");
+    var flag = document.getElementById(id+"_main_flag");
+    if (wrap) wrap.style.display = isPost ? "none" : "flex";
+    if (flag) flag.style.display = (cb && cb.checked && !isPost) ? "inline-flex" : "none";
+  });
+}
+
+// One Main event per project: ticking a day unticks the others. The workback
+// only follows along while it's empty, so ticking never moves existing dates.
+function setMainEvent(dayId, on) {
+  scheduleDays.forEach(function(id) {
+    var cb = document.getElementById(id+"_main_event");
+    if (cb) cb.checked = on && id === dayId;
+  });
+  refreshMainEventUI();
+  var sel = document.getElementById("wb_day_select");
+  if (on && sel && !wbItems.length && (document.getElementById(dayId+"_date_iso")||{}).value) {
+    refreshWbDaySelector();
+    sel.value = dayId;
+  }
+  wbRebuildPins();   // redraws the timeline star
+  autosaveTrigger();
+}
 
 function updateDayHeader(dayId) {
   wbRebuildPins();
@@ -1971,6 +2023,7 @@ function getScheduleDays() {
       show_blacks:       (document.getElementById(dayId+"_show_blacks")||{}).checked||false,
       exclude_callsheet: (document.getElementById(dayId+"_exclude_callsheet")||{}).checked||false,
       client_remote: (document.getElementById(dayId+"_client_in_person")||{checked:true}).checked === false,
+      main_event: (document.getElementById(dayId+"_main_event")||{}).checked||false,
       excluded_crew: getDayExcludedCrew(dayId),
       excluded_talent: getDayExcludedTalent(dayId),
       excluded_kp: getDayExcludedKP(dayId),
@@ -2423,7 +2476,7 @@ function wbDrawTimeline() {
 
   getSchedMilestones().forEach(function(m) {
     if (!m.date_iso) return;
-    all.push({type:"pin", pinId:"pin_"+m.id, label:m.label, owner:"", startIso:m.date_iso, endIso:m.date_iso});
+    all.push({type:"pin", pinId:"pin_"+m.id, label:m.label, owner:"", startIso:m.date_iso, endIso:m.date_iso, star:!!m.star});
   });
 
   if (all.length < 1) { container.style.display = "none"; return; }
@@ -2533,11 +2586,13 @@ function wbDrawTimeline() {
 
     if (d.type === "pin") {
       var pinEl = document.createElement("div");
-      pinEl.className = "wb-tl-pin";
+      pinEl.className = d.star ? "wb-tl-pin star" : "wb-tl-pin";
       pinEl.style.left = isoPct(d.startIso)+"%";
       pinEl.style.top = y+"px";
       pinEl.style.zIndex = "10";
-      if (isPast) {
+      if (d.star) {
+        if (isPast) pinEl.classList.add("past");
+      } else if (isPast) {
         pinEl.style.background = "rgba(255,255,255,.22)";
         pinEl.style.border = "2px solid rgba(255,255,255,.22)";
       } else {
@@ -2554,8 +2609,8 @@ function wbDrawTimeline() {
         pe.addEventListener("mouseleave", function() { if (_wbSelectedId !== pinId) pe.style.boxShadow = ""; hideTip(); });
         pe.addEventListener("click", function() { wbSelectItem(pinId); });
       })(pinEl, isPast, d.pinId || "");
-      _wbTlElements[d.pinId||""] = {el: pinEl, type: "pin"};
-      if (_wbSelectedId === (d.pinId||"")) { pinEl.style.width = "11px"; pinEl.style.height = "11px"; pinEl.style.boxShadow = "0 0 0 4px rgba(255,255,255,.3)"; }
+      _wbTlElements[d.pinId||""] = {el: pinEl, type: "pin", star: d.star};
+      if (_wbSelectedId === (d.pinId||"")) { pinEl.style.width = d.star ? "20px" : "11px"; pinEl.style.height = d.star ? "20px" : "11px"; pinEl.style.boxShadow = "0 0 0 4px rgba(255,255,255,.3)"; }
       container.appendChild(pinEl);
 
     } else {
@@ -2857,12 +2912,12 @@ function wbApplyTlSelection(id) {
         entry.el.style.height = "8px";
       } else {
         entry.el.style.boxShadow = "0 0 0 4px rgba(255,255,255,.3)";
-        entry.el.style.width = "11px"; entry.el.style.height = "11px";
+        entry.el.style.width = entry.star ? "20px" : "11px"; entry.el.style.height = entry.star ? "20px" : "11px";
       }
     } else {
       entry.el.style.boxShadow = "";
       if (entry.type === "task") entry.el.style.height = "4px";
-      else { entry.el.style.width = "8px"; entry.el.style.height = "8px"; }
+      else { entry.el.style.width = entry.star ? "" : "8px"; entry.el.style.height = entry.star ? "" : "8px"; }
     }
   });
 }
@@ -3856,6 +3911,30 @@ function persistRundownStatusChange(sheetKey) {
   });
 }
 
+// The project's big final date: the one rule for the project label, the
+// Projects Overview and the default workback anchor.
+//   Post Production: the Project Due Date.
+//   Everything else: the day ticked "Main event"; if none is ticked, the last
+//   schedule day that isn't a Wrap or Travel day.
+// Returns { iso, id }; id is "video_due", a schedule day id, or "".
+function projectFinalDate(data) {
+  var days = (data.schedule_days||[]).filter(function(d) { return d.date_iso; });
+  var isPost = data.project_type === "post_production";
+  if (isPost && data.video_due_date_iso) return { iso: data.video_due_date_iso, id: "video_due" };
+  function endOf(d) { return d.end_date_iso && d.end_date_iso > d.date_iso ? d.end_date_iso : d.date_iso; }
+  function latest(list) {
+    return list.reduce(function(best, d) { return !best || endOf(d) >= endOf(best) ? d : best; }, null);
+  }
+  var pick = null;
+  if (!isPost) {
+    pick = days.filter(function(d) { return d.main_event; })[0] ||
+      latest(days.filter(function(d) { return d.category !== "wrap_day" && d.category !== "travel_day"; }));
+  }
+  if (!pick) pick = latest(days);
+  if (pick) return { iso: endOf(pick), id: pick.id||"" };
+  return { iso: data.day2_date_iso||data.day1_date_iso||data.video_due_date_iso||"", id: "" };
+}
+
 // Due dates for one saved project's workback items, plus its date pins
 // (kickoff, schedule days, project due date). Shared by the Rundown and the
 // Projects Overview so both always agree. items: every named item with
@@ -3898,12 +3977,12 @@ function projectWorkbackDates(sheet) {
     items.push({item:item.item, owner:item.owner||"", due:due||"", status:item.status||"Not Started", uuid:item.uuid||"", internal:!!item.internal, mode:item.mode||"anchor", seq_anchor_uuid:item.seq_anchor_uuid||""});
   });
   var pins = [];
-  if (kickoffIso) pins.push({id:"kickoff", label:"Client Kickoff", date_iso:kickoffIso, call_time:sheet.kickoff_time||""});
+  if (kickoffIso) pins.push({id:"kickoff", label:"Kickoff", date_iso:kickoffIso, call_time:sheet.kickoff_time||""});
   schedDays.forEach(function(day, i) {
     if (!day.date_iso) return;
-    pins.push({id:day.id||"day_"+i, label:day.label||"Day "+(i+1), date_iso:day.date_iso, call_time:day.call_time||""});
+    pins.push({id:day.id||"day_"+i, label:day.label||"Day "+(i+1), date_iso:day.date_iso, call_time:day.call_time||"", star:sheet.project_type!=="post_production" && !!day.main_event});
   });
-  if (sheet.video_due_date_iso) pins.push({id:"video_due", label:"Project Due Date", date_iso:sheet.video_due_date_iso, call_time:sheet.video_due_time||""});
+  if (sheet.video_due_date_iso) pins.push({id:"video_due", label:"Project Due Date", date_iso:sheet.video_due_date_iso, call_time:sheet.video_due_time||"", star:sheet.project_type==="post_production"});
   // Needs every item and pin first: a chained item can point at any of them.
   var pinDates = {}, duesByUuid = {};
   pins.forEach(function(p) { pinDates[p.id] = p.date_iso; });
@@ -4191,7 +4270,7 @@ function renderCompleted() {
     // Past schedule pins auto-complete — they're events that happened
     var _cPinMilestones = [];
     if (sheet.kickoff_date_iso && sheet.kickoff_date_iso < today) {
-      _cPinMilestones.push({label:"Client Kickoff", date_iso:sheet.kickoff_date_iso, call_time:sheet.kickoff_time||""});
+      _cPinMilestones.push({label:"Kickoff", date_iso:sheet.kickoff_date_iso, call_time:sheet.kickoff_time||""});
     }
     (sheet.schedule_days||[]).forEach(function(day, i) {
       if (day.date_iso && day.date_iso < today) {
@@ -5206,7 +5285,7 @@ function refreshWbDaySelector() {
 
   // Collect all dated entries and sort most-recent first
   const entries = [];
-  if (kickoffIso) entries.push({value:"kickoff", label:"Client Kickoff", iso:kickoffIso});
+  if (kickoffIso) entries.push({value:"kickoff", label:"Kickoff", iso:kickoffIso});
   if (videoDueIso) entries.push({value:"video_due", label:"Project Due Date", iso:videoDueIso});
   days.forEach(function(day, i) {
     entries.push({value: day.id || ("day_"+i), label: day.label || ("Day "+(i+1)), iso: day.date_iso||""});
@@ -5221,9 +5300,15 @@ function refreshWbDaySelector() {
     sel.appendChild(opt);
   });
 
-  // Default to most recent day (last in ascending sort) if nothing matched
+  // Nothing saved matched: default to the project's final date, else the
+  // most recent entry (last in ascending sort).
   if (!sel.value || (!days.find(function(d) { return (d.id||"") === sel.value; }) && current !== "kickoff" && current !== "video_due")) {
-    sel.value = sel.options[sel.options.length-1].value;
+    const finalId = projectFinalDate({
+      project_type: (document.getElementById("project_type")||{}).value||"",
+      schedule_days: days,
+      video_due_date_iso: videoDueIso,
+    }).id;
+    sel.value = entries.some(function(e) { return e.value === finalId; }) ? finalId : sel.options[sel.options.length-1].value;
   }
 
   wbRecalc();
@@ -5247,8 +5332,9 @@ function getSchedMilestones() {
   var milestones = [];
   var kickoffIso = (document.getElementById("kickoff_date_iso")||{}).value||"";
   var kickoffTime = (document.getElementById("kickoff_time")||{}).value||"";
+  var isPostTl = (document.getElementById("project_type")||{}).value === "post_production";
   if (kickoffIso) {
-    milestones.push({id:"kickoff", label:"Client Kickoff", date_iso:kickoffIso, time:kickoffTime, isKickoff:true});
+    milestones.push({id:"kickoff", label:"Kickoff", date_iso:kickoffIso, time:kickoffTime, isKickoff:true});
   }
   getScheduleDays().forEach(function(day, i) {
     if (!day.date_iso) return;
@@ -5259,6 +5345,7 @@ function getSchedMilestones() {
       date_iso: day.date_iso,
       time: day.call_time||"",
       isKickoff: false,
+      star: !isPostTl && !!day.main_event,
       schedEntries: day.sched_entries||[],
     });
   });
@@ -5266,7 +5353,7 @@ function getSchedMilestones() {
   var videoDueIso = (document.getElementById("video_due_date_iso")||{}).value||"";
   var videoDueTime = (document.getElementById("video_due_time")||{}).value||"";
   if (videoDueIso) {
-    milestones.push({id:"video_due", label:"Project Due Date", date_iso:videoDueIso, time:videoDueTime, isKickoff:false, isVideoDue:true});
+    milestones.push({id:"video_due", label:"Project Due Date", date_iso:videoDueIso, time:videoDueTime, isKickoff:false, isVideoDue:true, star:isPostTl});
   }
   milestones.sort(function(a,b) {
     return (a.date_iso+"_"+(a.time||"")).localeCompare(b.date_iso+"_"+(b.time||""));
@@ -5324,6 +5411,7 @@ function syncVideoDueDate() {
 
 function updateVideoDueVisibility() {
   const isPost = (document.getElementById("project_type")||{}).value === "post_production";
+  refreshMainEventUI();
   const block = document.getElementById("video-due-block");
   const kickoffDiv = document.getElementById("schedule-kickoff-divider");
   const listEl = document.getElementById("schedule-days-list");
@@ -6970,12 +7058,7 @@ function libLabel(data) {
     if (parts.length >= 2) return parts[0].charAt(0) + ". " + parts.slice(1).join(" ");
     return clientName;
   })() : "";
-  // Final deliverable/event date
-  const days = data.schedule_days || [];
-  const isPost = data.project_type === "post_production";
-  const finalIso = isPost
-    ? (data.video_due_date_iso || (days.length ? days[days.length-1].date_iso||"" : ""))
-    : (days.length ? days[days.length-1].date_iso||"" : (data.day2_date_iso||data.day1_date_iso||""));
+  const finalIso = projectFinalDate(data).iso;
   const dateStr = finalIso ? (function() {
     const d = new Date(finalIso + "T12:00:00");
     const mm = String(d.getMonth()+1).padStart(2,"0");

@@ -92,6 +92,9 @@ section + section{border-top:1px solid var(--line-soft)}
 .tl-node.milestone{width:15px;height:15px;border-radius:3px;transform:translate(-50%,-50%) rotate(45deg);border-color:var(--ink);background:var(--ink)}
 .tl-node.milestone:hover{transform:translate(-50%,-50%) rotate(45deg) scale(1.15)}
 .tl-node.milestone.done{background:var(--ink-4);border-color:var(--ink-4)}
+.tl-node.star,.tl-node.star.done{width:22px;height:22px;border:0;border-radius:0;background:#E5A823;transform:translate(-50%,-50%);z-index:6;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.tl-node.star.done{opacity:.55}
+.tl-node.star:hover{transform:translate(-50%,-50%) scale(1.15);box-shadow:none}
 .tl-cap{position:absolute;font-size:10px;color:var(--ink-3);white-space:nowrap;transform:translateX(-50%);letter-spacing:.02em;text-align:center}
 .tl-cap.above{top:4px}
 .tl-cap.below{top:58px}
@@ -111,6 +114,7 @@ section + section{border-top:1px solid var(--line-soft)}
 .lg{display:flex;align-items:center;gap:7px}
 .lg-dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--ink-4);background:#fff;flex-shrink:0}
 .lg-dot.client{background:var(--accent);border-color:var(--accent)}
+.lg-dot.star{width:15px;height:15px;border:0;border-radius:0;background:#E5A823;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
 .lg-dot.ms{width:11px;height:11px;border-radius:2px;transform:rotate(45deg);background:var(--ink);border-color:var(--ink)}
 
 .tip{position:fixed;background:var(--ink);color:#fff;border-radius:7px;padding:9px 12px;font-size:12px;z-index:999;pointer-events:none;display:none;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:250px;line-height:1.45}

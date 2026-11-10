@@ -62,7 +62,10 @@
     });
     if (data.video_due_date_iso) dates.push(data.video_due_date_iso);
     dates.sort();
-    var keyDate = dates.length ? dates[dates.length - 1] : '';
+    // keyDate = the big final date; lastDate = the very last thing scheduled.
+    // A project stays upcoming through a Wrap Day after its main event.
+    var lastDate = dates.length ? dates[dates.length - 1] : '';
+    var keyDate = projectFinalDate(data).iso || lastDate;
     var dueItems = wb.items.filter(function (i) { return i.due; }).map(function (i) { return i.due; }).sort();
     var startDate = wb.kickoffIso || dueItems[0] || dates[0] || '';
     if (startDate && keyDate && startDate > keyDate) startDate = dates[0] || keyDate;
@@ -130,7 +133,7 @@
       name: data.project_title || label || 'Untitled',
       type: data.project_type || '', typeLabel: TYPE_LABELS[data.project_type] || '',
       keyDate: keyDate, startDate: startDate, daysOut: daysOut,
-      past: !!keyDate && keyDate < today,
+      past: !!(lastDate || keyDate) && (lastDate || keyDate) < today,
       items: wb.items, pins: wb.pins,
       pct: wb.items.length ? Math.round(doneCount / wb.items.length * 100) : null,
       overdue: overdue.length, waiting: withClient, comingUp: comingUp, heldUp: heldUp, nextTask: nextTask, nextPin: nextPin,
@@ -558,7 +561,7 @@
         });
       p.pins.forEach(function (x) {
         if (!inRange(x.date_iso, x.date_iso)) return;
-        h += '<div class="po-pt-pin" style="left:' + pct(x.date_iso) + '%" data-tip="' + esc('<b>' + esc(x.label) + '</b><span>' + esc(fmt(x.date_iso) + (x.call_time ? ' · ' + x.call_time : '')) + '</span>') + '"></div>';
+        h += '<div class="po-pt-pin' + (x.star ? ' star' : '') + '" style="left:' + pct(x.date_iso) + '%" data-tip="' + esc('<b>' + esc(x.label) + '</b><span>' + esc(fmt(x.date_iso) + (x.call_time ? ' · ' + x.call_time : '')) + '</span>') + '"></div>';
       });
       h += '</div>';
     });

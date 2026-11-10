@@ -213,6 +213,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Location dropdown from Contacts, address displayed below, hospital as plain text
 - Exclude from call sheet checkbox + Show blacks required checkbox (top of card)
 - Per-day crew editing modal (Edit Crew button)
+- Main event: optional tick box on each schedule card (`main_event`, one per project, not on Post Production). `projectFinalDate()` in `app.js` is the one rule for the big final date (project label, Projects Overview key date, default workback anchor): Post Production = Project Due Date; otherwise the ticked day, else the last day that isn't Wrap or Travel. Ticking only moves the workback anchor while the workback is empty. Gold star on all three timelines (Workback, Overview Portfolio, client portal) for the ticked Main event or the Post Production Due Date only; unticked projects get no star. Test: `scripts/e2e-main-event.js`
 - Per-day ICS export (📅 button on each card)
 - Collapsible cards with chevron indicator
 
@@ -325,24 +326,10 @@ git push
 
 ---
 
-## Backlog (decided, not scheduled)
-
-### Grid view: paste-from-spreadsheet editing (decided 2026-11-05)
-John: "we need to do this, but not right now." An editable spreadsheet-style grid of project/event details inside Slater, where whole rows or columns copied from Excel or Google Sheets can be pasted in.
-- Replaces the .xlsx bulk import, which was built, pushed and then removed on 2026-11-05 (added in 63e7597, removed by the "Remove bulk project import" commit). John's reasons: too many fields are dropdowns (locations, project type, etc.), so he had to keep looking in Slater for the exact values to type into the sheet, and everything the import didn't cover took forever to fill in afterward.
-- Open questions to ask John FIRST when picking this up:
-  1. One row per event day, grouped under its project (suggested), or one row per project?
-  2. Which columns? Starting list: project title, type, client, agency, kickoff, due date, event date, day label/category, location, call time, go-live, wrap. Add/drop (crew status? billing code?)?
-  3. Should the grid create new projects, edit existing ones, or both?
-- Design notes: the clipboard from a spreadsheet is tab-separated text. Dropdown columns match pasted text the way the project pickers do (`project-orgs-v2.js` `byName`: exact after trim/lowercase, active only, ambiguous never auto-links); unmatched cells are highlighted and fixed in place from the real dropdown; a missing client/location could be quick-added. Likely library: Tabulator (MIT, has clipboard paste and dropdown editors). Not Handsontable (needs a commercial license, and Slater is a paid product). Must not clash with the same project open in the form. Desktop only. Rough size: 1 to 2 weeks.
-- Reusable from the removed import (`git show 63e7597:public/project-import.js`): org and template matching, Excel date/time parsing (`XLSX.SSF.parse_date_code` on raw cell values, never `cellDates`, which shifts times in US time zones), building project data in `gather()`'s shape with `libLabel()` labels, the default-agency rule. If a spreadsheet library is needed again, use SheetJS from cdn.sheetjs.com, not the npm `xlsx` package (stuck at 0.18.5 with known CVEs).
-
----
-
 ## V1.0 Remaining
 
 - Default workback templates (5 project types) — on hold for now
-- Stripe setup (needs Chase bank account activation) — deferred, later
+- Paddle setup (payments, Pause/Cancel): deferred, later
 - Copyright registration: claim filed with the US Copyright Office 2026-10-27, Case #1-15258616171, "Slater, Version 1.0" (Literary Work). Application + fee + deposit all received ("claim submission completed, no further action required"); now awaiting examiner review (electronic filings typically take a few months). Effective date of registration is the 2026-10-27 submission date, not the eventual certificate date. TODO: confirm the claimant on the application is Production Labs LLC, not John personally — fixable later but easier to correct now if wrong. Deposit PDF (`Slater_v1.0_copyright_deposit.pdf`, via `scripts/make_copyright_deposit.js`) is a pre-rewrite snapshot (file list still references `routes/agencies.js`/`routes/contacts.js`/`migrate-agencies.js`, deleted 2026-10-20) — fine as a defensible v1.0 freeze point, just note it doesn't match current tree if anyone needs to regenerate it.
 
 Done:
@@ -370,3 +357,13 @@ Scheduled alongside V1.5 (not part of the client portal spec itself, just built 
 
 ## V2.0 — Team Tier (Premium)
 Project sharing, shared contacts/configs/templates, Microsoft Entra SSO, Azure migration.
+
+### Grid view: paste-from-spreadsheet editing (decided 2026-11-05, moved to V2.0 2026-11-10)
+John: "we need to do this, but not right now." An editable spreadsheet-style grid of project/event details inside Slater, where whole rows or columns copied from Excel or Google Sheets can be pasted in.
+- Replaces the .xlsx bulk import, which was built, pushed and then removed on 2026-11-05 (added in 63e7597, removed by the "Remove bulk project import" commit). John's reasons: too many fields are dropdowns (locations, project type, etc.), so he had to keep looking in Slater for the exact values to type into the sheet, and everything the import didn't cover took forever to fill in afterward.
+- Open questions to ask John FIRST when picking this up:
+  1. One row per event day, grouped under its project (suggested), or one row per project?
+  2. Which columns? Starting list: project title, type, client, agency, kickoff, due date, event date, day label/category, location, call time, go-live, wrap. Add/drop (crew status? billing code?)?
+  3. Should the grid create new projects, edit existing ones, or both?
+- Design notes: the clipboard from a spreadsheet is tab-separated text. Dropdown columns match pasted text the way the project pickers do (`project-orgs-v2.js` `byName`: exact after trim/lowercase, active only, ambiguous never auto-links); unmatched cells are highlighted and fixed in place from the real dropdown; a missing client/location could be quick-added. Likely library: Tabulator (MIT, has clipboard paste and dropdown editors). Not Handsontable (needs a commercial license, and Slater is a paid product). Must not clash with the same project open in the form. Desktop only. Rough size: 1 to 2 weeks (given before the 3 open questions above were answered; re-confirm once scoped).
+- Reusable from the removed import (`git show 63e7597:public/project-import.js`): org and template matching, Excel date/time parsing (`XLSX.SSF.parse_date_code` on raw cell values, never `cellDates`, which shifts times in US time zones), building project data in `gather()`'s shape with `libLabel()` labels, the default-agency rule. If a spreadsheet library is needed again, use SheetJS from cdn.sheetjs.com, not the npm `xlsx` package (stuck at 0.18.5 with known CVEs).

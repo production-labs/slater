@@ -144,6 +144,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .wb-tl-tip.visible{opacity:1}
 .wb-tl-bar{position:absolute;height:4px;border-radius:2px;cursor:pointer;transition:box-shadow .15s}
 .wb-tl-pin{position:absolute;width:8px;height:8px;border-radius:1px;cursor:pointer;transform:translate(-50%,-50%) rotate(45deg);transition:box-shadow .15s}
+.wb-tl-pin.star{width:15px;height:15px;border-radius:0;background:#E5A823;transform:translate(-50%,-50%);clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.wb-tl-pin.star.past{opacity:.5}
 .wb-tl-today-tick{position:absolute;width:2px;background:#fff;transform:translateX(-50%);z-index:12;pointer-events:none}
 .wb-tl-today-lbl{position:absolute;font-size:9px;font-weight:600;color:#fff;letter-spacing:.06em;white-space:nowrap;transform:translateX(-50%);z-index:12;pointer-events:none}
 .wb-tl-overlay{position:absolute;top:0;bottom:0;left:0;background:rgba(0,0,0,.3);pointer-events:none;z-index:8}
@@ -240,6 +242,8 @@ body.sidebar-open{padding-right:320px;transition:padding-right .4s cubic-bezier(
 .sday-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--tape);border-bottom:1px solid var(--border)}
 .sday-title{font-size:13px;font-weight:700;color:var(--marker);text-transform:uppercase;letter-spacing:.06em;font-family:"Geist",sans-serif}
 .sday-body{padding:16px}
+.sday-main-flag{display:none;align-items:center;gap:4px;flex-shrink:0;margin-left:8px;color:#5B9BD5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.sday-main-flag .lucide{width:12px;height:12px}
 .sday-cal{display:flex;flex-direction:column;align-items:center;width:46px;border-radius:5px;overflow:hidden;border:1px solid rgba(0,0,0,0.12);flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.15);cursor:pointer}
 .sday-cal-month{background:var(--accent);color:#ffffff;font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;width:100%;text-align:center;padding:3px 0;font-family:"Geist",sans-serif}
 .sday-cal-day{background:#ffffff;color:#222222;font-size:22px;font-weight:700;width:100%;text-align:center;padding:1px 0 4px;font-family:"Geist",sans-serif;line-height:1}

@@ -103,7 +103,7 @@ async function main() {
     const d = await serverData(key);
     assert(d.internal_pins.pin_kickoff === true && d.internal_pins.pin_sday_2 === true, 'server flags: ' + JSON.stringify(d.internal_pins));
     const labels = (d.wb_items_for_doc || []).filter(i => i.isPin).map(i => i.item);
-    assert(labels.includes('Shoot Day') && !labels.includes('Client Kickoff') && !labels.includes('Client Review'), 'saved doc items: ' + labels.join(', '));
+    assert(labels.includes('Shoot Day') && !labels.includes('Kickoff') && !labels.includes('Client Review'), 'saved doc items: ' + labels.join(', '));
   });
 
   // ---------------------------------------------------------------- device B
