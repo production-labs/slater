@@ -144,7 +144,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .wb-tl-tip.visible{opacity:1}
 .wb-tl-bar{position:absolute;height:4px;border-radius:2px;cursor:pointer;transition:box-shadow .15s}
 .wb-tl-pin{position:absolute;width:8px;height:8px;border-radius:1px;cursor:pointer;transform:translate(-50%,-50%) rotate(45deg);transition:box-shadow .15s}
-.wb-tl-pin.star{width:15px;height:15px;border-radius:0;background:#E5A823;transform:translate(-50%,-50%);clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.wb-tl-pin.star{width:15px;height:15px;border-radius:0;background:#FFE100;transform:translate(-50%,-50%);clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
 .wb-tl-pin.star.past{opacity:.5}
 .wb-tl-today-tick{position:absolute;width:2px;background:#fff;transform:translateX(-50%);z-index:12;pointer-events:none}
 .wb-tl-today-lbl{position:absolute;font-size:9px;font-weight:600;color:#fff;letter-spacing:.06em;white-space:nowrap;transform:translateX(-50%);z-index:12;pointer-events:none}

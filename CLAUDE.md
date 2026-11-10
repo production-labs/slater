@@ -213,7 +213,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Location dropdown from Contacts, address displayed below, hospital as plain text
 - Exclude from call sheet checkbox + Show blacks required checkbox (top of card)
 - Per-day crew editing modal (Edit Crew button)
-- Main event: optional tick box on each schedule card (`main_event`, one per project, not on Post Production). `projectFinalDate()` in `app.js` is the one rule for the big final date (project label, Projects Overview key date, default workback anchor): Post Production = Project Due Date; otherwise the ticked day, else the last day that isn't Wrap or Travel. Ticking only moves the workback anchor while the workback is empty. Gold star on all three timelines (Workback, Overview Portfolio, client portal) for the ticked Main event or the Post Production Due Date only; unticked projects get no star. Test: `scripts/e2e-main-event.js`
+- Main event: optional tick box on each schedule card (`main_event`, one per project, not on Post Production). `projectFinalDate()` in `app.js` is the one rule for the big final date (project label, Projects Overview key date, default workback anchor): Post Production = Project Due Date; otherwise the ticked day, else the last day that isn't Wrap or Travel. Ticking only moves the workback anchor while the workback is empty. Bright yellow star on all three timelines (Workback, Overview Portfolio, client portal) for the ticked Main event or the Post Production Due Date only; unticked projects get no star. Test: `scripts/e2e-main-event.js`
 - Per-day ICS export (📅 button on each card)
 - Collapsible cards with chevron indicator
 

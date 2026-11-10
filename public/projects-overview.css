@@ -59,7 +59,7 @@
 .po-pt-bar:hover{box-shadow:0 0 0 3px rgba(255,255,255,.15)}
 .po-pt-pin{position:absolute;top:13px;width:9px;height:9px;transform:translate(-50%,-50%) rotate(45deg);background:#fff;border-radius:1px;z-index:5}
 .po-pt-pin:hover{box-shadow:0 0 0 4px rgba(255,255,255,.15)}
-.po-pt-pin.star{width:15px;height:15px;border-radius:0;background:#E5A823;transform:translate(-50%,-50%);z-index:6;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.po-pt-pin.star{width:15px;height:15px;border-radius:0;background:#FFE100;transform:translate(-50%,-50%);z-index:6;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
 .po-pt-overlay{position:absolute;top:0;bottom:0;left:0;background:rgba(0,0,0,.3);pointer-events:none;z-index:4}
 .po-pt-today{position:absolute;top:-24px;bottom:0;width:2px;background:#fff;transform:translateX(-50%);z-index:6;pointer-events:none}
 .po-pt-today-l{position:absolute;top:-24px;font-size:9px;font-weight:700;letter-spacing:.08em;color:#fff;transform:translateX(-50%) translateY(-100%);white-space:nowrap}

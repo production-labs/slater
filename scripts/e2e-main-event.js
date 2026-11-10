@@ -168,11 +168,11 @@ async function main() {
 
   const wbStars = async () => page.evaluate(() => { st('workback'); wbDrawTimeline(); return document.querySelectorAll('#wb-timeline .wb-tl-pin.star').length; });
 
-  await step('Workback timeline: one gold star on the ticked day, moving and clearing with the tick', async () => {
+  await step('Workback timeline: one yellow star on the ticked day, moving and clearing with the tick', async () => {
     await openProject(near.star.key);
     assert(await wbStars() === 1, 'ticked day should have one star');
     const color = await page.$eval('#wb-timeline .wb-tl-pin.star', e => getComputedStyle(e).backgroundColor);
-    assert(color === 'rgb(229, 168, 35)', 'not gold: ' + color);
+    assert(color === 'rgb(255, 225, 0)', 'not bright yellow: ' + color);
     await sleep(200);
     await page.screenshot({ path: SHOTS + '/star-workback.png' });
     await page.evaluate(() => { document.getElementById('sday_2_main_event').click(); });
