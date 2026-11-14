@@ -436,7 +436,7 @@
     busy = false;
     if (j && j.error) {
       var msg = j.error === 'offline' ? "Couldn't reach Slater. Check your connection and try again."
-        : j.error === 'bad_password' ? 'Password needs at least 6 characters.'
+        : j.error === 'bad_password' ? 'Password needs at least 8 characters.'
         : j.error === 'not_found' ? 'Save this project first, then try again.'
         : "That didn't work. Please try again.";
       toast(msg, 'err');
@@ -618,7 +618,7 @@
       h += '<div class="pa-actions pa-actions-left"><button class="lb" data-pa="urls">Go to URLs</button></div>';
     } else {
       if (showPw) {
-        h += '<div class="pa-link-row"><input type="password" id="pa-pw" class="pa-link" placeholder="At least 6 characters" autocomplete="new-password" maxlength="200">' +
+        h += '<div class="pa-link-row"><input type="password" id="pa-pw" class="pa-link" placeholder="At least 8 characters" autocomplete="new-password" maxlength="200">' +
           '<button class="lb primary" data-pa="pw-save"' + dis + '>Save</button>' +
           '<button class="lb" data-pa="pw-cancel"' + dis + '>Cancel</button></div>' +
           '<p class="pa-note pa-small">Send it to your client separately from the link.' + (state.has_password ? ' Changing it signs out anyone already viewing.' : '') + '</p>';
@@ -663,7 +663,7 @@
     if (a === 'pw-cancel') { showPw = false; render(); return; }
     if (a === 'pw-save') {
       var v = (document.getElementById('pa-pw') || {}).value || '';
-      if (v.length < 6) { toast('Password needs at least 6 characters.', 'err'); return; }
+      if (v.length < 8) { toast('Password needs at least 8 characters.', 'err'); return; }
       return act('PUT', '/password', { password: v }, 'Portal password saved.').then(function (j) {
         if (j && !j.error) { showPw = false; render(); }
       });

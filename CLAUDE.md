@@ -58,6 +58,7 @@ Any additional major/structural work goes to **V2.0 — Team Tier** instead of b
 │   ├── project-orgs-v2.js # Project tab agency + client pickers
 │   ├── project-people-v2.js # Crew/Talent/KP contact + role pickers
 │   ├── booking-conflicts.js # Double-booking warnings across projects
+│   ├── timezones.js       # The one time zone list (SlaterTZ); also required by routes/portal.js
 │   ├── projects-overview.js/.css # V1.5 Projects Overview dashboard + closeout checklist
 │   ├── account.js         # My Info > Your data: Download my data (.zip) + Delete account
 │   ├── lib/               # Vendored libs: vendors.js (docx + JSZip), lucide
@@ -224,7 +225,10 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Exclude from call sheet checkbox + Show blacks required checkbox (top of card)
 - Per-day crew editing modal (Edit Crew button)
 - Main event: optional tick box on each schedule card (`main_event`, one per project, not on Post Production). `projectFinalDate()` in `app.js` is the one rule for the big final date (project label, Projects Overview key date, default workback anchor): Post Production = Project Due Date; otherwise the ticked day, else the last day that isn't Wrap or Travel. Ticking only moves the workback anchor while the workback is empty. Bright yellow star on all three timelines (Workback, Overview Portfolio, client portal) for the ticked Main event or the Post Production Due Date only; unticked projects get no star. Test: `scripts/e2e-main-event.js`
-- Per-day ICS export (📅 button on each card)
+- Per-day ICS export (📅 button on each card). Times are written as UTC, read in the project's time zone, so calendar apps show each person's own time; no project zone = floating local times, as before
+- Time zones (2026-11-14): one list in `public/timezones.js` (`SlaterTZ`, 49 zones grouped by region) feeds the Schedule tab, My Info and Organizations pickers, call sheets, ICS files and the portal server. The original eight codes (PT, ET, CT, MT, AKT, HT, GMT, CET) are still saved as codes; newer zones save as IANA names (`Asia/Tokyo`). `SlaterTZ.iana()` turns either into an IANA name; `SlaterTZ.abbr()` gives zone letters (PST, BST, IST, AEDT, else GMT+9); `SlaterTZ.toUtcMs()` is the DST-aware wall-clock to UTC conversion
+- AM/PM always uppercase with a space, however typed (`upperAmPm()` / `fixProjectTimes()` in app.js, applied when a project is opened, cached for Rundown/Overview, and saved; the portal server does the same)
+- Client portal times (2026-11-14): shown in the viewer's own time zone, always with the zone (`clockText()` in `public/portal.js`; the server sends UTC `start`/`end`, rules in `clientTimes()` in `routes/portal.js`). Meetings and sessions: start + end. Shoot / Live Broadcast: Cameras Up / Go Live only. Rehearsal with crew: start + end. Kickoff and Delivery: their time. Setup, Wrap and Travel days and every crew call time: never shown. Zone = the project's, else the producer's My Info default. A time that can't be read ("TBD") shows as typed. Portal passwords: at least 8 characters (same as accounts). Test: `scripts/e2e-portal.js`
 - Collapsible cards with chevron indicator
 
 ### Crew Tab

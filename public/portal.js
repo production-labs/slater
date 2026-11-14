@@ -40,6 +40,29 @@
   function todayIso() { return isoOf(new Date()); }
   function addDays(s, n) { var d = parse(s); d.setDate(d.getDate() + n); return isoOf(d); }
   function fmt(s) { var d = parse(s); return MON[d.getMonth()] + ' ' + d.getDate(); }
+
+  // Times arrive as exact moments (s.start / s.end, UTC) and show in the
+  // viewer's own time zone, always with the zone: "10:00 AM to 10:30 AM PST".
+  // If that lands on a different day for the viewer, say which day.
+  // No exact moment (no zone set, or "TBD"): the text as the producer typed it.
+  function viewerZone() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return undefined; } }
+  function clockText(s) {
+    if (!s.start) return s.time || '';
+    var a = new Date(s.start), b = s.end ? new Date(s.end) : null;
+    if (isNaN(a)) return s.time || '';
+    var zone = viewerZone();
+    var hm = function (d) { return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: zone }); };
+    var abbr = '';
+    if (window.SlaterTZ && zone) abbr = SlaterTZ.abbr(zone, a);  // "PST", "BST", "IST", "AEDT", else "GMT+9"
+    else try {
+      abbr = (new Intl.DateTimeFormat('en-US', { timeZoneName: 'short', timeZone: zone }).formatToParts(a)
+        .filter(function (x) { return x.type === 'timeZoneName'; })[0] || {}).value || '';
+    } catch (e) {}
+    var out = hm(a) + (b && !isNaN(b) ? ' to ' + hm(b) : '') + (abbr ? ' ' + abbr : '');
+    var localIso = a.toLocaleDateString('en-CA', { timeZone: zone });
+    if (localIso !== s.date) out += ' (' + DOW[parse(localIso).getDay()] + ' ' + fmt(localIso) + ')';
+    return out;
+  }
   function fmtY(s) { return fmt(s) + ', ' + parse(s).getFullYear(); }
   function daysBetween(a, b) { return Math.round((parse(b) - parse(a)) / 864e5); }
   function initials(name) {
@@ -383,7 +406,7 @@
     return el('div', { class: 'sched' }, rows.map(function (s) {
       var d = parse(s.date);
       var past = (s.end_date || s.date) < today;
-      var detail = [s.end_date ? 'Through ' + DOW[parse(s.end_date).getDay()] + ' ' + fmt(s.end_date) : '', s.location, s.time].filter(Boolean).join('  ·  ');
+      var detail = [s.end_date ? 'Through ' + DOW[parse(s.end_date).getDay()] + ' ' + fmt(s.end_date) : '', s.location, clockText(s)].filter(Boolean).join('  ·  ');
       var tag = !s.client_item ? null
         : s.done ? el('div', { class: 'sched-tag done' }, 'Complete')
         : s.ready ? el('div', { class: 'sched-tag you' }, 'Waiting on you')

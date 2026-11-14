@@ -54,7 +54,7 @@ const { MAX_RECIPIENTS, EMAIL_RE } = require('./portalNotify');
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const PW_MIN = 6, PW_MAX = 200, BODY_MAX = 10000;
+const PW_MIN = 8, PW_MAX = 200, BODY_MAX = 10000;
 const newToken = () => crypto.randomBytes(32).toString('base64url');
 
 async function findProject(req) {

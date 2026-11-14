@@ -44,7 +44,7 @@
       </button>
       <div class="app-nav-separator"></div>
       <button class="app-nav-util" onclick="openContacts()"><i data-lucide="book-user" class="lucide nav-icon"></i> Contacts</button>
-      <button class="app-nav-util" onclick="openAgencyManager()"><i data-lucide="building-2" class="lucide nav-icon"></i> Agencies</button>
+      <button class="app-nav-util" onclick="openAgencyManager()"><i data-lucide="building-2" class="lucide nav-icon"></i> Organizations</button>
     </nav>
     <div class="app-sidebar-user" onclick="openMyInfo()">
       <div class="app-sidebar-avatar" id="sidebar-avatar"></div>
@@ -75,7 +75,7 @@
           <div class="project-bar-select" id="topbar-select-wrap">
             <div class="select-wrap" style="width:100%">
               <select id="lib-select" onchange="libSelect()">
-                <option value="" disabled>— Select a project —</option>
+                <option value="" disabled>Select a project</option>
               </select>
             </div>
           </div>
@@ -123,15 +123,15 @@
               <option value="webinar">Webinar</option>
               </select></div>
             </div>
-            <div class="fl"><label>Billing code</label><input type="text" id="billing_code" placeholder="Project Billing Code" autocomplete="new-password"></div>
+            <div class="fl"><label>Billing code</label><input type="text" id="billing_code" placeholder="e.g. ABC-12345 (optional)" autocomplete="new-password"></div>
           </div>
           <div class="fl" style="margin-bottom:8px">
             <label>Agency</label>
             <div class="select-wrap"><select id="project_agency_id" onchange="autosaveTrigger();updateBrandingWarning()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-              <option value="">— No agency —</option>
+              <option value="">No agency</option>
             </select></div>
           </div>
-          <div class="fl"><label>Project / video title</label><input type="text" id="project_title" placeholder="e.g. Microsoft Unified Security Operations"></div>
+          <div class="fl"><label>Project / video title</label><input type="text" id="project_title" placeholder="e.g. Spring Product Launch"></div>
           <div class="g2">
             <div class="fl"><label>Company</label><input type="text" id="client_company" placeholder="Company name" autocomplete="new-password" oninput="updateBrandingWarning()"></div>
             <div class="fl"><label>Client name</label><input type="text" id="client_name" placeholder="First Last" autocomplete="new-password"></div>
@@ -158,15 +158,7 @@
           <div class="fl" style="margin-bottom:1.25rem">
             <label>Time zone</label>
             <div class="select-wrap"><select id="timezone" onchange="refreshAllTimeHints()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
-              <option value="none">— No timezone —</option>
-              <option value="ET">Eastern Time</option>
-              <option value="CT">Central Time</option>
-              <option value="MT">Mountain Time</option>
               <option value="PT" selected>Pacific Time</option>
-              <option value="AKT">Alaska Time</option>
-              <option value="HT">Hawaii Time</option>
-              <option value="GMT">Greenwich Mean Time</option>
-              <option value="CET">Central European Time</option>
             </select></div>
           </div>
           <datalist id="day-label-suggestions">
@@ -214,8 +206,8 @@
             <div class="sh" style="margin-bottom:0">Crew</div>
             <div style="display:flex;gap:8px">
               <button class="lb" onclick="addCrew()" style="font-size:12px;background:var(--accent);color:#fff;border-color:var(--accent)">+ Add crew</button>
-              <button class="lb" onclick="saveCrewConfig()" style="font-size:12px"><i data-lucide="save" class="lucide"></i> Save config</button>
-              <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px"><i data-lucide="folder" class="lucide"></i> Configs</button>
+              <button class="lb" onclick="saveCrewConfig()" style="font-size:12px"><i data-lucide="save" class="lucide"></i> Save as template</button>
+              <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px"><i data-lucide="folder" class="lucide"></i> Templates</button>
             </div>
           </div>
           <div id="crew-status-bar">
@@ -287,7 +279,7 @@
                 </select></div>
               </div>
             </div>
-            <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px;padding:5px 10px"><i data-lucide="save" class="lucide"></i> Template</button>
+            <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px;padding:5px 10px"><i data-lucide="save" class="lucide"></i> Save as template</button>
             <button class="lb" onclick="openTemplateManager()" style="font-size:12px;padding:5px 10px"><i data-lucide="folder" class="lucide"></i> Templates</button>
             <button class="lb accent" id="wb-btn" onclick="generateWorkback()" style="font-size:12px;padding:5px 10px"><i data-lucide="download" class="lucide"></i> Download</button>
           </div>
@@ -328,7 +320,7 @@
                       <th class="c-after">After</th>
                       <th class="c-due">Due</th>
                       <th class="c-status">Status</th>
-                      <th class="c-int" title="Internal only">Int</th>
+                      <th class="c-int" title="Internal only: hidden from the client and the Word doc">Internal</th>
                     </tr>
                   </thead>
                   <tbody id="wb-tv-tbody"></tbody>
@@ -406,7 +398,7 @@
               <button onclick="noteCmd('insertUnorderedList')" title="Bullet list">&#8226; List</button>
               <button onclick="noteCmd('insertOrderedList')" title="Numbered list">1. List</button>
             </div>
-            <div class="note-draft-indicator" id="note-draft-indicator">Draft restored -- hit Save note when ready</div>
+            <div class="note-draft-indicator" id="note-draft-indicator">Draft restored. Click Save note when you're ready.</div>
             <div id="note-editor" contenteditable="true" class="note-editor" placeholder="Write a note..." oninput="updateNoteDraftIndicator(this.innerHTML)"></div>
           </div>
           <div id="notes-save-row" style="display:flex;gap:8px;margin-bottom:1.5rem">
@@ -490,7 +482,7 @@
 <div class="tmpl-modal" id="crew-cfg-modal">
   <div class="tmpl-box">
     <div class="tmpl-head">
-      <h3>Crew Configs</h3>
+      <h3>Crew Templates</h3>
       <button class="rb" onclick="closeCrewConfigModal()" style="font-size:18px">&#x2715;</button>
     </div>
     <div class="tmpl-body" id="crew-cfg-body"></div>
@@ -546,17 +538,9 @@
       <div class="fl" style="margin-bottom:12px"><label>Phone</label><input type="text" id="myinfo_phone" class="fmt-phone" placeholder="(206) 555-0100" autocomplete="new-password" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%"></div>
       <div class="fl" style="margin-bottom:12px"><label>Email</label><input type="text" id="myinfo_email" disabled style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%;background:var(--surface-2);color:var(--text-muted)"></div>
       <div class="fl" style="margin-bottom:16px">
-        <label>Timezone</label>
+        <label>Time zone</label>
         <div class="select-wrap"><select id="myinfo_timezone" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface);width:100%">
-          <option value="none">— No default —</option>
-          <option value="ET">Eastern Time</option>
-          <option value="CT">Central Time</option>
-          <option value="MT">Mountain Time</option>
-          <option value="PT">Pacific Time</option>
-          <option value="AKT">Alaska Time</option>
-          <option value="HT">Hawaii Time</option>
-          <option value="GMT">Greenwich Mean Time</option>
-          <option value="CET">Central European Time</option>
+          <option value="none">No default</option>
         </select></div>
       </div>
       <!-- Account: download / delete (public/account.js) -->
@@ -697,6 +681,7 @@
 <script src="/connection.js"></script>
 <script src="/lib/lucide.min.js"></script>
 <script src="/lib/vendors.js"></script>
+<script src="/timezones.js"></script>
 <script src="/app.js"></script>
 <script src="/account.js"></script>
 <script src="/regions.js"></script>

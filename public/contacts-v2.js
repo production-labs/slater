@@ -327,10 +327,8 @@
     ['live_broadcast_location', 'Live Broadcast: On Location'], ['live_broadcast_studio', 'Live Broadcast: In Studio'],
     ['webinar', 'Webinar'],
   ];
-  var TIMEZONES = [
-    ['', 'No default'], ['ET', 'Eastern Time'], ['CT', 'Central Time'], ['MT', 'Mountain Time'], ['PT', 'Pacific Time'],
-    ['AKT', 'Alaska Time'], ['HT', 'Hawaii Time'], ['GMT', 'Greenwich Mean Time'], ['CET', 'Central European Time'],
-  ];
+  // From public/timezones.js, the one time zone list.
+  var TIMEZONES = [['', 'No default']].concat(window.SlaterTZ ? SlaterTZ.list.map(function (z) { return [z.v, SlaterTZ.label(z.v)]; }) : []);
   var UNION_SUGGESTIONS = ['Non-union', 'IATSE', 'IATSE Local 600', 'IATSE Local 488', 'IATSE Local 15', 'IBEW', 'NABET-CWA', 'SAG-AFTRA', 'DGA', 'Teamsters Local 399'];
   var TRAVEL_SUGGESTIONS = ['Local only', 'Regional (drive)', 'Will travel (domestic)', 'Will travel (international, has passport)'];
 

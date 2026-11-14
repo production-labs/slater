@@ -280,7 +280,7 @@ function f12(t) {
   // Extract HH:MM and AM/PM robustly regardless of API format
   const m = t.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
   if (!m) return t;
-  return m[1] + ":" + m[2] + (m[3] ? " " + m[3].toLowerCase() : "");
+  return m[1] + ":" + m[2] + (m[3] ? " " + m[3].toUpperCase() : "");
 }
 async function fetchSun(lat, lng, ds) {
   // Drop time_format param — it causes the API to return duration strings like "126our"
@@ -508,11 +508,12 @@ function syncDayDate(n) {
   document.getElementById("day"+n+"_date").value = days[d.getDay()]+" "+d.getDate()+" "+months[d.getMonth()]+" "+d.getFullYear();
   tl();
 }
+var CALLSHEET_BTN_HTML = '<i data-lucide="download" class="lucide"></i> Download call sheet (.docx)';
 var CREW_STATUS = {
   tbd:       {label:"TBD",       color:"#9D9D99", tip:"Not yet contacted"},
   contacted: {label:"Contacted", color:"#60a5fa", tip:"Reached out, awaiting response"},
   pencil:    {label:"Pencil",    color:"#E8B84B", tip:"Informally in mind, no commitment yet"},
-  hold:      {label:"1st Hold",  color:"#E07B39", tip:"Priority hold on their schedule — check with before accepting other work"},
+  hold:      {label:"1st Hold",  color:"#E07B39", tip:"Priority hold on their schedule: they check with you before accepting other work"},
   confirmed: {label:"Confirmed", color:"#4A9E6B", tip:"Booked and locked in"},
   declined:  {label:"Declined",  color:"#555555", tip:"Not available for this project"}
 };
@@ -782,7 +783,7 @@ function addCrew(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, crew));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Position / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="206.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at"><input type="hidden" id="${id}_contact_id"><input type="hidden" id="${id}_role_id"><input type="hidden" id="${id}_contact_ack">`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',crew)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_position" class="contact-card-role-input" placeholder="Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_position').focus()" title="Edit role">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveCrew('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="(206) 555-0100" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleCrewStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at"><input type="hidden" id="${id}_contact_id"><input type="hidden" id="${id}_role_id"><input type="hidden" id="${id}_contact_ack">`;
   if (afterId) {
     const idx = crew.indexOf(afterId); crew.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -799,7 +800,7 @@ function addTalent(afterId=null) {
   const d = document.createElement("div"); d.className="card"; d.id=id;
   d.addEventListener("dragover",  e => dragOver(e, id));
   d.addEventListener("drop",      e => dragDrop(e, id, talent));
-  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Title / Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="613.000.0000" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at"><input type="hidden" id="${id}_contact_id"><input type="hidden" id="${id}_role_id"><input type="hidden" id="${id}_contact_ack">`;
+  d.innerHTML = `<div class="contact-card-row1"><div style="display:flex;align-items:center;gap:4px"><span class="drag-handle" draggable="true" title="Drag to reorder" ondragstart="dragStart(event,'${id}',talent)" ondragend="dragEnd('${id}')">&#x2261;</span><input type="text" id="${id}_title" class="contact-card-role-input" placeholder="Role" autocomplete="new-password"><span class="contact-card-pencil" onclick="document.getElementById('${id}_title').focus()" title="Edit title">${icon('pencil','pencil-icon')}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--text-muted);display:none;white-space:nowrap" id="${id}_contacted_ago"></span><span class="crew-status-pill" id="${id}_status_pill"></span><button class="contact-card-delete" onclick="confirmRemoveTalent('${id}')">&#x2715;</button></div></div><div class="fl" style="margin-bottom:10px"><label>Name</label><input type="text" id="${id}_name" placeholder="Full name" autocomplete="new-password"></div><div class="contact-card-row3"><div class="fl"><label>Phone</label><input type="text" id="${id}_phone" placeholder="(206) 555-0100" autocomplete="new-password"></div><div class="fl"><label>Email</label><input type="text" id="${id}_email" placeholder="email@domain.com" autocomplete="new-password"></div><div class="fl"><label>Status</label><select id="${id}_status" data-prev="tbd" onchange="handleTalentStatusChange('${id}', this.value)"><option value="tbd">TBD</option><option value="contacted">Contacted</option><option value="pencil">Pencil</option><option value="hold">1st Hold</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div><div class="fl" style="margin-top:10px;margin-bottom:0"><label>Notes</label><input type="text" id="${id}_notes"></div><input type="hidden" id="${id}_contacted_at"><input type="hidden" id="${id}_contact_id"><input type="hidden" id="${id}_role_id"><input type="hidden" id="${id}_contact_ack">`;
   if (afterId) {
     const idx = talent.indexOf(afterId); talent.splice(idx+1, 0, id);
     document.getElementById(afterId).insertAdjacentElement("afterend", d);
@@ -878,28 +879,51 @@ function updateAddKPButton() {
 let scheduleDays = [];
 let daySchedItems = {};
 
-var TZ_IANA = {
-  PT:"America/Los_Angeles", ET:"America/New_York", CT:"America/Chicago",
-  MT:"America/Denver", AKT:"America/Anchorage", HT:"Pacific/Honolulu",
-  GMT:"Europe/London", CET:"Europe/Paris"
-};
+// Time zones come from public/timezones.js (SlaterTZ): the one list for every picker.
+// Saved value ("PT", "Asia/Tokyo") -> IANA name, or "" for none.
+function tzIana(v) { return window.SlaterTZ ? SlaterTZ.iana(v) : ""; }
+if (window.SlaterTZ) {
+  SlaterTZ.fill(document.getElementById("timezone"), "No time zone", "PT");
+  SlaterTZ.fill(document.getElementById("myinfo_timezone"), "No default", "none");
+}
+
+// AM/PM are always uppercase with a space ("6:30 am", "6:30am", "6:30 a.m." -> "6:30 AM"),
+// however they were typed. Only touches am/pm right after a digit.
+function upperAmPm(s) {
+  if (typeof s !== "string" || !s) return s;
+  return s.replace(/(\d)\s*([ap])\.?\s?m\.?(?![a-z])/gi, function(_, d, ap) { return d + " " + ap.toUpperCase() + "M"; });
+}
+// Apply upperAmPm to every time field of a project's data (in place). Used when a project
+// is opened, cached for Rundown/Overview, and saved, so older lowercase entries get fixed too.
+var PROJECT_TIME_KEYS = ["call_time","golive","wrap","breakfast","lunch","sunrise","sunset"];
+function fixProjectTimes(data) {
+  if (!data || typeof data !== "object") return data;
+  ["kickoff_time","video_due_time","breakfast","lunch","sunrise","sunset"].forEach(function(k) { if (data[k]) data[k] = upperAmPm(data[k]); });
+  (Array.isArray(data.schedule_days) ? data.schedule_days : []).forEach(function(day) {
+    if (!day) return;
+    PROJECT_TIME_KEYS.forEach(function(k) { if (day[k]) day[k] = upperAmPm(day[k]); });
+    (Array.isArray(day.sched_entries) ? day.sched_entries : []).forEach(function(e) { if (e && e.time) e.time = upperAmPm(e.time); });
+  });
+  return data;
+}
 
 function normalizeTimeStr(s) {
   if (!s) return s;
   var m = s.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s+\S+)?$/i);
-  if (!m) return s;
+  if (!m) return upperAmPm(s);
   var h = parseInt(m[1]), mn = m[2] ? parseInt(m[2]) : 0, ap = (m[3]||"").toLowerCase();
   if (!ap) {
     if (h >= 13 && h <= 23) return (h-12)+":"+String(mn).padStart(2,"0")+" PM";
     if (h === 0) return "12:"+String(mn).padStart(2,"0")+" AM";
     if (h === 12) return "12:"+String(mn).padStart(2,"0")+" PM";
-    return s;
+    return upperAmPm(s);
   }
   var h24 = h; if (ap==="pm"&&h!==12) h24=h+12; if (ap==="am"&&h===12) h24=0;
   return (h24%12||12)+":"+String(mn).padStart(2,"0")+" "+(h24>=12?"PM":"AM");
 }
 
 function getTzAbbr(ianaName) {
+  if (window.SlaterTZ) return SlaterTZ.abbr(ianaName);
   if (!ianaName) return "";
   try {
     var parts = new Intl.DateTimeFormat("en-US",{timeZone:ianaName,timeZoneName:"short",hour:"numeric"})
@@ -923,8 +947,8 @@ function updateTimeHint(inputEl, hintEl, dayId) {
   var val = (inputEl||{}).value||"";
   if (!val) { hintEl.textContent=""; return; }
   var projTzCode = (document.getElementById("timezone")||{}).value||"";
-  if (!projTzCode||projTzCode==="none"||!TZ_IANA[projTzCode]) { hintEl.textContent=""; return; }
-  var projIana = TZ_IANA[projTzCode];
+  var projIana = tzIana(projTzCode);
+  if (!projIana) { hintEl.textContent=""; return; }
   var localIana = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (localIana===projIana) { hintEl.textContent=""; return; }
   var m = val.trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)/i);
@@ -953,7 +977,7 @@ function updateTimeHint(inputEl, hintEl, dayId) {
 
 function refreshAllTimeHints() {
   var projTzCode = (document.getElementById("timezone")||{}).value||"";
-  var projIana = TZ_IANA[projTzCode]||"";
+  var projIana = tzIana(projTzCode);
   var localIana = Intl.DateTimeFormat().resolvedOptions().timeZone;
   var projAbbr = projIana ? getTzAbbr(projIana) : "";
 
@@ -1511,7 +1535,7 @@ function addScheduleDay(data, insertAfterDayId) {
   const locNotesLbl = document.createElement("label"); locNotesLbl.textContent = "Location notes";
   const locNotesInp = document.createElement("textarea");
   locNotesInp.id = dayId+"_loc_notes"; locNotesInp.rows = 2;
-  locNotesInp.placeholder = "Auto-filled from location contacts";
+  locNotesInp.placeholder = "Filled in from the location in Contacts";
   locNotesInp.value = data.loc_notes||"";
   locNotesInp.style.cssText = "width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical";
   locNotesWrap.appendChild(locNotesLbl); locNotesWrap.appendChild(locNotesInp);
@@ -1890,7 +1914,7 @@ function updateSchedDayDateDisplay(dayId) {
   if (endIso && endIso !== startIso) {
     var ed = new Date(endIso+"T12:00:00");
     var endStr = days[ed.getDay()]+" "+ed.getDate()+" "+months[ed.getMonth()]+" "+ed.getFullYear();
-    dispEl.textContent = startStr + " — " + endStr;
+    dispEl.textContent = startStr + " to " + endStr;
   } else {
     dispEl.textContent = startStr;
   }
@@ -3201,7 +3225,7 @@ function wbRenderEditPanelPin(pinId, panel) {
   var isInternal = !!_wbPinInternal[pinId];
   panel.innerHTML = '<div class="ep-hdr"><div class="ep-hdr-left"><div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:3px;background:rgba(217,75,67,.1);border:1px solid rgba(217,75,67,.2);font-size:10px;font-weight:600;color:var(--accent);margin-bottom:6px">&#128204; Milestone</div><div class="ep-name">' + m.label + '</div><div class="ep-breadcrumb">' + wbFmtDateFull(m.date_iso) + '</div></div><div class="nav-btns">' + navHtml + '</div></div>' +
     '<div class="ep-body"><div class="ep-sec"><div class="due-card" id="wb-ep-due-card"><div><div class="ep-lbl">Date</div><div class="due-card-date">' + (m.date_iso ? wbFmtDate(m.date_iso) : "--") + '</div><div class="due-card-full">' + wbFmtDateFull(m.date_iso) + '</div></div><div class="due-card-days" style="color:' + dcol + '">' + dlbl + '</div></div></div>' +
-    '<div class="ep-sec"><div class="ep-lbl">Status</div><div class="status-row"><button class="status-btn">Info only — set per item</button></div></div>' +
+    '<div class="ep-sec"><div class="ep-lbl">Status</div><div class="status-row"><button class="status-btn">Info only: set status on each item</button></div></div>' +
     '<label class="ep-check"><input type="checkbox"' + (isInternal?' checked':'') + ' onchange="wbPinSetInternal(\'' + pinId + '\',this.checked)"> Internal only</label>' +
     '</div>';
 }
@@ -3578,11 +3602,16 @@ let noteEditingId = null; // id of note being edited, or null for new
 
 // Shared by noteSave() and any automatic note (e.g. client portal feedback,
 // portal-admin.js) so timestamps look the same regardless of source.
+// Notes saved before 2026-11-14 have "Tue Aug 25, 2026 \u2014 05:21 PM" baked in.
+// Show them the new way ("\u00b7", no leading zero) without rewriting saved data.
+function notesDisplayTs(ts) {
+  return String(ts || "").replace(" \u2014 ", " \u00b7 ").replace(/\u00b7 0(\d:)/, "\u00b7 $1");
+}
 function notesFormatTs(d) {
   const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return days[d.getDay()]+" "+months[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear()
-    +" — "+d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+    +" · "+d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
 }
 
 // Appends an automatic note from a non-editor source. `html` must already
@@ -3668,7 +3697,7 @@ function renderNotes() {
       tag.className = "note-client-tag"; tag.textContent = "Client feedback";
       tsLeft.appendChild(tag);
     }
-    const tsSpan = document.createElement("span"); tsSpan.textContent = e.ts;
+    const tsSpan = document.createElement("span"); tsSpan.textContent = notesDisplayTs(e.ts);
     tsLeft.appendChild(tsSpan);
     const btnWrap = document.createElement("div"); btnWrap.style.cssText = "display:flex;gap:4px";
     const editBtn = document.createElement("button");
@@ -3730,7 +3759,7 @@ function notesSearch(query) {
     snippet = notesEscHtml(snippet.slice(0, matchStart)) +
       '<mark>' + notesEscHtml(snippet.slice(matchStart, matchStart + q.length)) + '</mark>' +
       notesEscHtml(snippet.slice(matchStart + q.length));
-    results.push({index: e.id, dateStr: e.ts, snippet: snippet});
+    results.push({index: e.id, dateStr: notesDisplayTs(e.ts), snippet: snippet});
   });
   document.getElementById("notes-editor-wrap").style.display = "none";
   document.getElementById("notes-save-row").style.display = "none";
@@ -4294,7 +4323,7 @@ function renderCompleted() {
   searchWrap.style.cssText = "padding:6px 4px;position:sticky;top:-10px;margin-top:-10px;background:var(--surface);z-index:1";
   var searchInp = document.createElement("input");
   searchInp.type = "text";
-  searchInp.placeholder = "🔍 Filter completed items...";
+  searchInp.placeholder = "Filter completed items...";
   searchInp.value = completedFilter;
   searchInp.style.cssText = "width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text-primary)";
   searchInp.addEventListener("input", function() {
@@ -4839,8 +4868,8 @@ function saveCrewConfig() {
   var people = crewSlots.filter(function(c) { return c.name && !c.declined; }).length;
 
   var msg = document.getElementById("modal-msg");
-  document.getElementById("modal-title").textContent = "Save crew config";
-  msg.innerHTML = '<div class="fl" style="margin:4px 0 12px"><label>Config name</label><input type="text" id="cc-save-name" autocomplete="off"></div>' +
+  document.getElementById("modal-title").textContent = "Save crew template";
+  msg.innerHTML = '<div class="fl" style="margin:4px 0 12px"><label>Template name</label><input type="text" id="cc-save-name" autocomplete="off"></div>' +
     '<label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;cursor:pointer"><input type="radio" name="cc-save-mode" value="roles" checked style="margin-top:3px"><span><strong style="color:var(--text-primary)">Roles only</strong><br><span style="font-size:12px;color:var(--text-muted)">' + roleSlots.length + ' role' + (roleSlots.length === 1 ? '' : 's') + ', no names</span></span></label>' +
     '<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer' + (people ? '' : ';opacity:.5') + '"><input type="radio" name="cc-save-mode" value="crew"' + (people ? '' : ' disabled') + ' style="margin-top:3px"><span><strong style="color:var(--text-primary)">Roles and assigned crew</strong><br><span style="font-size:12px;color:var(--text-muted)">' + (people ? people + ' ' + (people === 1 ? 'person' : 'people') + '. Status is not saved; everyone comes back as TBD.' : 'No one is assigned yet.') + (slots.some(function(c) { return c.declined && c.name; }) ? ' Declined crew are saved as open roles.' : '') + '</span></span></label>';
   var okBtn = document.getElementById("modal-ok");
@@ -4868,7 +4897,7 @@ function saveCrewConfig() {
     configs.push({ id: "cc_" + Date.now(), name: name, with_crew: withCrew, items: items,
       roles: items.map(function(it) { return it.position; }).filter(Boolean) });
     crewConfigSave(configs);
-    setStatus("Crew config saved" + (withCrew ? " with crew." : "."), "ok");
+    setStatus("Crew template saved" + (withCrew ? " with crew." : "."), "ok");
   };
   document.getElementById("modal-overlay").classList.add("open");
   setTimeout(function() { var n = document.getElementById("cc-save-name"); if (n) n.focus(); }, 0);
@@ -4896,7 +4925,7 @@ function renderCrewConfigManager() {
   if (!configs.length) {
     var empty = document.createElement("div");
     empty.style.cssText = "color:#bbb;font-size:13px;font-style:italic;padding:8px 0";
-    empty.textContent = "No crew configs yet. Set up your crew positions and click Save config.";
+    empty.textContent = "No crew templates yet. Set up your crew positions and click Save as template.";
     body.appendChild(empty);
   } else {
     configs.forEach(function(cfg) {
@@ -4906,7 +4935,7 @@ function renderCrewConfigManager() {
       nameEl.title = "Click to rename";
       nameEl.style.cursor = "pointer";
       nameEl.onclick = (function(c) { return function() {
-        var newName = prompt("Rename config:", c.name);
+        var newName = prompt("Rename template:", c.name);
         if (!newName || !newName.trim()) return;
         var cfgs = crewConfigLoad();
         var found = cfgs.find(function(x) { return x.id === c.id; });
@@ -4919,7 +4948,7 @@ function renderCrewConfigManager() {
       loadBtn.onclick = (function(c) { return function() { loadCrewConfig(c); }; })(cfg);
       var delBtn = document.createElement("button"); delBtn.className = "lb danger"; delBtn.style.fontSize = "11px"; delBtn.textContent = "Delete";
       delBtn.onclick = (function(c) { return function() {
-        if (!confirm("Delete config \"" + c.name + "\"?")) return;
+        if (!confirm("Delete template \"" + c.name + "\"?")) return;
         var cfgs = crewConfigLoad().filter(function(x) { return x.id !== c.id; });
         crewConfigSave(cfgs);
         renderCrewConfigManager();
@@ -4950,7 +4979,7 @@ function loadCrewConfig(config) {
   closeCrewConfigModal();
   if (window.ProjectPeopleV2) ProjectPeopleV2.render();
   if (typeof autosaveTrigger === "function") autosaveTrigger();
-  setStatus("Crew config loaded - " + items.length + (items.length === 1 ? " role" : " roles") + " added" + (config.with_crew ? " with crew, all TBD." : "."), "ok");
+  setStatus("Crew template loaded: " + items.length + (items.length === 1 ? " role" : " roles") + " added" + (config.with_crew ? " with crew, all TBD." : "."), "ok");
 }
 
 // ── Template manager modal ────────────────────────────────────────────────────
@@ -5117,9 +5146,9 @@ function renderTmplManager() {
 function renderTmplItemRow(i, item) {
   const list = document.getElementById("tmpl-items-list"); if (!list) return;
   const row = document.createElement("div"); row.className = "tmpl-item-row"; row.id = "tmpl-item-"+i;
-  const itemInp = document.createElement("input"); itemInp.type="text"; itemInp.placeholder="Deliverable"; itemInp.value=item.item||"";
+  const itemInp = document.createElement("input"); itemInp.type="text"; itemInp.placeholder="Item"; itemInp.value=item.item||"";
   itemInp.oninput = function() { tmplEditing.items[i].item = this.value; };
-  const ownInp = document.createElement("input"); ownInp.type="text"; ownInp.placeholder="Owner"; ownInp.value=item.owner||"";
+  const ownInp = document.createElement("input"); ownInp.type="text"; ownInp.placeholder="Pick or type a name"; ownInp.value=item.owner||"";
   ownInp.oninput = function() { tmplEditing.items[i].owner = this.value; };
   const daysInp = document.createElement("input"); daysInp.type="number"; daysInp.placeholder="Days"; daysInp.min="-365"; daysInp.max="365"; daysInp.value=item.days===undefined?0:item.days;
   daysInp.oninput = function() { tmplEditing.items[i].days = parseInt(this.value)||0; };
@@ -5278,7 +5307,7 @@ function refreshWbDaySelector() {
 
   if (!days.length && !kickoffIso && !videoDueIso) {
     const opt = document.createElement("option");
-    opt.value = ""; opt.textContent = "— No days added yet —";
+    opt.value = ""; opt.textContent = "No days added yet";
     sel.appendChild(opt);
     return;
   }
@@ -5703,7 +5732,7 @@ function saveMyInfo() {
 }
 
 
-// Agencies are organizations: the sidebar's Agencies button opens Contacts > Organizations.
+// Agencies are organizations: the sidebar's Organizations button opens Contacts > Organizations.
 function openAgencyManager() {
   if (window.ContactsV2) ContactsV2.open("organizations");
 }
@@ -6896,7 +6925,7 @@ async function generateExpenseDoc() {
         cell([pr([tx("$"+e.amount.toFixed(2),{s:16})],{a:AlignmentType.RIGHT})], {w:colWidths[3]}),
         cell([pr([tx(e.paid_by,{s:16})])], {w:colWidths[4]}),
         cell([pr([tx(e.reimbursable?"✔":"",{s:18,b:true,c:e.reimbursable?"2d7a3e":"AAAAAA"})],{a:AlignmentType.CENTER})], {w:colWidths[5]}),
-        cell([pr([tx(e.receipt?"Attached":"—",{s:14,c:"888888"})],{a:AlignmentType.CENTER})], {w:colWidths[6]}),
+        cell([pr([tx(e.receipt?"Attached":"None",{s:14,c:"888888"})],{a:AlignmentType.CENTER})], {w:colWidths[6]}),
       ]});
     });
 
@@ -7077,7 +7106,7 @@ function libSaveAll(db) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(db));
   } catch(e) {
-    setStatus("Save failed — storage full. Try removing receipt images or old projects.", "err");
+    setStatus("Save failed: storage is full. Try removing receipt images or old projects.", "err");
     console.error("libSaveAll quota error:", e);
   }
 }
@@ -7122,7 +7151,7 @@ function libRefreshDropdown(selectKey) {
       });
       libSaveAll(db);
     }
-    sel.innerHTML = '<option value="" disabled>— Select a project —</option>';
+    sel.innerHTML = '<option value="" disabled>Select a project</option>';
     const today = new Date().toISOString().slice(0,10);
     function lastDayIso(sheet) {
       var label = sheet.label || "";
@@ -7218,7 +7247,7 @@ function fetchAllProjectsForRundown() {
         return Promise.all(batch.map(function(p) {
           return API.getProject(p.key).then(function(result) {
             if (result && result.data) {
-              _allProjectsCache[p.key] = { label: p.label, data: result.data };
+              _allProjectsCache[p.key] = { label: p.label, data: fixProjectTimes(result.data) };
             }
           });
         }));
@@ -7365,7 +7394,7 @@ function gather() {
     doc_branding:(function(){ var el=document.querySelector('input[name="doc_branding"]:checked'); return el?el.value:"agency"; })(),
     project_title:v("project_title"), client:v("client_company"), client_company:v("client_company"), client_name:v("client_name"), billing_code:v("billing_code"),
     kp_cards: kp.map(function(id) { return Object.assign({_id:id, role:v(id+"_role")||"", name:v(id+"_name")||"", phone:v(id+"_phone")||"", email:v(id+"_email")||"", status:v(id+"_status")||"tbd"}, cardLinkFields(id)); }),
-    hospital:v("hospital"), breakfast:v("breakfast")||"8:00 am", lunch:v("lunch")||"12:00 pm",
+    hospital:v("hospital"), breakfast:v("breakfast")||"8:00 AM", lunch:v("lunch")||"12:00 PM",
     sunrise:v("sunrise"), sunset:v("sunset"),
 
     crew: crew.map(id => Object.assign({id:id,position:v(id+"_position"),name:v(id+"_name"),email:v(id+"_email"),phone:v(id+"_phone"),notes:v(id+"_notes"),status:v(id+"_status")||"tbd",contacted_at:v(id+"_contacted_at")||undefined}, cardLinkFields(id))).filter(c => c.position||c.name||c.email||c.phone||c.notes),
@@ -7396,11 +7425,12 @@ function gather() {
     agency_org_id: _orgLinks.agency_org_id || null,
     client_org_id: _orgLinks.client_org_id || null,
   };
-  return _d;
+  return fixProjectTimes(_d);
 }
 
 // ── Load form data from a saved object ───────────────────────────────────
 function loadFormData(data) {
+  fixProjectTimes(data);
   const s = (id, val) => { const e = document.getElementById(id); if(e && val !== undefined) e.value = val; };
 
   const ptEl = document.getElementById("project_type"); if(ptEl && data.project_type) ptEl.value = data.project_type;
@@ -7726,8 +7756,8 @@ async function generateWorkback() {
     }
 
     // Header row: single merged cell — gridSpan:3 is injected via XML patch below
-    var tzMap = {ET:"Eastern Time",CT:"Central Time",MT:"Mountain Time",PT:"Pacific Time",AKT:"Alaska Time",HT:"Hawaii Time"};
-    var tzLabel = data.timezone && data.timezone !== "none" ? "All times in "+(tzMap[data.timezone]||data.timezone) : "";
+    var tzName = window.SlaterTZ ? SlaterTZ.name(data.timezone) : "";
+    var tzLabel = tzName ? "All times in "+tzName : "";
     wbHdrRow = new TableRow({children:[
       new TableCell({
         borders:lbs,
@@ -7907,7 +7937,7 @@ function generateDayICS(dayId) {
   if (entries.length) {
     d.push(DIVIDER); d.push("");
     d.push("DAY SCHEDULE"); d.push("");
-    entries.forEach(function(e) { d.push((e.time||"") + (e.time && e.desc ? " \u2014 " : "") + (e.desc||"")); });
+    entries.forEach(function(e) { d.push((e.time||"") + (e.time && e.desc ? " - " : "") + (e.desc||"")); });
     d.push("");
   }
 
@@ -7937,13 +7967,13 @@ function generateDayICS(dayId) {
   }
 
   d.push(DIVIDER); d.push("");
-  d.push("Generated by Slater \u2014 The Producer's Toolbox");
+  d.push("Generated by Slater, the producer's toolbox");
   d.push("productionlabs.io");
 
   var descVal = d.map(esc).join("\\n");
   var locStr = loc ? [loc.name, loc.address, [loc.city, loc.state, loc.zip].filter(Boolean).join(", ")].filter(Boolean).join(", ") : "";
 
-  var summary = [data.project_title, dayLabelDisplay + (callTimeRaw ? " \u2014 Crew Call " + callTimeRaw : "")].filter(Boolean).join(" | ");
+  var summary = [data.project_title, dayLabelDisplay + (callTimeRaw ? ", Crew Call " + callTimeRaw : "")].filter(Boolean).join(" | ");
   var dateStr = isoDate(dateIso);
   var lines = [
     "BEGIN:VCALENDAR",
@@ -7956,7 +7986,17 @@ function generateDayICS(dayId) {
     "DTSTAMP:" + dtstamp,
   ];
   var endDateStr = isoDate(endDateIsoVal || dateIso);
-  if (callT) {
+  // Times go in as UTC ("...Z") read in the project's time zone, so every calendar app
+  // shows them in each person's own zone. No project zone: local "floating" times, as before.
+  var icsZone = tzIana(data.timezone);
+  var utcStamp = function(ms) { return new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); };
+  if (callT && icsZone) {
+    var startMs = SlaterTZ.toUtcMs(dateIso, callT.h, callT.m, icsZone);
+    var endMs = SlaterTZ.toUtcMs(endDateIsoVal || dateIso, wrapT.h, wrapT.m, icsZone);
+    if (endMs <= startMs) endMs += 86400000;  // wraps after midnight
+    lines.push("DTSTART:" + utcStamp(startMs));
+    lines.push("DTEND:" + utcStamp(endMs));
+  } else if (callT) {
     lines.push("DTSTART:" + dateStr + "T" + hhmmss(callT));
     lines.push("DTEND:" + endDateStr + "T" + hhmmss(wrapT));
   } else {
@@ -8292,8 +8332,8 @@ async function generateDoc() {
       var _docF3Label = _docCat === 'other' ? (dayData.f3_label || "Wrap") : (_docCfg.f3.show ? _docCfg.f3.label : "Wrap");
       const meals = [
         ...(_docCfg.hasMeals ? [
-          ["BREAKFAST", dayData.breakfast||"8:00 am"],
-          ["LUNCH",     dayData.lunch||"12:00 pm"],
+          ["BREAKFAST", upperAmPm(dayData.breakfast||"8:00 AM")],
+          ["LUNCH",     upperAmPm(dayData.lunch||"12:00 PM")],
         ] : []),
         ["SUNRISE",   dayData.sunrise||""],
         ["SUNSET",    dayData.sunset||""],
@@ -8349,9 +8389,9 @@ async function generateDoc() {
             children:[
               pr([tx(_docF1Label.toUpperCase(),{s:16,c:"7F7F7F"})],{a:AlignmentType.CENTER}),
               pr([
-                tx(((dayData.call_time||"8am").replace(/am/i,"AM").replace(/pm/i,"PM"))+(dayData.tzAbbr?" "+dayData.tzAbbr:""),{b:true,s:56,c:"262626"}),
+                tx(upperAmPm(dayData.call_time||"8 AM")+(dayData.tzAbbr?" "+dayData.tzAbbr:""),{b:true,s:56,c:"262626"}),
               ],{a:AlignmentType.CENTER}),
-              pr([tx((dayData.end_date && dayData.end_date !== dayData.date) ? (dayData.date||"")+" — "+(dayData.end_date||"") : (dayData.date||""),{s:18,c:"262626"})],{a:AlignmentType.CENTER}),
+              pr([tx((dayData.end_date && dayData.end_date !== dayData.date) ? (dayData.date||"")+" to "+(dayData.end_date||"") : (dayData.date||""),{s:18,c:"262626"})],{a:AlignmentType.CENTER}),
               pr([tx(dayData.label||"",{s:18,c:"262626"})],{a:AlignmentType.CENTER}),
             ]}),
           cell([pr([tx("NOTES",{s:18,c:"7F7F7F"})])], {w:3507}),
@@ -8491,25 +8531,16 @@ async function generateDoc() {
 
     const pp = {page:{size:{width:12240,height:15840},margin:{top:720,right:720,bottom:540,left:720}}};
     // Build full timezone label for the location block
-    const tzAbbrMap = {
-      ET:["EST","EDT"], CT:["CST","CDT"], MT:["MST","MDT"], PT:["PST","PDT"],
-      AKT:["AKST","AKDT"], HT:["HST","HST"], GMT:["GMT","GMT"], CET:["CET","CEST"],
-    };
     var sdays = (data.schedule_days || []).filter(function(d) { return !d.exclude_callsheet; });
-    if (!sdays.length) { setStatus("No schedule days to export — all days are excluded from call sheet.", "err"); btn.disabled=false; btn.innerHTML="&#8595; Call sheet (.docx)"; return; }
+    if (!sdays.length) { setStatus("No schedule days to export: every day is set to Exclude from call sheet.", "err"); btn.disabled=false; btn.innerHTML=CALLSHEET_BTN_HTML; if (typeof lucide !== "undefined") lucide.createIcons(); return; }
     var sd0 = sdays[0] || {};
     var sd1 = sdays[1] || {};
 
+    // Zone letters for the first day's date ("PST" / "PDT", "BST", "AEDT"), daylight saving included.
     const tzAbbr = (() => {
-      const tz = data.timezone || "";
-      if (!tz || tz === "none") return "";
-      const pair = tzAbbrMap[tz] || [tz, tz];
-      try {
-        const d = new Date((sd0.date_iso || new Date().toISOString().slice(0,10)) + "T12:00:00");
-        const m = d.getMonth()+1, day = d.getDate();
-        const isDST = (m > 3 && m < 11) || (m === 3 && day >= 8) || (m === 11 && day < 8);
-        return isDST ? pair[1] : pair[0];
-      } catch(e) { return pair[0]; }
+      const zone = tzIana(data.timezone);
+      if (!zone || !window.SlaterTZ) return "";
+      return SlaterTZ.abbr(zone, new Date((sd0.date_iso || new Date().toISOString().slice(0,10)) + "T20:00:00Z"));
     })();
 
     function getDayHospital(sd) {
@@ -8538,7 +8569,7 @@ async function generateDoc() {
   } catch(e) {
     console.error(e); setStatus("Error: "+e.message, "err");
   }
-  btn.disabled = false; btn.innerHTML = "Download call sheet (.docx)";
+  btn.disabled = false; btn.innerHTML = CALLSHEET_BTN_HTML; if (typeof lucide !== "undefined") lucide.createIcons();
 }
 
 

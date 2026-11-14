@@ -157,6 +157,35 @@ async function main() {
     assert(!JSON.stringify(p).includes('Video Edit'), 'internal step leaked');
   });
 
+  await step('times: meetings show start + end, crew days never the call time, zone-correct, DST-aware', async () => {
+    const { buildPayload } = require(APP + '/routes/portal.js');
+    const row = { label: 'x', user_timezone: 'ET', updated_at: new Date(), data: {
+      timezone: 'PT', project_type: 'location_shoot', kickoff_date_iso: '2026-12-01', kickoff_time: '9:00 am',
+      schedule_days: [
+        { date_iso: '2026-12-02', label: 'Meet', category: 'client_meeting', call_time: '10:00 AM', wrap: '10:30 AM' },
+        { date_iso: '2026-07-02', label: 'Summer', category: 'review_session', call_time: '10:00 AM', wrap: '11:00 AM' },
+        { date_iso: '2026-12-03', label: 'Live', category: 'live_broadcast', call_time: '4:30 AM', golive: '6:30 AM', wrap: '8:00 AM' },
+        { date_iso: '2026-12-04', label: 'Setup', category: 'setup_day', call_time: '12:00 PM', wrap: '5:00 PM' },
+        { date_iso: '2026-12-05', label: 'Late', category: 'tech_check', call_time: '11:30 PM', wrap: '12:30 AM' },
+        { date_iso: '2026-12-06', label: 'Odd', category: 'client_meeting', call_time: 'tbd' },
+      ] } };
+    const by = l => buildPayload(row, { today: '2026-11-14' }).schedule.find(x => x.label === l);
+    const eq = (l, start, end, time) => { const x = by(l); assert(x && x.start === start && x.end === end && x.time === time, l + ' ' + JSON.stringify(x)); };
+    eq('Kickoff', '2026-12-01T17:00:00.000Z', '', '');                          // 9 AM PST
+    eq('Meet', '2026-12-02T18:00:00.000Z', '2026-12-02T18:30:00.000Z', '');     // 10 to 10:30 AM PST
+    eq('Summer', '2026-07-02T17:00:00.000Z', '2026-07-02T18:00:00.000Z', '');   // PDT in July
+    eq('Live', '2026-12-03T14:30:00.000Z', '', '');                             // Go Live, not the 4:30 call
+    eq('Setup', '', '', '');                                                    // crew call + wrap stay internal
+    eq('Late', '2026-12-06T07:30:00.000Z', '2026-12-06T08:30:00.000Z', '');     // ends after midnight
+    eq('Odd', '', '', 'tbd');                                                   // unreadable: text as typed
+    row.data.timezone = 'none';                                                 // falls back to the producer's ET
+    eq('Kickoff', '2026-12-01T14:00:00.000Z', '', '');
+    row.data.timezone = 'Asia/Tokyo';                                           // a zone from the longer list (IANA value)
+    eq('Kickoff', '2026-12-01T00:00:00.000Z', '', '');                          // 9 AM JST
+    row.data.timezone = 'Australia/Sydney';                                     // southern-hemisphere summer: AEDT, UTC+11
+    eq('Kickoff', '2026-11-30T22:00:00.000Z', '', '');
+  });
+
   await step('payload has what the client should see', async () => {
     const p = payload;
     assert(p.project.title === 'Q4 Summit' && p.project.type === 'Live Broadcast', 'project ' + JSON.stringify(p.project));
@@ -166,7 +195,10 @@ async function main() {
     const kinds = p.timeline.map(n => n.kind + ':' + n.label).join(', ');
     assert(/milestone:Kickoff/.test(kinds) && /milestone:Live Event/.test(kinds) && /client:Approve Script V2/.test(kinds) && /ours:Edit begins/.test(kinds), 'timeline ' + kinds);
     const live = p.schedule.find(s => s.label === 'Live Event');
-    assert(live && live.time === '9:00 AM PT' && live.location === 'Smith Tower' && live.end_date === rel(9), 'live day ' + JSON.stringify(live));
+    // Go-live only, as an exact moment: no project time zone here, so it's read in the producer's default (PT).
+    const pacific = live && new Date(live.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
+    assert(live && pacific === '9:00 AM' && live.end === '' && live.location === 'Smith Tower' && live.end_date === rel(9), 'live day ' + JSON.stringify(live));
+    assert(!JSON.stringify(p).includes('5:45'), 'crew call time leaked');
     assert(p.venues.length === 1 && p.venues[0].city_line === 'Seattle, WA 98104', 'venue ' + JSON.stringify(p.venues));
     assert(p.links.length === 2 && p.links[0].url === 'https://example.com/script' && p.links[1].url === 'https://f.io/abc', 'links ' + JSON.stringify(p.links));
     assert(p.links.every(l => JSON.stringify(Object.keys(l).sort()) === '["name","notes","url"]'), 'link keys ' + JSON.stringify(p.links));

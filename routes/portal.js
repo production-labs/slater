@@ -142,6 +142,12 @@ function setUnlockCookie(req, res, portal) {
 }
 
 // ── Payload (the allowlist) ────────────────────────────────────────────────
+// AM/PM always uppercase with a space, however it was typed ("6:30am" -> "6:30 AM").
+// Same rule as upperAmPm() in public/app.js.
+function upperAmPm(s) {
+  return typeof s === 'string' ? s.replace(/(\d)\s*([ap])\.?\s?m\.?(?![a-z])/gi, (_, d, ap) => d + ' ' + ap.toUpperCase() + 'M') : s;
+}
+
 function str(v, max) {
   if (v === null || v === undefined) return '';
   return String(v).trim().slice(0, max || 500);
@@ -162,14 +168,56 @@ function isDone(status) { return status === 'Complete'; }
 
 // Today in the producer's timezone (users.timezone: PT, ET, ...): "has this
 // shoot day arrived yet" is answered on the producer's calendar.
-const TZ_IANA = {
-  PT: 'America/Los_Angeles', ET: 'America/New_York', CT: 'America/Chicago',
-  MT: 'America/Denver', AKT: 'America/Anchorage', HT: 'Pacific/Honolulu',
-  GMT: 'Europe/London', CET: 'Europe/Paris',
-};
+// Saved zone values ("PT", "Asia/Tokyo") -> IANA names: the same list the app uses.
+const SlaterTZ = require('../public/timezones.js');
+// Clock times on the portal show in each client's own time zone. The server
+// turns "10:00 AM" on a date into an exact moment (UTC ISO), reading it in the
+// project's time zone (Schedule tab), else the producer's default (My Info).
+// No zone known, or a time that can't be read ("TBD"): the text as typed.
+function parseClock(s) {
+  const m = String(s || '').trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(?:([ap])\.?\s?m\.?)?(?![\d:])/i);
+  if (!m) return null;
+  let h = +m[1];
+  const mn = +(m[2] || 0);
+  if (mn > 59) return null;
+  if (m[3]) {
+    if (h < 1 || h > 12) return null;
+    h = (h % 12) + (/p/i.test(m[3]) ? 12 : 0);
+  } else if (!m[2] || h > 23) {
+    return null;  // "9" alone is ambiguous; "19:00" is fine
+  }
+  return { h, mn };
+}
+function zonedMs(dateIso, clock, iana) {
+  return SlaterTZ.toUtcMs(dateIso, clock.h, clock.mn, iana);  // public/timezones.js, shared with the app
+}
+// { start, end } as UTC ISO strings (end optional), or null.
+function clockRange(dateIso, startText, endText, iana) {
+  if (!iana || !isoDate(dateIso)) return null;
+  const a = parseClock(startText);
+  if (!a) return null;
+  const startMs = zonedMs(dateIso, a, iana);
+  const b = parseClock(endText);
+  let endMs = b ? zonedMs(dateIso, b, iana) : null;
+  if (endMs !== null && endMs <= startMs) endMs += 86400000;  // ends after midnight
+  return { start: new Date(startMs).toISOString(), end: endMs === null ? '' : new Date(endMs).toISOString() };
+}
+// Which of a schedule day's times the client sees, by day type. Crew call,
+// crew wrap, travel and wrap-day times stay internal.
+const MEETING_DAYS = new Set(['internal_kickoff', 'client_meeting', 'uncrewed_rehearsal', 'tech_check',
+  'location_scout', 'edit_session', 'review_session']);
+function clientTimes(day) {
+  const cat = day.category || 'shoot_day';
+  if (MEETING_DAYS.has(cat)) return { start: day.call_time, end: day.wrap };               // Start Time / End Time
+  if (cat === 'crewed_rehearsal') return { start: day.golive, end: day.wrap };             // Start Time / End Time
+  if (cat === 'other') return /call/i.test(day.f1_label || '') ? { start: '', end: '' } : { start: day.call_time, end: day.wrap };
+  if (cat === 'shoot_day' || cat === 'live_broadcast') return { start: day.golive, end: '' }; // Cameras Up / Go Live
+  return { start: '', end: '' };  // setup, wrap, travel, deadline
+}
+
 function todayIn(tz) {
   // en-CA formats as YYYY-MM-DD.
-  return new Date().toLocaleDateString('en-CA', { timeZone: TZ_IANA[tz] || TZ_IANA.PT });
+  return new Date().toLocaleDateString('en-CA', { timeZone: SlaterTZ.iana(tz) || 'America/Los_Angeles' });
 }
 
 // row: findPortal() row. extra: { clientOrg, agencyOrg, locations, updates, responses, sent }
@@ -179,6 +227,14 @@ function buildPayload(row, extra) {
   const agencyOrg = extra.agencyOrg || null;
   const clientName = str(data.client_company || data.client || (clientOrg && clientOrg.name), 200);
   const internalPins = (data.internal_pins && typeof data.internal_pins === 'object') ? data.internal_pins : {};
+  const zone = SlaterTZ.iana(data.timezone) || SlaterTZ.iana(row.user_timezone) || '';
+  // A pin's times: exact moments when they can be read (the page shows them in
+  // the viewer's zone), else the text as typed.
+  const pinTimes = (date, startText, endText) => {
+    const a = upperAmPm(str(startText, 40)), b = upperAmPm(str(endText, 40));
+    const r = clockRange(date, a, b, zone);
+    return r ? { time: '', start: r.start, end: r.end } : { time: a && b ? a + ' to ' + b : a, start: '', end: '' };
+  };
   const pinHidden = (id) => !!internalPins['pin_' + id];
 
   // Workback items the client may see: not internal, not N/A, dated.
@@ -207,7 +263,8 @@ function buildPayload(row, extra) {
   const locById = new Map((extra.locations || []).map(l => [l.id, l]));
   const pins = [];
   if (isoDate(data.kickoff_date_iso) && !pinHidden('kickoff')) {
-    pins.push({ id: 'kickoff', label: 'Kickoff', date: data.kickoff_date_iso, end_date: '', time: '', location: '' });
+    pins.push(Object.assign({ id: 'kickoff', label: 'Kickoff', date: data.kickoff_date_iso, end_date: '', location: '' },
+      pinTimes(data.kickoff_date_iso, data.kickoff_time, '')));
   }
   const venues = [];
   const seenVenue = new Set();
@@ -222,15 +279,15 @@ function buildPayload(row, extra) {
     const loc = remote ? null : locById.get(Number(day.location_id));
     const locName = remote ? '' : loc ? str(loc.name, 200) : str(day.loc_name, 200);
     const end = isoDate(day.end_date_iso);
-    pins.push({
+    const t = clientTimes(day);  // never the crew call time
+    pins.push(Object.assign({
       id: 'day:' + pins.length,  // not the internal day id
       label: str(day.label, 200) || 'Day ' + (i + 1),
       date: day.date_iso,
       end_date: end && end > day.date_iso ? end : '',
-      time: str(day.golive, 40),   // go-live time only; crew call times stay internal
       location: locName,
       star: data.project_type !== 'post_production' && day.main_event === true,
-    });
+    }, pinTimes(day.date_iso, t.start, t.end)));
     const cityLine = loc ? [str(loc.city, 100), [str(loc.state, 50), str(loc.zip, 20)].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '';
     // Only real places become a venue (with a Maps link): a saved location
     // with no address, like "Teams Meeting", shows by name on the schedule only.
@@ -240,7 +297,8 @@ function buildPayload(row, extra) {
     }
   });
   if (isoDate(data.video_due_date_iso) && !pinHidden('video_due')) {
-    pins.push({ id: 'video_due', label: 'Delivery', date: data.video_due_date_iso, end_date: '', time: '', location: '', star: data.project_type === 'post_production' });
+    pins.push(Object.assign({ id: 'video_due', label: 'Delivery', date: data.video_due_date_iso, end_date: '', location: '', star: data.project_type === 'post_production' },
+      pinTimes(data.video_due_date_iso, data.video_due_time, '')));
   }
   pins.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
   const finalPin = pins.find(p => p.star) || pins[pins.length - 1];
@@ -301,9 +359,9 @@ function buildPayload(row, extra) {
     producer: { name: producer },
     waiting,
     timeline,
-    schedule: pins.map(p => ({ date: p.date, end_date: p.end_date, label: p.label, time: p.time, location: p.location }))
+    schedule: pins.map(p => ({ date: p.date, end_date: p.end_date, label: p.label, time: p.time, start: p.start, end: p.end, location: p.location }))
       .concat(items.filter(i => i.client).map(i => ({
-        date: i.due, end_date: '', label: i.item, time: '', location: '', client_item: true, done: i.done, ready: i.ready,
+        date: i.due, end_date: '', label: i.item, time: '', start: '', end: '', location: '', client_item: true, done: i.done, ready: i.ready,
       })))
       .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0),
     team,

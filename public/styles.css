@@ -386,7 +386,7 @@ body.sidebar-open{padding-right:320px;transition:padding-right .4s cubic-bezier(
 .wb-table th.c-after{width:160px}
 .wb-table th.c-due{width:90px}
 .wb-table th.c-status{width:115px}
-.wb-table th.c-int{width:36px;text-align:center}
+.wb-table th.c-int{width:64px;text-align:center}
 .wb-table tbody tr{border-bottom:1px solid var(--border);transition:background .08s;cursor:pointer}
 .wb-table tbody tr:hover{background:var(--surface-2)}
 .wb-table tbody tr.t-selected td{border-top:1px solid #2563eb;border-bottom:1px solid #2563eb}
