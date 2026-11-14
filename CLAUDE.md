@@ -12,6 +12,16 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 
 ---
 
+## Current Priority (decided 2026-11-12, John): Slater Solo go-to-market
+
+Slater Solo is close to launch-ready. Focus from here:
+1. **Mobile** — test and fix the untested mobile build (hamburger drawer, bottom nav, collapsible schedule cards, full-screen modals; see "Mobile Responsive" under Key Features Built, and "Known Issues / In Progress"). Not started yet as of 2026-11-12.
+2. **Small tweaks/polish** picked up along the way.
+
+Any additional major/structural work goes to **V2.0 — Team Tier** instead of blocking Solo's launch. This doesn't change what's already scoped in V1.0 Remaining (Paddle, workback templates, copyright) or V1.5 (Pause/Cancel) — those stay as-is, just not the active focus right now.
+
+---
+
 ## Business Context
 
 - **Company:** Production Labs LLC
@@ -280,6 +290,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Reset page at `/reset-password?token=xxx`
 
 ### Mobile Responsive
+- Untested, active priority as of 2026-11-12 ahead of Slater Solo launch (see "Current Priority" near top of this file)
 - Breakpoint: 768px (iPhone 13 target)
 - Hamburger drawer: project management only
 - Bottom nav bar: Project, Schedule, Crew, Expenses, More
@@ -321,7 +332,7 @@ git push
 
 ## Known Issues / In Progress
 
-- Mobile bottom nav bar: built 2026-08-17 but untested; all mobile work is on hold for now
+- Mobile (bottom nav bar, hamburger drawer, collapsible schedule cards, full-screen modals): built 2026-08-17 but untested. Active priority as of 2026-11-12 ahead of Slater Solo launch (see "Current Priority" above) — no longer on hold.
 - Cloudflare "Browser Cache TTL" on productionlabs.io: set to "Respect Existing Headers" by John 2026-11-07 (was 4 hours, applied even to 404s, so browsers could mix old and new JS after a deploy). Verified live: JS/CSS are `public, max-age=0`, 404s carry no cache-control. Still true: when checking a deploy, don't poll a brand-new file URL through Cloudflare before the deploy is live (Cloudflare caches the 404); add a cache-busting query string.
 
 ---
@@ -345,7 +356,7 @@ Done:
 
 ## V1.5 — Client Portal
 **Working plan + current status: `docs/v1.5-client-portal-plan.md` (read its PICK UP HERE section first).**
-Status 2026-11-07: ALL LIVE, including everything that doesn't need Paddle (self-hosted fonts, Download my data + Delete account, workback Owner box + "Client review"). Left: Pause / Cancel (with Paddle) and John's legal leftovers.
+Status 2026-11-10: ALL LIVE (11-10 added Main event + timeline stars, see Schedule Tab), including everything that doesn't need Paddle (self-hosted fonts, Download my data + Delete account, workback Owner box + "Client review"). Left: Pause / Cancel (with Paddle) and John's legal leftovers.
 Scope (John, 2026-10-27): Client Portal + Project Overview only. Crew portal mockup is tabled, may never be built.
 Mockups: `~/Documents/Production Labs LLC/Slater/Mock-slater_client_portal.html` and `Mock-slater_projects_overview.html`. (The original spec docx at `/mnt/user-data/outputs/...` was a past session's sandbox file and is not on this machine.)
 
