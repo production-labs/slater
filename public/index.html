@@ -112,7 +112,8 @@
 
         <div id="tab-project" class="sec active">
           <div class="sh">Project details</div>
-          <div class="g2" style="margin-bottom:1.25rem">
+          <!-- Project type, billing code and agency share one row (one column on phones) -->
+          <div class="g3p">
             <div class="fl">
               <label>Project type</label>
               <div class="select-wrap"><select id="project_type" onchange="offerDefaultTemplate(this.value); rebuildScheduleDays(); updateVideoDueVisibility()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
@@ -124,12 +125,12 @@
               </select></div>
             </div>
             <div class="fl"><label>Billing code</label><input type="text" id="billing_code" placeholder="e.g. ABC-12345 (optional)" autocomplete="new-password"></div>
-          </div>
-          <div class="fl" style="margin-bottom:8px">
+            <div class="fl">
             <label>Agency</label>
             <div class="select-wrap"><select id="project_agency_id" onchange="autosaveTrigger();updateBrandingWarning()" style="-webkit-appearance:none;appearance:none;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface)">
               <option value="">No agency</option>
             </select></div>
+          </div>
           </div>
           <div class="fl"><label>Project / video title</label><input type="text" id="project_title" placeholder="e.g. Spring Product Launch"></div>
           <div class="g2">
@@ -146,14 +147,17 @@
             </div>
             <div id="branding-warning" style="display:none;color:var(--accent);font-size:12px;margin-top:6px"></div>
           </div>
-          <div class="sh" style="margin-top:1.5rem">Key personnel</div>
-          <div id="kp-list"></div>
-          <button id="add-kp-btn" class="ab" style="margin-top:8px" onclick="addKP();autosaveTrigger()">+ Add key personnel</button>
+          <div class="tab-head" style="margin-top:1.5rem">
+            <div class="sh">Key personnel</div>
+            <div class="tab-actions"><button id="add-kp-btn" class="lb accent" onclick="addKP();autosaveTrigger()"><i data-lucide="plus" class="lucide btn-icon"></i> Add key personnel</button></div>
+          </div>
+          <div id="kp-list" class="empty-hint" data-empty="No key personnel yet. Add the producers and leads who appear on call sheets and the client portal."></div>
         </div>
 
         <div id="tab-schedule" class="sec">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
-            <button class="gb" id="gen-btn" onclick="generateDoc()" style="margin-top:0;font-size:13px"><i data-lucide="download" class="lucide"></i> Download call sheet (.docx)</button>
+          <div class="tab-head">
+            <div class="sh">Schedule</div>
+            <div class="tab-actions"><button class="lb" id="gen-btn" onclick="generateDoc()" title="Word document (.docx)"><i data-lucide="download" class="lucide btn-icon"></i> Download call sheet</button></div>
           </div>
           <div class="fl" style="margin-bottom:1.25rem">
             <label>Time zone</label>
@@ -202,12 +206,12 @@
         </div>
 
         <div id="tab-crew" class="sec">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-            <div class="sh" style="margin-bottom:0">Crew</div>
-            <div style="display:flex;gap:8px">
-              <button class="lb" onclick="addCrew()" style="font-size:12px;background:var(--accent);color:#fff;border-color:var(--accent)">+ Add crew</button>
-              <button class="lb" onclick="saveCrewConfig()" style="font-size:12px"><i data-lucide="save" class="lucide"></i> Save as template</button>
-              <button class="lb" onclick="openCrewConfigManager()" style="font-size:12px"><i data-lucide="folder" class="lucide"></i> Templates</button>
+          <div class="tab-head">
+            <div class="sh">Crew</div>
+            <div class="tab-actions">
+              <button class="lb accent" onclick="addCrew()"><i data-lucide="plus" class="lucide btn-icon"></i> Add crew</button>
+              <button class="lb" onclick="saveCrewConfig()"><i data-lucide="save" class="lucide btn-icon"></i> Save as template</button>
+              <button class="lb" onclick="openCrewConfigManager()"><i data-lucide="folder" class="lucide btn-icon"></i> Templates</button>
             </div>
           </div>
           <div id="crew-status-bar">
@@ -224,15 +228,13 @@
               <div class="crew-progress-label" id="csb-summary"></div>
             </div>
           </div>
-          <div id="crew-list"></div>
+          <div id="crew-list" class="empty-hint" data-empty="No crew yet. Click Add crew to start your roster, or load one of your crew templates."></div>
         </div>
 
         <div id="tab-talent" class="sec">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-            <div class="sh" style="margin-bottom:0">Talent</div>
-            <div style="display:flex;gap:8px">
-              <button class="lb" onclick="addTalent()" style="font-size:12px;background:var(--accent);color:#fff;border-color:var(--accent)">+ Add talent</button>
-            </div>
+          <div class="tab-head">
+            <div class="sh">Talent</div>
+            <div class="tab-actions"><button class="lb accent" onclick="addTalent()"><i data-lucide="plus" class="lucide btn-icon"></i> Add talent</button></div>
           </div>
           <div id="talent-status-bar" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:none">
             <div class="crew-status-bar-row1">
@@ -248,11 +250,19 @@
               <div class="crew-progress-label" id="tsb-summary"></div>
             </div>
           </div>
-          <div id="talent-list"></div>
+          <div id="talent-list" class="empty-hint" data-empty="No talent yet. Click Add talent to track on-camera people and their booking status."></div>
         </div>
 
         <div id="tab-workback" class="sec wb-sec">
-          <!-- Top toolbar row -->
+          <div class="tab-head">
+            <div class="sh">Workback</div>
+            <div class="tab-actions">
+              <button class="lb" onclick="saveCurrentAsTemplate()"><i data-lucide="save" class="lucide btn-icon"></i> Save as template</button>
+              <button class="lb" onclick="openTemplateManager()"><i data-lucide="folder" class="lucide btn-icon"></i> Templates</button>
+              <button class="lb" id="wb-btn" onclick="generateWorkback()" title="Word document (.docx)"><i data-lucide="download" class="lucide btn-icon"></i> Download workback</button>
+            </div>
+          </div>
+          <!-- Controls row: view, anchor, direction -->
           <div style="display:flex;align-items:flex-end;margin-bottom:.75rem;flex-wrap:wrap;gap:6px">
             <!-- View toggle -->
             <div class="view-toggle">
@@ -279,9 +289,6 @@
                 </select></div>
               </div>
             </div>
-            <button class="lb" onclick="saveCurrentAsTemplate()" style="font-size:12px;padding:5px 10px"><i data-lucide="save" class="lucide"></i> Save as template</button>
-            <button class="lb" onclick="openTemplateManager()" style="font-size:12px;padding:5px 10px"><i data-lucide="folder" class="lucide"></i> Templates</button>
-            <button class="lb accent" id="wb-btn" onclick="generateWorkback()" style="font-size:12px;padding:5px 10px"><i data-lucide="download" class="lucide"></i> Download</button>
           </div>
           <!-- Timeline -->
           <div id="wb-timeline" style="margin-bottom:.5rem"></div>
@@ -348,14 +355,12 @@
         </div>
 
         <div id="tab-expenses" class="sec">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-            <div class="sh" style="margin-bottom:0">Expenses</div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <button class="lb" onclick="addExpense()" style="font-size:12px">+ Add expense</button>
+          <div class="tab-head">
+            <div class="sh">Expenses</div>
+            <div class="tab-actions">
+              <button class="lb accent" onclick="addExpense()"><i data-lucide="plus" class="lucide btn-icon"></i> Add expense</button>
+              <button class="lb" id="exp-docx-btn" onclick="generateExpenseDoc()" title="Word document (.docx)" style="display:none"><i data-lucide="download" class="lucide btn-icon"></i> Download expense report</button>
             </div>
-          </div>
-          <div id="exp-download-row" style="display:none;gap:10px;margin-bottom:1rem">
-            <button class="gb" id="exp-docx-btn" onclick="generateExpenseDoc()" style="margin-top:0;font-size:13px"><i data-lucide="download" class="lucide"></i> Download expense report (.docx)</button>
           </div>
           <div id="expense-totals" style="margin-bottom:1rem;padding:12px 16px;background:var(--tape);border:1px solid var(--border);border-radius:8px;display:none">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
@@ -373,14 +378,16 @@
               </div>
             </div>
           </div>
-          <div id="expense-list"></div>
+          <div id="expense-list" class="empty-hint" data-empty="No expenses yet. Click Add expense, then attach a photo of the receipt and Slater fills in the details."></div>
         </div>
 
         <div id="tab-urls" class="sec">
-          <div class="sh">URLs</div>
+          <div class="tab-head">
+            <div class="sh">URLs</div>
+            <div class="tab-actions"><button class="lb accent" onclick="addUrl()"><i data-lucide="plus" class="lucide btn-icon"></i> Add URL</button></div>
+          </div>
           <div id="url-portal-card"></div>
-          <div id="url-list"></div>
-          <button class="ab" onclick="addUrl()" style="margin-top:4px">+ Add URL</button>
+          <div id="url-list" class="empty-hint" data-empty="No links yet. Add review links, shared folders or meeting links for this project."></div>
         </div>
 
         <div id="tab-portal" class="sec">
@@ -402,7 +409,7 @@
             <div id="note-editor" contenteditable="true" class="note-editor" placeholder="Write a note..." oninput="updateNoteDraftIndicator(this.innerHTML)"></div>
           </div>
           <div id="notes-save-row" style="display:flex;gap:8px;margin-bottom:1.5rem">
-            <button class="ab" id="note-save-btn" onclick="noteSave()"><i data-lucide="save" class="lucide"></i> Save note</button>
+            <button class="lb accent" id="note-save-btn" onclick="noteSave()"><i data-lucide="save" class="lucide btn-icon"></i> Save note</button>
             <button class="lb" id="note-cancel-btn" onclick="noteCancelEdit()" style="display:none">Cancel</button>
           </div>
           <div id="notes-search-wrap" style="margin-bottom:12px;position:relative">
@@ -671,12 +678,6 @@
   <button onclick="mobileNavGo('notes')">Notes</button>
 </div>
 
-<div style="text-align:center;padding:12px;font-size:11px;color:var(--film-can);border-top:1px solid var(--border)">
-  <a href="https://www.termsfeed.com/live/d2688282-542f-4f45-8c27-4c2f8b3a9429" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Privacy Policy</a>
-  <a href="https://www.termsfeed.com/live/206abd78-3de5-4b2c-b95e-01e6dc67360f" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Terms of Service</a>
-  <a href="https://www.termsfeed.com/live/be956bd1-ec1c-455c-afa8-d538f43031ab" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Cookie Policy</a>
-  <a href="https://www.termsfeed.com/live/f6bd045b-eeec-46a6-ad94-b735341faf6c" target="_blank" style="color:var(--film-can);text-decoration:underline;margin:0 8px">Refund Policy</a>
-</div>
 
 <script src="/connection.js"></script>
 <script src="/lib/lucide.min.js"></script>

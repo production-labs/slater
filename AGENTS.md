@@ -201,7 +201,11 @@ Project | Schedule | Crew | Talent | Workback | URLs | Notes | Expenses | Portal
 
 ## Brand & Design
 
-- **Colors:** Charcoal `#222222`, Film Can `#9D9D99`, Masking Tape `#E9DFC8`, Paper Aging `#B89F76`, Marker `#181818`, Accent Red `#D94B43`, Background `#f3f0ed`, Tape Light `#F5F0E8`
+- **Two looks, on purpose (John, 2026-11-14):**
+  - **App** (`public/styles.css` `:root`): dark. Background `#181818`, surfaces `#282828` / `#303030` / `#393939`, borders `#3C3C3C`, text `#F7F5EF`, muted `#6E747B`, accent orange `#FF4D00`, yellow `#FFC107`. Careful: some variable names are left over from the old light theme and no longer match their meaning (`--charcoal` is the light text color `#F7F5EF`, `--tape` is a dark surface).
+  - **Client portal** (`public/portal.css`): light. Background `#FBFBFC`, cards white, ink `#181818`, accent red `#D94B43`. Keep it this way; don't match it to the app.
+  - Word docs (call sheet, workback, expense report) keep their own print palette (charcoal / Masking Tape `#E9DFC8` / Tape Light `#F5F0E8`).
+- **UI conventions (2026-11-14):** every tab opens with a `.tab-head` row: title (`.sh`) left, buttons right (`.tab-actions`), one full-width rule. Button order: **+ Add** (`.lb.accent`, plus icon), then Save as template / Templates, then **Download** (`.lb`, download icon; label "Download call sheet / workback / expense report", `.docx` only in the tooltip). Empty lists use `class="empty-hint" data-empty="..."` (CSS shows the message while the list is empty) or `.empty-msg`. Workback table cells that don't apply to a row use `wbTvNaCell()` (striped, not editable, tooltip says why). No `--` placeholders in tables: leave the cell empty.
 - **Font:** Geist only, every page (self-hosted: `public/fonts/geist.css`). Never add a third-party font link
 - **Logo:** Film can baked in as `const LB64`
 - **NEVER use em-dashes** (`—`) anywhere

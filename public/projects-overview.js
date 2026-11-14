@@ -539,7 +539,8 @@
     lanes.forEach(function (p) {
       var dot = p.status === 'red' ? 'var(--accent)' : p.status === 'yellow' ? 'var(--accent-yellow)' : 'var(--po-green)';
       h += '<div class="po-pt-name" data-open="' + esc(p.key) + '" title="' + esc((p.client ? p.client + ': ' : '') + p.name) + '">' +
-        '<span class="po-dot" style="background:' + dot + '"></span>' + esc((p.client ? p.client + ': ' : '') + p.name) + '</div>';
+        '<span class="po-dot" style="background:' + dot + '"></span><span class="po-pt-name-t">' +
+        (p.client ? '<span class="po-pt-client">' + esc(p.client) + ' · </span>' : '') + esc(p.name) + '</span></div>';
     });
     h += '</div><div class="po-pt-lanes">';
     lanes.forEach(function (p) {

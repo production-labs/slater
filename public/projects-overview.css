@@ -147,3 +147,9 @@ button.po-co:hover{filter:brightness(1.25)}
   .po-money{text-align:left}
   .po-pt-grid{grid-template-columns:110px 1fr}
 }
+
+/* Timeline names: cut with an ellipsis (the flex row needs the text in its own box), client muted.
+   Week labels sit above the TODAY line so a date under it stays readable. */
+.po-pt-name-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.po-pt-client{color:var(--text-muted)}
+.po-pt-wk{z-index:7;background:var(--surface);padding:0 4px}

@@ -508,7 +508,7 @@ function syncDayDate(n) {
   document.getElementById("day"+n+"_date").value = days[d.getDay()]+" "+d.getDate()+" "+months[d.getMonth()]+" "+d.getFullYear();
   tl();
 }
-var CALLSHEET_BTN_HTML = '<i data-lucide="download" class="lucide"></i> Download call sheet (.docx)';
+var CALLSHEET_BTN_HTML = '<i data-lucide="download" class="lucide btn-icon"></i> Download call sheet';
 var CREW_STATUS = {
   tbd:       {label:"TBD",       color:"#9D9D99", tip:"Not yet contacted"},
   contacted: {label:"Contacted", color:"#60a5fa", tip:"Reached out, awaiting response"},
@@ -2302,7 +2302,8 @@ function wbSetReview(id, on) {
 // Table view owner cell: dot, name, and for client tasks a Review switch.
 function wbTvOwnerHtml(id) {
   var d = _wbData[id] || {};
-  var html = '<div class="t-owner-dot" style="background:' + wbOwnerColor(d.owner) + '"></div><span class="t-owner-name">' + (d.owner ? wbEsc(d.owner) : "--") + '</span>';
+  if (!d.owner) return "";  // no owner yet: an empty cell (double-click to pick one)
+  var html = '<div class="t-owner-dot" style="background:' + wbOwnerColor(d.owner) + '"></div><span class="t-owner-name">' + wbEsc(d.owner) + '</span>';
   if (wbIsClientOwner(d.owner)) {
     var on = wbReviewOn(d);
     html += '<button type="button" class="t-review' + (on ? ' on' : '') + '" title="' + (on ? 'Client review: the client can Approve or Request changes on the portal. Click to turn off.' : 'No client review: the client just sees it waiting on them. Click to turn on.') + '" onclick="event.stopPropagation();wbSetReview(\'' + id + '\',' + !on + ')" ondblclick="event.stopPropagation()">Review</button>';
@@ -2525,7 +2526,11 @@ function wbDrawTimeline() {
 
   function pctOf(ms) { return (ms - minMs) / range * 100; }
   function isoPct(iso) { return pctOf(isoMs(iso)); }
-  var todayPct = pctOf(todayMs);
+  // Today can be after the whole project (a finished one): keep the marker, the past
+  // shading and the track lines inside the box, with the marker at the right edge.
+  var todayRaw = pctOf(todayMs);
+  var todayPastEnd = todayRaw > 100;
+  var todayPct = Math.max(0, Math.min(100, todayRaw));
 
   // ── Row assignment ───────────────────────────────────────────────────────
 
@@ -2581,8 +2586,8 @@ function wbDrawTimeline() {
 
   var todayLbl = document.createElement("div");
   todayLbl.className = "wb-tl-today-lbl";
-  todayLbl.textContent = "TODAY";
-  todayLbl.style.cssText = "left:"+todayPct+"%;top:"+(tickH+4)+"px";
+  todayLbl.textContent = todayPastEnd ? "TODAY \u203a" : "TODAY";
+  todayLbl.style.cssText = "left:"+todayPct+"%;top:"+(tickH+4)+"px" + (todayPastEnd ? ";transform:translateX(-100%)" : "");
   container.appendChild(todayLbl);
 
   // ── Tooltip ──────────────────────────────────────────────────────────────
@@ -3018,7 +3023,7 @@ function wbRefreshDates() {
       var d = _wbData[id]; if (!d) return;
       var row = document.getElementById("wb-tr-" + id); if (!row) return;
       var dueCell = row.querySelector(".t-due");
-      if (dueCell) { dueCell.textContent = d.due ? wbFmtDate(d.due) : "--"; dueCell.className = "t-due " + wbGetDueClass(d); }
+      if (dueCell) { dueCell.textContent = d.due ? wbFmtDate(d.due) : ""; dueCell.className = "t-due " + wbGetDueClass(d); }
     });
   }
   wbDrawTimeline();
@@ -3256,6 +3261,11 @@ function wbBuildTableView() {
   wbItems.forEach(function(id, i) { tbody.appendChild(wbBuildTvTaskRow(id, i+1)); });
 }
 
+// A cell that doesn't apply to this row: empty, striped, not editable, with a tooltip saying why.
+function wbTvNaCell(why) {
+  return '<td class="t-na" title="' + why.replace(/"/g, "&quot;") + '"><div class="t-cell"></div></td>';
+}
+
 function wbBuildTvPinRow(m) {
   var pinId = "pin_" + m.id;
   var dc = wbGetDueClassFromIso(m.date_iso, "");
@@ -3266,12 +3276,12 @@ function wbBuildTvPinRow(m) {
   tr.innerHTML = '<td><div class="t-drag">&#10783;</div></td>' +
     '<td><div class="t-pin-icon"><div class="t-diamond"></div></div></td>' +
     '<td><div class="t-cell"><span style="font-size:10px;color:var(--accent);margin-right:5px;opacity:.7">&#128204;</span><span class="tv-val-label">' + m.label + '</span></div></td>' +
-    '<td><div class="t-cell" style="color:var(--text-muted);font-size:11px">Milestone</div></td>' +
+    wbTvNaCell("Milestones come from the Schedule tab and don't have an owner") +
     '<td><div class="t-cell"><span class="t-mode pinned">pinned</span></div></td>' +
-    '<td><div class="t-days">--</div></td>' +
-    '<td><div class="t-cell" style="color:var(--text-muted)">--</div></td>' +
-    '<td><div class="t-due-cell"><span class="t-due ' + dc + '">' + (m.date_iso ? wbFmtDate(m.date_iso) : "--") + '</span></div></td>' +
-    '<td><div class="t-status-cell"><span style="font-size:11px;color:var(--text-muted)">--</span></div></td>' +
+    wbTvNaCell("Milestones are pinned to their Schedule date") +
+    wbTvNaCell("Only sequential items use After") +
+    '<td><div class="t-due-cell"><span class="t-due ' + dc + '">' + (m.date_iso ? wbFmtDate(m.date_iso) : "") + '</span></div></td>' +
+    wbTvNaCell("Milestones don't have a status") +
     '<td><div class="t-int-cell"><input type="checkbox"' + (_wbPinInternal[pinId] ? " checked" : "") + ' onchange="wbPinSetInternal(\'' + pinId + '\',this.checked)" onclick="event.stopPropagation()"></div></td>';
   return tr;
 }
@@ -3282,15 +3292,16 @@ function wbBuildTvTaskRow(id, num) {
   var sc = wbStatusClass(d.status);
   var color = wbOwnerColor(d.owner);
   var milestones = getSchedMilestones();
-  var afterLabel = "--";
-  if (d.seq_anchor_id) {
+  var isSeq = d.mode === "sequential";
+  var afterLabel = "";
+  if (isSeq && d.seq_anchor_id) {
     if (d.seq_anchor_id.indexOf("pin_") === 0) {
       var mid = d.seq_anchor_id.replace(/^pin_/, "");
       var pm = milestones.find(function(x) { return x.id === mid; });
       afterLabel = pm ? pm.label : d.seq_anchor_id;
     } else {
       var ad = _wbData[d.seq_anchor_id];
-      afterLabel = ad ? (ad.item || "(untitled)") : "--";
+      afterLabel = ad ? (ad.item || "(untitled)") : "";
     }
   }
   var tr = document.createElement("tr");
@@ -3302,9 +3313,11 @@ function wbBuildTvTaskRow(id, num) {
     '<td ondblclick="wbTvEditLabel(\'' + id + '\',this)"><div class="t-cell"><span class="tv-val-label">' + (d.item||"").replace(/</g,"&lt;") + '</span>' + (window.PortalAdmin ? PortalAdmin.badgeHtml(d.uuid) : '') + '</div></td>' +
     '<td ondblclick="wbTvEditOwner(\'' + id + '\',this)"><div class="t-owner">' + wbTvOwnerHtml(id) + '</div></td>' +
     '<td ondblclick="wbTvEditMode(\'' + id + '\',this)"><div class="t-cell"><span class="t-mode ' + d.mode + '">' + d.mode + '</span></div></td>' +
-    '<td ondblclick="wbTvEditDays(\'' + id + '\',this)"><div class="t-days tv-val-days">' + (d.mode==="sequential"?d.seq_days:d.mode==="manual"?"--":d.days) + '</div></td>' +
-    '<td ondblclick="wbTvEditAfter(\'' + id + '\',this)"><div class="t-cell" style="color:var(--text-muted);font-size:11px"><span class="tv-val-after" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + afterLabel + '</span></div></td>' +
-    '<td><div class="t-due-cell"><span class="t-due ' + dc + '">' + (d.due ? wbFmtDate(d.due) : "--") + '</span></div></td>' +
+    (d.mode === "manual" ? wbTvNaCell("Manual items use the date you set, not a number of days")
+      : '<td ondblclick="wbTvEditDays(\'' + id + '\',this)"><div class="t-days tv-val-days">' + (isSeq ? d.seq_days : d.days) + '</div></td>') +
+    (isSeq ? '<td ondblclick="wbTvEditAfter(\'' + id + '\',this)"><div class="t-cell" style="color:var(--text-muted);font-size:11px"><span class="tv-val-after" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + afterLabel + '</span></div></td>'
+      : wbTvNaCell("Only sequential items use After")) +
+    '<td><div class="t-due-cell"><span class="t-due ' + dc + '">' + (d.due ? wbFmtDate(d.due) : "") + '</span></div></td>' +
     '<td><div class="t-status-cell"><button class="t-status ' + sc + '" onclick="wbTvCycleStatus(\'' + id + '\',event)">' + wbStatusDisplayLabel(d.status) + '</button></div></td>' +
     '<td><div class="t-int-cell"><input type="checkbox"' + (d.internal?" checked":"") + ' onchange="_wbData[\'' + id + '\'].internal=this.checked;autosaveTrigger()" onclick="event.stopPropagation()"></div></td>';
   return tr;
@@ -3397,6 +3410,8 @@ function wbTvEditMode(id, td) {
     d.mode=sel.value; td.classList.remove("t-editing");
     cell.innerHTML='<span class="t-mode '+sel.value+'">'+sel.value+'</span>';
     td.ondblclick=function(){wbTvEditMode(id,td);}; _wbEditingCell=null; wbRecalc(); autosaveTrigger();
+    // Days and After apply to some modes only: redraw the table so those cells update.
+    setTimeout(function() { if (_wbView === "table") wbBuildTableView(); }, 0);
   };
   _wbEditingCell={td:td,commit:commit};
   sel.addEventListener("change",commit); sel.addEventListener("blur",commit);
@@ -3682,7 +3697,7 @@ function renderNotes() {
   const ticker = document.getElementById("note-ticker");
   if (!ticker) return;
   if (!noteEntries.length) {
-    ticker.innerHTML = "<div style='color:#bbb;font-size:13px;padding:8px 0'>No notes yet.</div>";
+    ticker.innerHTML = "<div class='empty-msg'>No notes yet. Notes you save show up here, with the date and time.</div>";
     return;
   }
   ticker.innerHTML = "";
@@ -6668,11 +6683,11 @@ function updateExpTotals() {
   const items = getExpenses();
   if (!items.length) {
     document.getElementById("expense-totals").style.display = "none";
-  document.getElementById("exp-download-row").style.display = "none";
+  document.getElementById("exp-docx-btn").style.display = "none";
   return;
   }
   document.getElementById("expense-totals").style.display = "";
-  document.getElementById("exp-download-row").style.display = "flex";
+  document.getElementById("exp-docx-btn").style.display = "";
   const total = items.reduce(function(s,e) { return s + e.amount; }, 0);
   const reimb = items.filter(function(e) { return e.reimbursable; }).reduce(function(s,e) { return s + e.amount; }, 0);
   document.getElementById("exp-total").textContent = "$" + total.toFixed(2);
@@ -6815,12 +6830,13 @@ function wireNoteImages() {
 // ── Expense Report Word Doc ───────────────────────────────────────────────────
 async function generateExpenseDoc() {
   const btn = document.getElementById("exp-docx-btn");
+  const btnHtml = btn.innerHTML;
   btn.disabled = true; btn.textContent = "Building...";
   try {
     const data = gather();
     const ag = getAgencyInfo();
     const items = getExpenses();
-    if (!items.length) { setStatus("No expenses to export.", "err"); btn.disabled=false; btn.textContent="Download expense report (.docx)"; return; }
+    if (!items.length) { setStatus("No expenses to export.", "err"); btn.disabled=false; btn.innerHTML=btnHtml; return; }
 
     const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,ImageRun,
            AlignmentType,WidthType,BorderStyle,ShadingType,VerticalAlign,Header,Footer,
@@ -7056,7 +7072,7 @@ async function generateExpenseDoc() {
     console.error(err);
     setStatus("Error generating expense report: "+err.message, "err");
   }
-  btn.disabled=false; btn.textContent="Download expense report (.docx)";
+  btn.disabled=false; btn.innerHTML=btnHtml;
 }
 
 // ── Call Sheet Library ────────────────────────────────────────────────────
@@ -7656,11 +7672,12 @@ async function patchGridSpan(blob) {
 
 async function generateWorkback() {
   const btn = document.getElementById("wb-btn");
+  const btnHtml = btn.innerHTML;
   btn.disabled=true; btn.textContent="Building...";
   try {
     const data = gather();
     const items = wbGetItemsForDoc();
-    if (!items.length) { setStatus("No workback items to export.", "err"); btn.disabled=false; btn.textContent="Download workback (.docx)"; return; }
+    if (!items.length) { setStatus("No workback items to export.", "err"); btn.disabled=false; btn.innerHTML=btnHtml; return; }
 
     await new Promise(r => { if(window.docx) return r(); const t = setInterval(() => { if(window.docx){clearInterval(t);r();} },100); });
 
@@ -7850,7 +7867,7 @@ async function generateWorkback() {
     URL.revokeObjectURL(url);
     setStatus("Workback downloaded.", "ok");
   } catch(e) { console.error(e); setStatus("Error: "+e.message,"err"); }
-  btn.disabled=false; btn.textContent="Download workback (.docx)";
+  btn.disabled=false; btn.innerHTML=btnHtml;
 }
 
 

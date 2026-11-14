@@ -411,7 +411,7 @@ body.sidebar-open{padding-right:320px;transition:padding-right .4s cubic-bezier(
 .t-mode.sequential{background:rgba(37,99,235,.15);color:#60a5fa}
 .t-mode.anchor{background:rgba(255,193,7,.12);color:#FFC107}
 .t-mode.manual{background:rgba(110,116,123,.15);color:var(--text-muted)}
-.t-mode.pinned{background:rgba(217,75,67,.1);color:var(--accent)}
+.t-mode.pinned{background:none;border:1px solid var(--border);color:var(--text-muted)}
 .t-days{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;font-weight:500}
 .t-due-cell{display:flex;align-items:center;padding:0 10px;height:100%}
 .t-due{font-size:11px;font-weight:600;padding:2px 6px;border-radius:3px;white-space:nowrap}
@@ -866,3 +866,26 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .t-review{margin-left:6px;flex-shrink:0;font-family:inherit;font-size:9.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;line-height:1;padding:3px 6px;border-radius:999px;cursor:pointer;background:transparent;color:var(--text-muted);border:1px dashed var(--border-strong,#555)}
 .t-review:hover{color:var(--text-primary)}
 .t-review.on{background:rgba(232,123,164,.16);color:#e87ba4;border:1px solid rgba(232,123,164,.55)}
+
+/* ── Tab header row (2026-11-14): title left, the tab's buttons right, one full-width rule.
+   Button order everywhere: + Add (accent), Save as template / Templates, Download (outlined). */
+.tab-head{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.tab-head .sh{margin:0;padding:0;border:none}
+.tab-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tab-actions .lb{font-size:13px;padding:6px 14px}
+.tab-actions .lb.accent .btn-icon{opacity:1}
+
+/* Empty lists explain themselves. The list element must be truly empty (no whitespace). */
+.empty-hint:empty::before,.empty-msg{content:attr(data-empty);display:block;padding:18px 16px;border:1px dashed var(--border);border-radius:8px;color:var(--text-muted);font-size:13px;line-height:1.5;text-align:center;margin-bottom:12px}
+
+/* Rundown is an on/off switch, not a tab: no "selected" highlight, the switch shows its state. */
+.app-nav-toggle.active{background:none;border-left-color:transparent;font-weight:500;color:rgba(247,245,239,.6)}
+.app-nav-toggle.active:hover{background:var(--surface-2);color:var(--text-primary)}
+
+/* Workback table: a cell that doesn't apply to its row (e.g. After on a non-sequential item). */
+.wb-table td.t-na{cursor:not-allowed;background-image:repeating-linear-gradient(135deg,transparent 0 6px,rgba(255,255,255,.085) 6px 9px)}
+
+/* Project tab top row: Project type / Billing code / Agency (one column on phones). */
+.g3p{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.g3p>*{min-width:0}
+@media(max-width:768px){.g3p{grid-template-columns:1fr;gap:0}}

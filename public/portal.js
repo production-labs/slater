@@ -368,7 +368,7 @@
       var x = pct(n.date);
       var past = n.date < today || n.done;
       var cls = 'tl-node ' + (n.kind === 'milestone' ? 'milestone' : n.kind === 'client' ? 'client' : '') + (n.star ? ' star' : '') + (past ? ' done' : '');
-      var note = n.kind === 'milestone' ? 'Key date' : n.kind === 'client' ? (n.done ? 'Done' : n.ready ? 'Needs you' : 'Coming up for you') : 'Our work';
+      var note = n.kind === 'milestone' ? 'Key date' : n.kind === 'client' ? (n.done ? 'Done' : n.ready ? 'Needs you' : n.date < today ? 'In progress' : 'Coming up for you') : 'Our work';
       var node = el('div', { class: cls, style: 'left:' + x + '%', tabindex: '0', 'aria-label': n.label + ', ' + fmt(n.date) + ', ' + note });
       node.addEventListener('mouseenter', function () {
         tip.textContent = '';
@@ -410,6 +410,8 @@
       var tag = !s.client_item ? null
         : s.done ? el('div', { class: 'sched-tag done' }, 'Complete')
         : s.ready ? el('div', { class: 'sched-tag you' }, 'Waiting on you')
+        // Its date has passed but the step before it isn't done yet: neutral "In progress", never "late".
+        : past ? el('div', { class: 'sched-tag soon' }, 'In progress')
         : el('div', { class: 'sched-tag soon' }, 'Coming up');
       return el('div', { class: 'sched-row' + (past && !(s.client_item && !s.done) ? ' is-past' : '') },
         el('div', { class: 'sched-date' },

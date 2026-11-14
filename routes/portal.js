@@ -293,7 +293,12 @@ function buildPayload(row, extra) {
     // with no address, like "Teams Meeting", shows by name on the schedule only.
     if (loc && (str(loc.address, 300) || cityLine) && !seenVenue.has(loc.id)) {
       seenVenue.add(loc.id);
-      venues.push({ name: str(loc.name, 200), address: str(loc.address, 300), city_line: cityLine });
+      // Some addresses were typed with the city already in them ("506 Second Ave, Seattle, WA 98104"):
+      // don't print the city line twice.
+      const addr = str(loc.address, 300);
+      const norm = (v) => String(v || '').toLowerCase().replace(/[\s,.]+/g, ' ').trim();
+      const repeats = cityLine && norm(addr).includes(norm(loc.city)) && (!str(loc.zip, 20) || norm(addr).includes(norm(loc.zip)));
+      venues.push({ name: str(loc.name, 200), address: addr, city_line: repeats ? '' : cityLine });
     }
   });
   if (isoDate(data.video_due_date_iso) && !pinHidden('video_due')) {
