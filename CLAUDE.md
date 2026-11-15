@@ -18,6 +18,8 @@ Slater Solo is close to launch-ready. Focus from here:
 1. **Mobile**: done in a simulated iPhone 2026-11-14 (see "Mobile Responsive" under Key Features Built); waiting on John's real-phone test.
 2. **Small tweaks/polish** picked up along the way.
 
+**PICK UP HERE (2026-11-15):** UI audit fixes and the phone build are all live (last code commit 0ad318e). John is reviewing the phone app on his real iPhone one tab at a time. Done: Schedule (redesigned as read-only summary cards + full-screen editor) and Crew (card grid, also applied to Talent and Key Personnel). Next session: ask which tab he wants to review next. Not yet reviewed on his phone: Talent, Workback, URLs, Portal tab, Notes, Expenses (receipt photo), Rundown, Overview, Contacts, the menu, the client portal.
+
 Any additional major/structural work goes to **V2.0 — Team Tier** instead of blocking Solo's launch. This doesn't change what's already scoped in V1.0 Remaining (Paddle, workback templates, copyright) or V1.5 (Pause/Cancel) — those stay as-is, just not the active focus right now.
 
 ---
