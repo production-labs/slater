@@ -48,26 +48,32 @@ async function main() {
 
   browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-first-run'] });
   const ctx = await browser.createBrowserContext();
-  const page = await ctx.newPage(); global.__page = page;
-  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-  page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
-  page.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
-  await page.setRequestInterception(true);
-  page.on('request', req => {
-    if (req.url().endsWith('/api/ocr') && req.method() === 'POST' && fakeOcr) {
-      const f = fakeOcr;
-      setTimeout(() => req.respond({ status: f.status, contentType: f.type || 'application/json', body: f.body }), 300);
-    } else req.continue();
-  });
-
-  await page.goto(BASE + '/login');
-  const login = await page.evaluate(async (e, p) => (await fetch('/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e, password: p }) })).status, EMAIL, PASS);
-  assert(login === 200, 'login failed ' + login);
-  await page.evaluate(k => localStorage.setItem('slater_last_project', k), KEY);
-  await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
-  await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
-  await page.evaluate(() => mobileNavGo('expenses'));
-  await sleep(300);
+  // A fresh page (phone or computer size), logged in, on the Expenses tab.
+  // Helpers below use whichever page is current.
+  let page;
+  const openPage = async (viewport) => {
+    if (page) await page.close();
+    page = await ctx.newPage(); global.__page = page;
+    await page.setViewport(viewport);
+    page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+    page.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
+    await page.setRequestInterception(true);
+    page.on('request', req => {
+      if (req.url().endsWith('/api/ocr') && req.method() === 'POST' && fakeOcr) {
+        const f = fakeOcr;
+        setTimeout(() => req.respond({ status: f.status, contentType: f.type || 'application/json', body: f.body }), 300);
+      } else req.continue();
+    });
+    await page.goto(BASE + '/login');
+    const login = await page.evaluate(async (e, p) => (await fetch('/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e, password: p }) })).status, EMAIL, PASS);
+    assert(login === 200, 'login failed ' + login);
+    await page.evaluate(k => localStorage.setItem('slater_last_project', k), KEY);
+    await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
+    await page.waitForFunction(k => _formKey === k, { timeout: 8000 }, KEY);
+    await page.evaluate(() => isPhone() ? mobileNavGo('expenses') : st('expenses'));
+    await sleep(300);
+  };
+  await openPage({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
 
   // Adds an expense card and "picks" a file for it. kind: 'png' | 'pdf' | 'bad'
   const upload = (kind) => page.evaluate(async (kind) => {
@@ -158,6 +164,64 @@ async function main() {
     assert(r.saved.join() === 'First,Second+r,Third', 'saved ' + r.saved.join());
   });
 
+  const visibleBtns = id => page.evaluate(id => [...document.querySelectorAll('#' + id + '_receipt_actions button')].filter(b => b.offsetParent).map(b => b.textContent), id);
+
+  await step('phone: View / Replace / Read again / Remove under a photo', async () => {
+    fakeOcr = { status: 500, body: JSON.stringify({ error: 'x' }) };
+    const id = await upload('png');
+    await waitNote(id, 'warn');
+    const b = await visibleBtns(id);
+    assert(b.join() === 'View,Replace,Read again,Remove', b.join());
+    await (await page.$('#' + id)).screenshot({ path: SHOTS + '/ocr-buttons-phone.png' });
+  });
+
+  await step('Read again replaces what was there', async () => {
+    fakeOcr = { status: 500, body: JSON.stringify({ error: 'x' }) };
+    const id = await upload('png');
+    await waitNote(id, 'warn');
+    await page.evaluate(id => { document.getElementById(id + '_vendor').value = 'Typed'; document.getElementById(id + '_amount').value = '$1.00'; }, id);
+    fakeOcr = { status: 200, body: JSON.stringify({ vendor: 'Real Diner', date: '2030-05-06', amount: 42, category: 'Meals' }) };
+    await page.evaluate(id => [...document.querySelectorAll('#' + id + '_receipt_actions button')].find(b => b.textContent === 'Read again').click(), id);
+    await waitNote(id, '');
+    const v = await page.evaluate(id => [id + '_vendor', id + '_date', id + '_amount'].map(x => document.getElementById(x).value), id);
+    assert(v[0] === 'Real Diner' && v[1] === '2030-05-06' && /42/.test(v[2]), v.join(' | '));
+  });
+
+  await step('Remove takes the photo off (after OK) and shows Add receipt again', async () => {
+    fakeOcr = { status: 200, body: JSON.stringify({ vendor: 'Keep me', date: '', amount: 3, category: 'Other' }) };
+    const id = await upload('png');
+    await waitNote(id, '');
+    await page.evaluate(id => [...document.querySelectorAll('#' + id + '_receipt_actions button')].find(b => b.textContent === 'Remove').click(), id);
+    await sleep(200);
+    assert(await page.evaluate(id => !!document.getElementById(id + '_receipt_data').value, id), 'photo should stay until OK');
+    await page.click('#modal-ok');
+    await sleep(200);
+    const r = await page.evaluate(id => ({
+      photo: document.getElementById(id + '_receipt_data').value,
+      add: !!document.querySelector('#' + id + '_receipt_thumb .exp-receipt-placeholder'),
+      btns: document.querySelectorAll('#' + id + '_receipt_actions button').length,
+      vendor: document.getElementById(id + '_vendor').value,
+    }), id);
+    assert(r.photo === '' && r.add && r.btns === 0 && r.vendor === 'Keep me', JSON.stringify(r));
+  });
+
+  await step('PDF: no Read again', async () => {
+    const id = await upload('pdf');
+    await waitNote(id, 'warn');
+    const b = await visibleBtns(id);
+    assert(b.join() === 'View,Replace,Remove', b.join());
+  });
+
+  await step('computer: only Read again / Remove are buttons', async () => {
+    await openPage({ width: 1400, height: 900 });
+    fakeOcr = { status: 200, body: JSON.stringify({ vendor: 'Desk', date: '', amount: 5, category: 'Other' }) };
+    const id = await upload('png');
+    await waitNote(id, '');
+    const b = await visibleBtns(id);
+    assert(b.join() === 'Read again,Remove', b.join());
+    await page.screenshot({ path: SHOTS + '/ocr-buttons-desk.png' });
+  });
+
   await step('no page errors', async () => {
     const real = consoleErrors.filter(e => !/Failed to load resource/.test(e));
     assert(!real.length, real.join(' | '));
@@ -167,7 +231,7 @@ async function main() {
 main().catch(e => { fails.push('crashed'); console.error(e); }).finally(async () => {
   try { if (browser) await browser.close(); } catch (_) {}
   try { if (server) server.kill(); } catch (_) {}
-  try { if (userId) { await db.query('DELETE FROM projects WHERE owner_id=$1', [userId]); await db.query('DELETE FROM users WHERE id=$1', [userId]); } } catch (e) { console.error('cleanup', e.message); }
+  try { if (userId) { await db.query('DELETE FROM receipts WHERE owner_id=$1', [userId]); await db.query('DELETE FROM projects WHERE owner_id=$1', [userId]); await db.query('DELETE FROM users WHERE id=$1', [userId]); } } catch (e) { console.error('cleanup', e.message); }
   await db.end();
   console.log(`\n${passed} passed, ${fails.length} failed`);
   process.exit(fails.length ? 1 : 0);

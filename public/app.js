@@ -6596,30 +6596,13 @@ function addExpense(data) {
   fileInp.style.display = "none";
   fileInp.onchange = function() { handleReceiptUpload(id, this); };
 
+  // Photo (or "Add receipt") + its buttons: drawn by renderReceipt().
   const thumb = document.createElement("div"); thumb.id = id+"_receipt_thumb";
-  if (data.receipt) {
-    const wrap = document.createElement("div"); wrap.className = "exp-receipt-thumb-wrap";
-    const img = document.createElement("img"); img.className = "exp-receipt-thumb";
-    img.src = data.receipt; img.onclick = function() { fileInp.click(); };
-    const prevBtn = document.createElement("button"); prevBtn.className = "exp-receipt-preview-btn";
-    prevBtn.title = "Preview receipt"; prevBtn.innerHTML = "&#128065;";
-    prevBtn.onclick = function(e) { e.stopPropagation(); openReceiptModal(document.getElementById(id+"_receipt_data").value); };
-    wrap.appendChild(img); wrap.appendChild(prevBtn); thumb.appendChild(wrap);
-    const mobileBtns = document.createElement("div"); mobileBtns.className = "exp-receipt-mobile-btns"; mobileBtns.id = id+"_receipt_mobile_btns";
-    const mView = document.createElement("button"); mView.className = "gb"; mView.style.cssText = "font-size:11px;margin:0;padding:6px 12px";
-    mView.textContent = "View"; mView.onclick = function() { openReceiptModal(document.getElementById(id+"_receipt_data").value); };
-    const mReplace = document.createElement("button"); mReplace.className = "lb"; mReplace.style.cssText = "font-size:11px;margin:0;padding:6px 12px";
-    mReplace.textContent = "Replace"; mReplace.onclick = function() { fileInp.click(); };
-    mobileBtns.appendChild(mView); mobileBtns.appendChild(mReplace); receiptWrap.appendChild(mobileBtns);
-  } else {
-    const ph = document.createElement("div"); ph.className = "exp-receipt-placeholder";
-    ph.innerHTML = "&#128247;<br> Add<br> receipt"; /* phones hide the <br>s: "📷 Add receipt" */ ph.onclick = function() { fileInp.click(); };
-    thumb.appendChild(ph);
-  }
+  const actions = document.createElement("div"); actions.id = id+"_receipt_actions"; actions.className = "exp-receipt-actions";
   const receiptHidden = document.createElement("input");
   receiptHidden.type = "hidden"; receiptHidden.id = id+"_receipt_data";
   receiptHidden.value = data.receipt||"";
-  receiptWrap.appendChild(fileInp); receiptWrap.appendChild(receiptHidden); receiptWrap.appendChild(thumb);
+  receiptWrap.appendChild(fileInp); receiptWrap.appendChild(receiptHidden); receiptWrap.appendChild(thumb); receiptWrap.appendChild(actions);
   bottomRow.appendChild(receiptWrap);
   card.appendChild(bottomRow);
 
@@ -6636,6 +6619,7 @@ function addExpense(data) {
   // and the receipt index each photo is stored under) stays oldest-first.
   const expList = document.getElementById("expense-list");
   expList.insertBefore(card, expList.firstChild);
+  renderReceipt(id);
   updateExpTotals();
 }
 
@@ -6655,7 +6639,8 @@ function handleReceiptUpload(id, input) {
         canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
         const compressed = canvas.toDataURL("image/jpeg", 0.82);
         setReceiptThumb(id, compressed);
-        // Try OCR
+        // Save the photo now, whether or not reading it works.
+        if (typeof autosaveTrigger === "function") autosaveTrigger();
         ocrReceipt(id, compressed);
       };
       // e.g. a HEIC photo on a browser that can't open it
@@ -6665,6 +6650,7 @@ function handleReceiptUpload(id, input) {
       img.src = src;
     } else {
       setReceiptThumb(id, src);
+      if (typeof autosaveTrigger === "function") autosaveTrigger();
       setOcrNote(id, "PDF receipts aren't read automatically. Fill in the details by hand.", "warn");
     }
   };
@@ -6700,7 +6686,10 @@ if (window.SlaterConn) SlaterConn.addSource("receipt-reading", { pending: functi
 
 var OCR_FAILED_MSG = "Couldn't read this receipt. Fill in the details by hand.";
 
-function ocrReceipt(id, imageData) {
+// opts.overwrite (Read again): replace the date / vendor / amount instead of
+// only filling empty ones.
+function ocrReceipt(id, imageData, opts) {
+  var overwrite = !!(opts && opts.overwrite);
   if (window.SlaterConn && !SlaterConn.online) {
     _pendingOcr[id] = imageData;
     setOcrNote(id, "Will read this receipt when you're back online.");
@@ -6732,9 +6721,9 @@ function ocrReceipt(id, imageData) {
     var dateEl    = document.getElementById(id+"_date");
     var amountEl  = document.getElementById(id+"_amount");
     var catEl     = document.getElementById(id+"_cat");
-    if (vendorEl  && !vendorEl.value  && data.vendor)   vendorEl.value  = data.vendor;
-    if (dateEl    && !dateEl.value    && data.date)      dateEl.value    = data.date;
-    if (amountEl  && !amountEl.value  && data.amount)    amountEl.value  = fmtCurrencyVal(data.amount);
+    if (vendorEl  && (overwrite || !vendorEl.value)  && data.vendor)  vendorEl.value  = data.vendor;
+    if (dateEl    && (overwrite || !dateEl.value)    && data.date)    dateEl.value    = data.date;
+    if (amountEl  && (overwrite || !amountEl.value)  && data.amount)  amountEl.value  = fmtCurrencyVal(data.amount);
     if (catEl     && data.category)                      catEl.value     = data.category;
     setOcrNote(id, "");
     updateExpTotals();
@@ -6754,28 +6743,64 @@ function ocrReceipt(id, imageData) {
 }
 
 function setReceiptThumb(id, src) {
+  // The hidden input is what gets saved; renderReceipt draws from it.
+  const hidden = document.getElementById(id+"_receipt_data");
+  if (!hidden) return;
+  hidden.value = src || "";
+  renderReceipt(id);
+}
+
+// Draws an expense card's receipt area from its saved photo: the photo and
+// its buttons, or "Add receipt". Phones: View / Replace / Read again / Remove.
+// Computers: the photo opens Replace and the eye opens View, so only
+// Read again / Remove are buttons. PDFs can't be read, so no Read again.
+function renderReceipt(id) {
   const thumb = document.getElementById(id+"_receipt_thumb");
-  if (!thumb) return;
-  thumb.innerHTML = "";
+  const actions = document.getElementById(id+"_receipt_actions");
+  const hidden = document.getElementById(id+"_receipt_data");
+  if (!thumb || !actions || !hidden) return;
+  const src = hidden.value;
+  const pick = function() { var f = document.getElementById(id+"_receipt_file"); if (f) { f.value = ""; f.click(); } };
+  thumb.innerHTML = ""; actions.innerHTML = "";
+  if (!src) {
+    const ph = document.createElement("div"); ph.className = "exp-receipt-placeholder";
+    ph.innerHTML = "&#128247;<br> Add<br> receipt"; /* phones hide the <br>s: "📷 Add receipt" */
+    ph.onclick = pick;
+    thumb.appendChild(ph);
+    return;
+  }
   const wrap = document.createElement("div"); wrap.className = "exp-receipt-thumb-wrap";
   const img = document.createElement("img"); img.className = "exp-receipt-thumb";
-  img.src = src; img.onclick = function() { var f = document.getElementById(id+"_receipt_file"); if (f) f.click(); };
+  img.src = src; img.title = "Replace receipt"; img.onclick = pick;
   const prevBtn = document.createElement("button"); prevBtn.className = "exp-receipt-preview-btn";
   prevBtn.title = "Preview receipt"; prevBtn.innerHTML = "&#128065;";
   prevBtn.onclick = function(e) { e.stopPropagation(); openReceiptModal(src); };
   wrap.appendChild(img); wrap.appendChild(prevBtn); thumb.appendChild(wrap);
-  var existingMobile = document.getElementById(id+"_receipt_mobile_btns");
-  if (existingMobile) existingMobile.remove();
-  const mobileBtns = document.createElement("div"); mobileBtns.className = "exp-receipt-mobile-btns"; mobileBtns.id = id+"_receipt_mobile_btns";
-  const mView = document.createElement("button"); mView.className = "gb"; mView.style.cssText = "font-size:11px;margin:0;padding:6px 12px";
-  mView.textContent = "View"; mView.onclick = function() { openReceiptModal(src); };
-  const mReplace = document.createElement("button"); mReplace.className = "lb"; mReplace.style.cssText = "font-size:11px;margin:0;padding:6px 12px";
-  mReplace.textContent = "Replace"; mReplace.onclick = function() { var f = document.getElementById(id+"_receipt_file"); if (f) f.click(); };
-  mobileBtns.appendChild(mView); mobileBtns.appendChild(mReplace);
-  if (thumb.parentElement) thumb.parentElement.appendChild(mobileBtns);
-  // Store in hidden input for reliable persistence
-  const hidden = document.getElementById(id+"_receipt_data");
-  if (hidden) hidden.value = src;
+  const btn = function(label, cls, title, fn) {
+    const b = document.createElement("button"); b.type = "button";
+    b.className = cls + " exp-rc-btn"; b.textContent = label; b.title = title; b.onclick = fn;
+    actions.appendChild(b); return b;
+  };
+  btn("View", "gb exp-rc-phone", "View receipt", function() { openReceiptModal(src); });
+  btn("Replace", "lb exp-rc-phone", "Replace with a different photo", pick);
+  if (/^data:image\//.test(src)) {
+    btn("Read again", "lb", "Read this receipt again and replace the date, vendor, amount and category", function() {
+      var n = document.getElementById(id+"_ocr_note");
+      if (n && n.dataset.kind === "busy") return; // already reading
+      ocrReceipt(id, src, { overwrite: true });
+    });
+  }
+  btn("Remove", "lb", "Remove this receipt photo (the expense stays)", function() { removeReceipt(id); });
+}
+
+function removeReceipt(id) {
+  showModal("Remove receipt", "Remove this receipt photo? The expense and its details stay.", function() {
+    delete _pendingOcr[id];
+    setOcrNote(id, "");
+    setReceiptThumb(id, "");
+    // Code change, no input event: save it (the save also clears it on the server).
+    if (typeof autosaveTrigger === "function") autosaveTrigger();
+  });
 }
 
 function openReceiptModal(src) {
