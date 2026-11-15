@@ -146,9 +146,9 @@ function st(n) {
   document.querySelectorAll(".app-nav-item:not(.app-nav-toggle)").forEach(function(btn) {
     btn.classList.toggle("active", btn.dataset.tab === n);
   });
-  document.querySelectorAll(".mobile-nav-btn").forEach(function(btn) {
-    btn.classList.toggle("active", btn.dataset.tab === n);
-  });
+  if (isPhone() && sidebarOpen) toggleSidebar();  // phones: Rundown is a full screen; a tab replaces it
+  updateMobileNav();
+  updateMobileTitle();
   if (n === "workback") refreshWbDaySelector();
   if (n === "notes") setTimeout(initNoteEditorPaste, 50);
   if (window.BookingConflicts) BookingConflicts.changed();
@@ -163,6 +163,7 @@ function openMobileDrawer() {
   if (sel) {
     var clone = sel.cloneNode(true);
     clone.id = "mobile-lib-select";
+    clone.value = sel.value;  // cloneNode copies the options, not which one is selected
     clone.style.cssText = "width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;background:var(--surface);box-sizing:border-box";
     clone.onchange = function() { sel.value = this.value; sel.dispatchEvent(new Event("change")); closeMobileDrawer(); };
     mobileSelectWrap.appendChild(clone);
@@ -170,17 +171,19 @@ function openMobileDrawer() {
 
   var btnWrap = document.getElementById("mobile-lib-buttons");
   btnWrap.innerHTML = "";
+  var hasProject = !!currentSheetKey;
   var actions = [
-    { label: "+ New", fn: function() { libNew(); closeMobileDrawer(); } },
-    { label: "Save", fn: function() { libSave(); closeMobileDrawer(); } },
-    { label: "Duplicate", fn: function() { libDuplicate(); closeMobileDrawer(); } },
-    { label: "Delete", fn: function() { libDelete(); closeMobileDrawer(); } },
+    { label: "New Project", icon: "plus", cls: "lb accent", fn: function() { libNew(); closeMobileDrawer(); } },
+    { label: "Save", icon: "save", cls: "lb", fn: function() { libSave(); closeMobileDrawer(); } },
+    { label: "Duplicate", icon: "copy", cls: "lb", fn: function() { libDuplicate(); closeMobileDrawer(); }, needs: true },
+    { label: "Delete", icon: "trash-2", cls: "lb danger", fn: function() { libDelete(); closeMobileDrawer(); }, needs: true },
   ];
   actions.forEach(function(a) {
+    if (a.needs && !hasProject) return;
     var btn = document.createElement("button");
-    btn.textContent = a.label;
+    btn.className = a.cls + " mobile-drawer-btn";
+    btn.innerHTML = icon(a.icon, "btn-icon") + " " + a.label;
     btn.onclick = a.fn;
-    btn.style.cssText = "width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:14px;font-family:inherit;cursor:pointer;text-align:left;color:var(--charcoal);min-height:unset";
     btnWrap.appendChild(btn);
   });
 
@@ -193,9 +196,53 @@ function closeMobileDrawer() {
   document.body.style.overflow = "";
 }
 
+// Phone layout (matches the 768px breakpoint in styles.css).
+function isPhone() { return !!(window.matchMedia && window.matchMedia("(max-width:768px)").matches); }
+
 function mobileNavGo(tabId) {
+  if (window.ProjectsOverview && ProjectsOverview.isOpen()) ProjectsOverview.close();
   st(tabId);
   closeMobileMoreMenu();
+  window.scrollTo(0, 0);
+}
+
+// Phones: Rundown is its own full screen, opened from the bottom nav.
+function mobileOpenRundown() {
+  closeMobileMoreMenu();
+  if (window.ProjectsOverview && ProjectsOverview.isOpen()) ProjectsOverview.close();
+  if (!sidebarOpen) toggleSidebar();
+  updateMobileNav();
+}
+
+function mobileOpenOverview() {
+  if (isPhone() && sidebarOpen) toggleSidebar();
+  ProjectsOverview.open();
+  updateMobileNav();
+  window.scrollTo(0, 0);
+}
+
+// Bottom nav highlight: Rundown when it's open, else the current tab
+// (tabs that live in the More menu light up More).
+var MOBILE_MORE_TABS = ["project", "talent", "workback", "urls", "portal", "notes"];
+function updateMobileNav() {
+  var sec = document.querySelector(".sec.active");
+  var cur = sec ? sec.id.replace("tab-", "") : "";
+  var rundown = isPhone() && sidebarOpen;
+  var overview = !!(window.ProjectsOverview && ProjectsOverview.isOpen());
+  document.querySelectorAll(".mobile-nav-btn").forEach(function(btn) {
+    var on = rundown ? btn.id === "mobile-nav-rundown"
+      : overview ? false
+      : (btn.dataset.tab === cur || (btn.id === "mobile-nav-more" && MOBILE_MORE_TABS.indexOf(cur) > -1));
+    btn.classList.toggle("active", on);
+  });
+}
+
+// Phone top bar: which project is open (tap it to switch projects).
+function updateMobileTitle() {
+  var el = document.getElementById("mobile-project-name");
+  if (!el) return;
+  var t = ((document.getElementById("project_title") || {}).value || "").trim();
+  el.textContent = t || (currentSheetKey ? "Untitled project" : "No project open");
 }
 
 function toggleMobileMoreMenu() {
@@ -4058,6 +4105,7 @@ function setProjectCloseout(sheetKey, field, value) {
 function toggleSidebar() {
   sidebarOpen = !sidebarOpen;
   document.getElementById("daily-sidebar").classList.toggle("hidden", !sidebarOpen);
+  if (isPhone()) { updateMobileNav(); if (sidebarOpen) window.scrollTo(0, 0); }
   var rundownBtn = document.getElementById("sidebar-rundown-btn");
   if (rundownBtn) rundownBtn.classList.toggle("active", sidebarOpen);
   if (sidebarOpen) { if (dailyTab === "crew") renderSidebarCrew(); else refreshSidebar(); }
@@ -7447,6 +7495,7 @@ function gather() {
 // ── Load form data from a saved object ───────────────────────────────────
 function loadFormData(data) {
   fixProjectTimes(data);
+  setTimeout(updateMobileTitle, 0);
   const s = (id, val) => { const e = document.getElementById(id); if(e && val !== undefined) e.value = val; };
 
   const ptEl = document.getElementById("project_type"); if(ptEl && data.project_type) ptEl.value = data.project_type;
@@ -7571,6 +7620,7 @@ function loadFormData(data) {
 
 // ── Clear form ────────────────────────────────────────────────────────────
 function clearForm() {
+  setTimeout(updateMobileTitle, 0);
   ["project_title","client_company","client_name","billing_code",
    "hospital","breakfast","lunch","sunrise","sunset"
   ].forEach(function(id) { const e = document.getElementById(id); if(e) e.value = ""; });
@@ -8771,3 +8821,14 @@ window.addEventListener("focus", function() { _unloading = false; });
 
 // ── SAMPLE DATA (remove before go-live) ───────────────────────────────────
 
+
+// Phones start with the Rundown closed (it's a full screen there, opened from the bottom nav),
+// and the top bar follows the project title as it's typed.
+(function () {
+  if (isPhone() && sidebarOpen) toggleSidebar();
+  if (isPhone()) st("schedule");  // on set, the day's schedule is the first thing you want
+  var t = document.getElementById("project_title");
+  if (t) t.addEventListener("input", updateMobileTitle);
+  updateMobileNav();
+  updateMobileTitle();
+})();

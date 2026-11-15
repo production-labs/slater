@@ -281,6 +281,7 @@
     var nav = document.getElementById('nav-overview');
     if (nav) nav.classList.remove('active');
     document.querySelectorAll('.app-nav-item[data-tab]').forEach(function (b) { b.classList.remove('po-dim'); });
+    if (window.updateMobileNav) updateMobileNav();  // phones: bottom nav highlights the tab again
   }
 
   // ── render ────────────────────────────────────────────────────────────────

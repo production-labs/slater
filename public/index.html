@@ -61,7 +61,10 @@
     <!-- Top bar (mobile only) -->
     <div class="app-topbar">
       <button class="hamburger-btn" onclick="openMobileDrawer()"><i data-lucide="menu" class="lucide"></i></button>
-      <span class="mobile-brand">SLATER</span>
+      <button type="button" class="mobile-project" onclick="openMobileDrawer()" title="Switch project">
+        <span class="mobile-project-kicker">SLATER</span>
+        <span class="mobile-project-name" id="mobile-project-name">No project open</span>
+      </button>
     </div>
 
     <!-- Content + Rundown side by side -->
@@ -642,16 +645,17 @@
     </div>
     <div style="margin-bottom:12px" id="mobile-lib-select-wrap"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px" id="mobile-lib-buttons"></div>
-    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
-    <button onclick="openMyInfo();closeMobileDrawer()" style="background:none;border:none;text-align:left;font-size:14px;color:var(--film-can);cursor:pointer;padding:8px 0;min-height:unset"><i data-lucide="settings" class="lucide"></i> My Info</button>
+    <hr style="border:none;border-top:1px solid var(--border);margin:8px 0 12px">
+    <div class="mobile-drawer-links">
+      <button onclick="closeMobileDrawer();mobileOpenOverview()"><i data-lucide="layout-dashboard" class="lucide"></i> Overview</button>
+      <button onclick="closeMobileDrawer();openContacts()"><i data-lucide="book-user" class="lucide"></i> Contacts</button>
+      <button onclick="closeMobileDrawer();openAgencyManager()"><i data-lucide="building-2" class="lucide"></i> Organizations</button>
+      <button onclick="closeMobileDrawer();openMyInfo()"><i data-lucide="settings" class="lucide"></i> My Info</button>
+    </div>
   </div>
 </div>
 
 <div id="mobile-bottom-nav">
-  <button class="mobile-nav-btn" data-tab="project" onclick="mobileNavGo('project')">
-    <span class="mobile-nav-icon"><i data-lucide="clapperboard" class="lucide mobile-nav-svg"></i></span>
-    <span class="mobile-nav-label">Project</span>
-  </button>
   <button class="mobile-nav-btn" data-tab="schedule" onclick="mobileNavGo('schedule')">
     <span class="mobile-nav-icon"><i data-lucide="calendar" class="lucide mobile-nav-svg"></i></span>
     <span class="mobile-nav-label">Schedule</span>
@@ -659,6 +663,10 @@
   <button class="mobile-nav-btn" data-tab="crew" onclick="mobileNavGo('crew')">
     <span class="mobile-nav-icon"><i data-lucide="users" class="lucide mobile-nav-svg"></i></span>
     <span class="mobile-nav-label">Crew</span>
+  </button>
+  <button class="mobile-nav-btn" id="mobile-nav-rundown" onclick="mobileOpenRundown()">
+    <span class="mobile-nav-icon"><i data-lucide="clipboard-list" class="lucide mobile-nav-svg"></i></span>
+    <span class="mobile-nav-label">Rundown</span>
   </button>
   <button class="mobile-nav-btn" data-tab="expenses" onclick="mobileNavGo('expenses')">
     <span class="mobile-nav-icon"><i data-lucide="receipt" class="lucide mobile-nav-svg"></i></span>
@@ -671,6 +679,7 @@
 </div>
 
 <div id="mobile-more-menu" style="display:none">
+  <button onclick="mobileNavGo('project')">Project</button>
   <button onclick="mobileNavGo('talent')">Talent</button>
   <button onclick="mobileNavGo('workback')">Workback</button>
   <button onclick="mobileNavGo('urls')">URLs</button>

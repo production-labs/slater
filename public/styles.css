@@ -889,3 +889,34 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .g3p{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .g3p>*{min-width:0}
 @media(max-width:768px){.g3p{grid-template-columns:1fr;gap:0}}
+
+/* Crew / talent / key personnel cards: the role box stretches like a schedule card's title,
+   from the drag handle to just before the status pill. */
+.contact-card-row1>div:first-child{flex:1;min-width:0;margin-right:16px}
+.contact-card-row1 .contact-card-role-input{flex:1;width:auto;min-width:40px}
+/* The Contacts role picker wraps the box (project-people-v2.js .pv2-role-wrap): stretch the wrapper too. */
+.contact-card-row1 .pv2-role-wrap{flex:1;min-width:40px}
+.contact-card-row1 .pv2-role-wrap .contact-card-role-input{width:100%}
+
+/* ── Phones (2026-11-14): Slater as an on-set companion ──────────────────────────────── */
+.mobile-project{display:none}
+@media(max-width:768px){
+  /* The page scrolls (desktop locks html/body and scrolls inside the content column). */
+  html,body{overflow-y:auto;height:auto}
+  /* Top bar stays put and shows which project is open; tap it to switch. */
+  .app-topbar{position:fixed;top:0;left:0;right:0;z-index:160;height:56px;min-height:56px;padding:0 10px}
+  .app-main{padding-top:56px}
+  .mobile-brand{display:none!important}
+  .mobile-project{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;flex:1;min-width:0;background:none;border:none;padding:0;text-align:left;cursor:pointer;min-height:unset;font-family:inherit}
+  .mobile-project-kicker{font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--text-muted)}
+  .mobile-project-name{font-size:15px;font-weight:600;color:var(--text-primary);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* Rundown: a full screen between the top bar and the bottom nav; gone entirely when closed. */
+  #daily-sidebar{position:fixed!important;top:56px;bottom:56px;left:0;right:0;width:100%!important;height:auto!important;z-index:150;border:none!important;box-shadow:none}
+  #daily-sidebar.hidden{display:none!important}
+  #daily-resize{display:none}
+  /* Menu drawer */
+  .mobile-drawer-btn{width:100%;justify-content:flex-start;font-size:14px;min-height:44px}
+  .mobile-drawer-links{display:flex;flex-direction:column;gap:2px}
+  .mobile-drawer-links button{display:flex;align-items:center;gap:10px;background:none;border:none;text-align:left;font-size:15px;color:var(--text-primary);cursor:pointer;padding:12px 4px;min-height:44px;font-family:inherit;border-radius:6px}
+  .mobile-drawer-links button:active{background:var(--surface-2)}
+}
