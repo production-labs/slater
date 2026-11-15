@@ -305,8 +305,9 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Phone rule (2026-11-15): `(max-width:768px), (max-height:500px) and (pointer:coarse)`, so a phone held sideways (844px wide) still gets the phone layout. Every phone @media block, `isPhone()` (`PHONE_MQ` in app.js) and the offline banner (connection.js) use it; keep them in sync. Landscape phones: slimmer top bar and bottom nav.
 - Crew / Talent / Key Personnel card grid (2026-11-15, all screens): `#crew-list,#talent-list,#kp-list` auto-fill grid, cards min ~360px, max 4 columns (adapts to the Rundown opening/closing). Crew, talent and key personnel cards lay out Phone / Email / Status by their own width via container queries (wide one row, medium Phone+Status / Email, narrow stacked).
 - Page scrolls (html/body are overflow:hidden on desktop only); top bar is fixed and shows the open project's name (`updateMobileTitle()`), tap it for the menu.
-- Bottom nav: Schedule, Crew, Rundown, Expenses, More (More = Project, Talent, Workback, URLs, Portal, Notes; More lights up for those). `updateMobileNav()`. Phones open on Schedule.
-- Rundown: a full screen between the top bar and bottom nav (`mobileOpenRundown()`), starts closed, closes when a tab is picked.
+- Bottom nav (John, 2026-11-15): Schedule, Crew, Talent, Expenses, More (More = Project, Workback, URLs, Portal, Notes, Rundown last; More lights up for those, incl. while Rundown is open). `updateMobileNav()`. Phones open on Schedule.
+- Rundown: a full screen between the top bar and bottom nav (`mobileOpenRundown()`, opened from More), starts closed, closes when a tab is picked.
+- Expenses list shows newest on top (display only: the `expenses` array stays oldest-first because receipts are stored by array index).
 - Menu drawer: project picker + New/Save/Duplicate/Delete, then Overview, Contacts, Organizations, My Info.
 - Workback: list only on phones; tapping an item swaps in a full-screen editor with an "All workback items" Back button (`wbMobileShowEditor()`/`wbMobileBack()`).
 - `.desk-only` hides desk-work buttons on phones (crew/workback templates, Workback List/Table switch). `.app-content-col{overflow-x:clip}` stops anything pushing the page sideways.

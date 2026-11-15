@@ -229,16 +229,16 @@ function mobileOpenOverview() {
   window.scrollTo(0, 0);
 }
 
-// Bottom nav highlight: Rundown when it's open, else the current tab
-// (tabs that live in the More menu light up More).
-var MOBILE_MORE_TABS = ["project", "talent", "workback", "urls", "portal", "notes"];
+// Bottom nav highlight: the current tab; tabs that live in the More menu,
+// and Rundown (also in More) when it's open, light up More.
+var MOBILE_MORE_TABS = ["project", "workback", "urls", "portal", "notes"];
 function updateMobileNav() {
   var sec = document.querySelector(".sec.active");
   var cur = sec ? sec.id.replace("tab-", "") : "";
   var rundown = isPhone() && sidebarOpen;
   var overview = !!(window.ProjectsOverview && ProjectsOverview.isOpen());
   document.querySelectorAll(".mobile-nav-btn").forEach(function(btn) {
-    var on = rundown ? btn.id === "mobile-nav-rundown"
+    var on = rundown ? btn.id === "mobile-nav-more"
       : overview ? false
       : (btn.dataset.tab === cur || (btn.id === "mobile-nav-more" && MOBILE_MORE_TABS.indexOf(cur) > -1));
     btn.classList.toggle("active", on);
