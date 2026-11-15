@@ -308,6 +308,9 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Workback: list only on phones; tapping an item swaps in a full-screen editor with an "All workback items" Back button (`wbMobileShowEditor()`/`wbMobileBack()`).
 - `.desk-only` hides desk-work buttons on phones (crew/workback templates, Workback List/Table switch). `.app-content-col{overflow-x:clip}` stops anything pushing the page sideways.
 - Expense card: date + amount on top, full-width description, "📷 Add receipt" button (opens camera/library).
+- Schedule tab on phones (2026-11-15, John's design, `public/schedule-mobile.js`): each day is a read-only summary card (name, day/type/zone; the day schedule if any, else the key times; location, tap = maps). "More details" holds the rest. Edit turns the existing card into a full-screen editor (Done on top, Delete day at the bottom), so all save logic is the desktop code. Kickoff / Due Date: one line + Edit in place. "+ Add day" replaces the "+" dividers. Hooks in app.js: `addScheduleDay` -> `ScheduleMobile.setup`, `refreshDayLocDisplay` / `closeDayStaffModal` -> `render`, `loadFormData` / `clearForm` -> `renderAll`. `initMobileCollapse` is now a no-op.
+- Maps links (`public/maps-link.js`, `SlaterMaps.url()`): Apple Maps on iPhone/iPad, `geo:` (default app) on Android, Google Maps web on computers. Used by the schedule cards and the portal venue link.
+- Phone layout guard: `.app-shell{grid-template-columns:minmax(0,1fr)}` + `min-width:0` on the columns. Without it, iPhone date fields widened the page and the right margin looked tiny (John's 2026-11-15 screenshot).
 - Screenshot tooling used for the survey (not in repo): iPhone 13 emulation via puppeteer `KnownDevices['iPhone 13']`, same read-only session approach as `scripts/ui-snapshot.js`.
 
 ---
