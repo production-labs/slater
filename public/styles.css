@@ -80,7 +80,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .sb{margin-top:12px;padding:10px 14px;border-radius:6px;font-size:13px;display:none}
 .sb.ok{background:#1a3a2a;color:#4CAF77;border:1px solid #2a5a3a}
 .sb.err{background:#3a1a1a;color:var(--accent);border:1px solid #5a2a2a}
-.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:11px 22px;border-radius:8px;font-size:14px;font-weight:500;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s ease;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:11px 22px;border-radius:8px;font-size:14px;font-weight:500;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s ease;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;text-align:center;line-height:1.35;overflow-wrap:anywhere;box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .toast.ok{background:#2d7a3e;color:#fff}
 .toast.err{background:var(--accent);color:#fff}
 .toast.warn{background:#E9DFC8;color:#181818} /* notices, e.g. saved on this device while offline (Session 7) */
