@@ -4513,7 +4513,9 @@ function renderCompleted() {
       openLink.addEventListener("click", (function(sk, iname) {
         return function() { openSheetFromSidebar(sk, iname); };
       })(entry.sheetKey, entry.itemName));
-      metaDiv.textContent = (entry.owner ? entry.owner + " " : "") + (entry.due ? "· due " + entry.due : "");
+      // Pins already show their day on the line above; tasks show "due Wed Aug 19" (not 2026-08-19).
+      var _dueTxt = entry.due && !entry.isPin ? "due " + wbFmtDate(entry.due) : "";
+      metaDiv.textContent = [entry.owner, _dueTxt].filter(Boolean).join(" · ");
       metaDiv.appendChild(document.createTextNode(" "));
       metaDiv.appendChild(openLink);
       bodyDiv.appendChild(nameDiv);
