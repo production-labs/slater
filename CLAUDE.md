@@ -308,6 +308,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Bottom nav (John, 2026-11-15): Schedule, Crew, Talent, Expenses, More (More = Project, Workback, URLs, Portal, Notes, Rundown last; More lights up for those, incl. while Rundown is open). `updateMobileNav()`. Phones open on Schedule.
 - Rundown: a full screen between the top bar and bottom nav (`mobileOpenRundown()`, opened from More), starts closed, closes when a tab is picked.
 - Expenses list shows newest on top (display only: the `expenses` array stays oldest-first because receipts are stored by array index).
+- Receipt cleanup (2026-11-15): receipts are stored by expense position, so every save now also calls `POST /api/receipts/:key/prune {keep}` to remove rows at positions with no photo (before, a deleted expense's photo could show up on the next expense in its spot). Only after that project's photos have loaded (`_receiptsLoaded`), so a failed/slow load can never wipe them. One send per project at a time (`_runReceiptSave`, newer saves collapse into one). Test: `scripts/e2e-receipts-prune.js`
 - Menu drawer: project picker + New/Save/Duplicate/Delete, then Overview, Contacts, Organizations, My Info.
 - Workback: list only on phones; tapping an item swaps in a full-screen editor with an "All workback items" Back button (`wbMobileShowEditor()`/`wbMobileBack()`).
 - `.desk-only` hides desk-work buttons on phones (crew/workback templates, Workback List/Table switch). `.app-content-col{overflow-x:clip}` stops anything pushing the page sideways.

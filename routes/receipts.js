@@ -6,6 +6,29 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
+// Remove receipts left at positions that no longer have one. Receipts are
+// stored by expense position, so after an expense is deleted (or loses its
+// photo) the old row would otherwise show up on whatever expense lands in
+// that spot next. Body: { keep: [indexes that have a receipt now] }.
+// Must stay above '/:projectKey/:index', which would match "prune".
+router.post('/:projectKey/prune', async (req, res) => {
+  const keep = req.body && req.body.keep;
+  if (!Array.isArray(keep) || !keep.every(i => Number.isInteger(i) && i >= 0)) {
+	return res.status(400).json({ error: 'keep must be a list of positions' });
+  }
+  try {
+	const result = await pool.query(
+	  `DELETE FROM receipts
+	   WHERE project_key = $1 AND owner_id = $2 AND NOT (expense_index = ANY($3::int[]))`,
+	  [req.params.projectKey, req.session.userId, keep]
+	);
+	res.json({ success: true, removed: result.rowCount });
+  } catch (err) {
+	console.error(err);
+	res.status(500).json({ error: 'Failed to prune receipts' });
+  }
+});
+
 // Save a receipt
 router.post('/:projectKey/:index', async (req, res) => {
   const { projectKey, index } = req.params;

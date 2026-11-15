@@ -2,6 +2,7 @@
 var _serverSavedAt = {};   // project key -> data.savedAt of the last server copy seen
 var _flushing = {};        // project key -> in-flight flush promise
 var _pendingReceipts = {}; // "<key>_<index>" -> { key, i, img } (memory only: images are big)
+var _pendingReceiptPrune = {}; // project key -> receipt positions to keep (prune failed, retry)
 var _lastSentOk = {};      // project key -> savedAt of the last save THIS tab got onto the server
 var _unloading = false;    // set in beforeunload: the page is going away
 var _formSnap = {};        // project key -> gather() JSON at the last load/save in this tab
@@ -69,6 +70,17 @@ function _noteMine(key, t) {
          method:'POST',
          headers:{'Content-Type':'application/json'},
          body:JSON.stringify({image_data: imageData})
+       });
+       if (!r.ok) return null;
+       return await r.json();
+     } catch(e) { return null; }
+   },
+   async pruneReceipts(projectKey, keep) {
+     try {
+       const r = await fetch(this.base+'/api/receipts/'+projectKey+'/prune', {
+         method:'POST',
+         headers:{'Content-Type':'application/json'},
+         body:JSON.stringify({keep: keep})
        });
        if (!r.ok) return null;
        return await r.json();
@@ -6403,6 +6415,14 @@ function flushAllPendingSaves() {
         if (ok && _pendingReceipts[id] === r) delete _pendingReceipts[id];
       });
     }));
+  }).then(function() {
+    // After the photos, so a retried photo can't bring back a removed slot.
+    return Promise.all(Object.keys(_pendingReceiptPrune).map(function(k) {
+      var keep = _pendingReceiptPrune[k];
+      return API.pruneReceipts(k, keep).then(function(ok) {
+        if (ok && _pendingReceiptPrune[k] === keep) delete _pendingReceiptPrune[k];
+      });
+    }));
   }).then(function() { if (window.SlaterConn) SlaterConn.changed(); });
 }
 if (window.SlaterConn) {
@@ -6793,12 +6813,16 @@ function loadExpenses(items) {
   (items||[]).forEach(function(item) { addExpense(item); });
   // Load receipts from server if we have a project key
   if (currentSheetKey) {
-    API.getReceipts(currentSheetKey).then(function(rows) {
-      if (!rows || !rows.length) return;
+    var key = currentSheetKey, list = expenses;
+    delete _receiptsLoaded[key];
+    API.getReceipts(key).then(function(rows) {
+      if (!rows) return; // couldn't load: saves must not prune (see saveReceipts)
+      if (currentSheetKey !== key || expenses !== list) return; // another project/load since
       rows.forEach(function(row) {
         var id = expenses[row.expense_index];
         if (id) setReceiptThumb(id, row.image_data);
       });
+      _receiptsLoaded[key] = true;
     });
   }
 }
@@ -7744,16 +7768,50 @@ function saveReceipts(projectKey, expenses) {
     if (k && k.startsWith(RECEIPT_PREFIX + projectKey + "_")) toRemove.push(k);
   }
   toRemove.forEach(function(k) { localStorage.removeItem(k); });
-  // Save each receipt to server
-  expenses.forEach(function(e, i) {
-    if (e.receipt) {
-      var id = projectKey + "_" + i, img = e.receipt;
-      API.saveReceipt(projectKey, i, img).then(function(result) {
-        if (result) { if (_pendingReceipts[id] && _pendingReceipts[id].img === img) delete _pendingReceipts[id]; }
-        else { console.warn("Server receipt save failed for index", i, "(kept, will retry)"); _pendingReceipts[id] = { key: projectKey, i: i, img: img }; }
-        if (window.SlaterConn) SlaterConn.changed();
-      });
-    }
+  // Receipts are stored by position, so each save sends every photo and then
+  // removes rows at positions that no longer have one (deleted expense, etc.).
+  // One run per project at a time; saves made meanwhile collapse into the
+  // newest, so a slow upload can't let an older save undo a newer one.
+  // Removing is only safe once this project's photos are on the cards: until
+  // then (still loading, or loading failed) the cards look photo-less.
+  _receiptWant[projectKey] = {
+    imgs: expenses.map(function(e) { return e.receipt || ""; }),
+    prune: !!_receiptsLoaded[projectKey],
+  };
+  if (!_receiptBusy[projectKey]) _runReceiptSave(projectKey);
+}
+
+var _receiptWant = {};   // project key -> { imgs (by position), prune } not yet sent
+var _receiptBusy = {};   // project key -> a send is running
+var _receiptsLoaded = {}; // project key -> its saved receipts are shown on the cards (loadExpenses)
+function _runReceiptSave(projectKey) {
+  var job = _receiptWant[projectKey], want = job.imgs;
+  delete _receiptWant[projectKey];
+  _receiptBusy[projectKey] = true;
+  // Older retries for this project are replaced by this full list (an old
+  // keep-list could otherwise remove a photo added since).
+  Object.keys(_pendingReceipts).forEach(function(id) { if (_pendingReceipts[id].key === projectKey) delete _pendingReceipts[id]; });
+  delete _pendingReceiptPrune[projectKey];
+  var keep = [];
+  var sends = want.map(function(img, i) {
+    if (!img) return null;
+    keep.push(i);
+    var id = projectKey + "_" + i;
+    return API.saveReceipt(projectKey, i, img).then(function(result) {
+      if (result) { if (_pendingReceipts[id] && _pendingReceipts[id].img === img) delete _pendingReceipts[id]; }
+      else { console.warn("Server receipt save failed for index", i, "(kept, will retry)"); _pendingReceipts[id] = { key: projectKey, i: i, img: img }; }
+    });
+  });
+  Promise.all(sends).then(function() {
+    if (!job.prune) return;
+    return API.pruneReceipts(projectKey, keep).then(function(ok) {
+      if (ok) delete _pendingReceiptPrune[projectKey];
+      else _pendingReceiptPrune[projectKey] = keep;
+    });
+  }).then(function() {
+    if (window.SlaterConn) SlaterConn.changed();
+    if (_receiptWant[projectKey]) _runReceiptSave(projectKey);
+    else delete _receiptBusy[projectKey];
   });
 }
 
@@ -8769,6 +8827,7 @@ function logout() {
   clearTimeout(_autosaveTimer);
   currentSheetKey = null;
   _pendingReceipts = {};
+  _pendingReceiptPrune = {};
   if (window.SlaterConn) SlaterConn.allowLeave();
   var keysToRemove = [];
   for (var i = 0; i < localStorage.length; i++) {
