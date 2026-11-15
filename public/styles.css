@@ -594,7 +594,6 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
   #mobile-more-menu button{display:block;width:100%;padding:12px 20px;background:none;border:none;text-align:left;font-size:15px;font-family:'Geist',sans-serif;color:var(--charcoal);cursor:pointer;min-height:unset}
   #mobile-more-menu button:hover{background:var(--surface-2)}
   .sec{padding-bottom:72px!important}
-  .contact-card-row3{grid-template-columns:1fr!important}
 }
 .contact-card-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .contact-card-role-input{background:none;border:none;border-bottom:1px dashed var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);padding:0 0 1px 0;width:120px;outline:none;font-family:inherit}
@@ -1049,11 +1048,8 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
   .ssum-pin .lb{flex-shrink:0;min-height:44px;padding:0 18px}
 }
 
-/* Phone held sideways: crew and talent cards in two columns. */
+/* Phone held sideways: slimmer bars (crew/talent columns come from the grid below). */
 @media (max-height:500px) and (pointer:coarse) and (orientation:landscape){
-  #crew-list,#talent-list{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
-  #crew-list:empty,#talent-list:empty{display:block}
-  #crew-list>.card,#talent-list>.card{margin:0!important;min-width:0}
   /* Short screen: slimmer top bar and bottom nav (icon and label side by side). */
   .app-topbar{height:44px;min-height:44px}
   .app-main{padding-top:44px}
@@ -1062,4 +1058,24 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
   .mobile-nav-btn{flex-direction:row;gap:6px}
   #mobile-more-menu{bottom:44px}
   #daily-sidebar{top:44px;bottom:44px}
+}
+
+/* ── Crew and Talent: a card grid sized by the room available (2026-11-15) ─────────────
+   Cards are at least ~360px wide, at most 4 columns. So: phone upright 1, phone sideways 2,
+   laptop 2 (Rundown open) / 3 (closed), 1920 monitor 3 / 4, wider screens cap at 4. */
+#crew-list,#talent-list{display:grid;gap:12px;align-items:start;
+  grid-template-columns:repeat(auto-fill,minmax(max(min(360px,100%),calc((100% - 36px) / 4)),1fr))}
+#crew-list:empty,#talent-list:empty{display:block}
+#crew-list>.card,#talent-list>.card{margin:0;min-width:0}
+/* Each card lays out Phone / Email / Status by its own width (crew, talent, key personnel):
+   wide = one row; medium = Phone + Status, Email below; narrow = stacked. */
+#crew-list>.card,#talent-list>.card,#kp-list>.card{container-type:inline-size}
+@container (max-width:399px){
+  .contact-card-row3{grid-template-columns:1fr}
+}
+@container (min-width:400px) and (max-width:519px){
+  .contact-card-row3{grid-template-columns:1fr 140px}
+  .contact-card-row3>.fl:nth-child(1){grid-column:1;grid-row:1}
+  .contact-card-row3>.fl:nth-child(2){grid-column:1 / -1;grid-row:2}
+  .contact-card-row3>.fl:nth-child(3){grid-column:2;grid-row:1}
 }
