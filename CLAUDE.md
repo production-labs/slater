@@ -18,7 +18,7 @@ Slater Solo is close to launch-ready. Focus from here:
 1. **Mobile**: done in a simulated iPhone 2026-11-14 (see "Mobile Responsive" under Key Features Built); waiting on John's real-phone test.
 2. **Small tweaks/polish** picked up along the way.
 
-**PICK UP HERE (2026-11-15):** UI audit fixes and the phone build are all live (last code commit 0ad318e). John is reviewing the phone app on his real iPhone one tab at a time. Done: Schedule (redesigned as read-only summary cards + full-screen editor) and Crew (card grid, also applied to Talent and Key Personnel). Next session: ask which tab he wants to review next. Not yet reviewed on his phone: Talent, Workback, URLs, Portal tab, Notes, Expenses (receipt photo), Rundown, Overview, Contacts, the menu, the client portal.
+**PICK UP HERE (2026-11-15, end of 2nd session):** all live (last code commit 61678d8). John is reviewing the phone app on his real iPhone one tab at a time. Approved: Schedule, Crew, Talent, Project, Expenses, URLs, Portal setup, Notes. **Next session: the Workback tab on a phone** (the only tab John wants to discuss next); ask what he saw. Not yet reviewed after that: Rundown (now at the end of More), Overview, Contacts, the menu, the client portal.
 
 Any additional major/structural work goes to **V2.0 — Team Tier** instead of blocking Solo's launch. This doesn't change what's already scoped in V1.0 Remaining (Paddle, workback templates, copyright) or V1.5 (Pause/Cancel) — those stay as-is, just not the active focus right now.
 
@@ -355,7 +355,7 @@ git push
 
 ## Known Issues / In Progress
 
-- Mobile: fixed in a simulated iPhone 2026-11-14 (see Mobile Responsive). Waiting on John's real-phone test.
+- Mobile: John is reviewing on his real iPhone tab by tab (see PICK UP HERE).
 - Cloudflare "Browser Cache TTL" on productionlabs.io: set to "Respect Existing Headers" by John 2026-11-07 (was 4 hours, applied even to 404s, so browsers could mix old and new JS after a deploy). Verified live: JS/CSS are `public, max-age=0`, 404s carry no cache-control. Still true: when checking a deploy, don't poll a brand-new file URL through Cloudflare before the deploy is live (Cloudflare caches the 404); add a cache-busting query string.
 
 ---
