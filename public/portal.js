@@ -456,7 +456,9 @@
         return el('div', { class: 'venue' },
           el('div', { class: 'venue-name' }, v.name),
           (v.address || v.city_line) ? el('div', { class: 'venue-addr' }, v.address, v.address && v.city_line ? el('br') : null, v.city_line) : null,
-          el('a', ext('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q), { class: 'venue-map' }), 'Open in Maps'));
+          // The device's own map app (maps-link.js): Apple Maps on iPhone, the default app on Android.
+          el('a', window.SlaterMaps && !SlaterMaps.opensNewTab() ? { href: SlaterMaps.url(q), class: 'venue-map' }
+            : ext(window.SlaterMaps ? SlaterMaps.url(q) : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q), { class: 'venue-map' }), 'Open in Maps'));
       })));
     }
     return out;

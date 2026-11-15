@@ -268,7 +268,9 @@ document.addEventListener("click", function(e) {
 });
 
 function initMobileCollapse(dayId) {
-  if (window.innerWidth > 768) return;
+  // Phones show a read-only summary per day now (public/schedule-mobile.js); the
+  // old tap-to-collapse would hide the fields inside its Edit view.
+  return;
   var el = document.getElementById(dayId);
   if (!el) return;
   var body = el.querySelector(".sday-body");
@@ -530,6 +532,7 @@ function refreshDayLocDisplay(dayId) {
     var h = parseHospitalText(loc.hospital);
     if (hospEl.textContent !== h) { hospEl.textContent = h; hospEl.style.display = "block"; }
   }
+  if (window.ScheduleMobile) ScheduleMobile.render(dayId);
 }
 
 function doLookup() {
@@ -1651,6 +1654,7 @@ function addScheduleDay(data, insertAfterDayId) {
     if (data.f3_label) { var _rl3 = document.getElementById(dayId+"_f3_lbl"); if (_rl3) _rl3.value = data.f3_label; }
   }
   refreshAllTimeHints();
+  if (window.ScheduleMobile) ScheduleMobile.setup(dayId);
   return dayId;
 }
 
@@ -7528,6 +7532,7 @@ function gather() {
 function loadFormData(data) {
   fixProjectTimes(data);
   setTimeout(updateMobileTitle, 0);
+  setTimeout(function() { if (window.ScheduleMobile) ScheduleMobile.renderAll(); }, 0);
   const s = (id, val) => { const e = document.getElementById(id); if(e && val !== undefined) e.value = val; };
 
   const ptEl = document.getElementById("project_type"); if(ptEl && data.project_type) ptEl.value = data.project_type;
@@ -7653,6 +7658,7 @@ function loadFormData(data) {
 // ── Clear form ────────────────────────────────────────────────────────────
 function clearForm() {
   setTimeout(updateMobileTitle, 0);
+  setTimeout(function() { if (window.ScheduleMobile) ScheduleMobile.renderAll(); }, 0);
   ["project_title","client_company","client_name","billing_code",
    "hospital","breakfast","lunch","sunrise","sunset"
   ].forEach(function(id) { const e = document.getElementById(id); if(e) e.value = ""; });
@@ -8318,6 +8324,7 @@ function openDayStaffModal(dayId) {
 function closeDayStaffModal() {
   document.getElementById('day-staff-modal').style.display = 'none';
   if (_currentDayStaffId) updateDayStaffCounts(_currentDayStaffId);
+  if (_currentDayStaffId && window.ScheduleMobile) ScheduleMobile.render(_currentDayStaffId);
   _currentDayStaffId = null;
 }
 
