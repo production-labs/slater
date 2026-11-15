@@ -316,13 +316,18 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Token expires in 1 hour
 - Reset page at `/reset-password?token=xxx`
 
-### Mobile Responsive
-- Breakpoint: 768px (iPhone 13 target)
-- Hamburger drawer: project management only
-- Bottom nav bar: Project, Schedule, Crew, Expenses, More
-- Schedule cards collapsible on mobile
-- Modals full screen on mobile
-- Built 2026-08-17 but untested; all mobile work is on hold for now
+### Mobile Responsive (phones = on-set companion; decided by John 2026-11-14)
+- Scope: phones are a companion for on-set work (schedule, crew, Rundown, expenses + receipt photos). Heavy editing (workback building, templates) is done on a computer; on phones it only has to not break.
+- Status 2026-11-14: fixed and checked in a simulated iPhone 13 (3 batches, all live: 4fa5968, d053886, cd23c02). WAITING ON John's real-phone test (scroll feel, tap sizes, keyboard covering fields, receipt camera flow). Ask him for results first when mobile comes up.
+- Breakpoint: 768px (iPhone 13 target). `isPhone()` in app.js matches it.
+- Page scrolls (html/body are overflow:hidden on desktop only); top bar is fixed and shows the open project's name (`updateMobileTitle()`), tap it for the menu.
+- Bottom nav: Schedule, Crew, Rundown, Expenses, More (More = Project, Talent, Workback, URLs, Portal, Notes; More lights up for those). `updateMobileNav()`. Phones open on Schedule.
+- Rundown: a full screen between the top bar and bottom nav (`mobileOpenRundown()`), starts closed, closes when a tab is picked.
+- Menu drawer: project picker + New/Save/Duplicate/Delete, then Overview, Contacts, Organizations, My Info.
+- Workback: list only on phones; tapping an item swaps in a full-screen editor with an "All workback items" Back button (`wbMobileShowEditor()`/`wbMobileBack()`).
+- `.desk-only` hides desk-work buttons on phones (crew/workback templates, Workback List/Table switch). `.app-content-col{overflow-x:clip}` stops anything pushing the page sideways.
+- Expense card: date + amount on top, full-width description, "📷 Add receipt" button (opens camera/library).
+- Screenshot tooling used for the survey (not in repo): iPhone 13 emulation via puppeteer `KnownDevices['iPhone 13']`, same read-only session approach as `scripts/ui-snapshot.js`.
 
 ---
 
@@ -359,7 +364,7 @@ git push
 
 ## Known Issues / In Progress
 
-- Mobile bottom nav bar: built 2026-08-17 but untested; all mobile work is on hold for now
+- Mobile: fixed in a simulated iPhone 2026-11-14 (see Mobile Responsive). Waiting on John's real-phone test.
 - (Fixed 2026-11-07: `e2e-portal-notify` failures were stale test data; 15/15.) Cloudflare Browser Cache TTL now "Respect Existing Headers" (2026-11-07).
 
 ---

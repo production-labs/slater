@@ -15,7 +15,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 ## Current Priority (decided 2026-11-12, John): Slater Solo go-to-market
 
 Slater Solo is close to launch-ready. Focus from here:
-1. **Mobile** — test and fix the untested mobile build (hamburger drawer, bottom nav, collapsible schedule cards, full-screen modals; see "Mobile Responsive" under Key Features Built, and "Known Issues / In Progress"). Not started yet as of 2026-11-12.
+1. **Mobile**: done in a simulated iPhone 2026-11-14 (see "Mobile Responsive" under Key Features Built); waiting on John's real-phone test.
 2. **Small tweaks/polish** picked up along the way.
 
 Any additional major/structural work goes to **V2.0 — Team Tier** instead of blocking Solo's launch. This doesn't change what's already scoped in V1.0 Remaining (Paddle, workback templates, copyright) or V1.5 (Pause/Cancel) — those stay as-is, just not the active focus right now.
@@ -297,13 +297,18 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - Token expires in 1 hour
 - Reset page at `/reset-password?token=xxx`
 
-### Mobile Responsive
-- Untested, active priority as of 2026-11-12 ahead of Slater Solo launch (see "Current Priority" near top of this file)
-- Breakpoint: 768px (iPhone 13 target)
-- Hamburger drawer: project management only
-- Bottom nav bar: Project, Schedule, Crew, Expenses, More
-- Schedule cards collapsible on mobile
-- Modals full screen on mobile
+### Mobile Responsive (phones = on-set companion; decided by John 2026-11-14)
+- Scope: phones are a companion for on-set work (schedule, crew, Rundown, expenses + receipt photos). Heavy editing (workback building, templates) is done on a computer; on phones it only has to not break.
+- Status 2026-11-14: fixed and checked in a simulated iPhone 13 (3 batches, all live: 4fa5968, d053886, cd23c02). WAITING ON John's real-phone test (scroll feel, tap sizes, keyboard covering fields, receipt camera flow). Ask him for results first when mobile comes up.
+- Breakpoint: 768px (iPhone 13 target). `isPhone()` in app.js matches it.
+- Page scrolls (html/body are overflow:hidden on desktop only); top bar is fixed and shows the open project's name (`updateMobileTitle()`), tap it for the menu.
+- Bottom nav: Schedule, Crew, Rundown, Expenses, More (More = Project, Talent, Workback, URLs, Portal, Notes; More lights up for those). `updateMobileNav()`. Phones open on Schedule.
+- Rundown: a full screen between the top bar and bottom nav (`mobileOpenRundown()`), starts closed, closes when a tab is picked.
+- Menu drawer: project picker + New/Save/Duplicate/Delete, then Overview, Contacts, Organizations, My Info.
+- Workback: list only on phones; tapping an item swaps in a full-screen editor with an "All workback items" Back button (`wbMobileShowEditor()`/`wbMobileBack()`).
+- `.desk-only` hides desk-work buttons on phones (crew/workback templates, Workback List/Table switch). `.app-content-col{overflow-x:clip}` stops anything pushing the page sideways.
+- Expense card: date + amount on top, full-width description, "📷 Add receipt" button (opens camera/library).
+- Screenshot tooling used for the survey (not in repo): iPhone 13 emulation via puppeteer `KnownDevices['iPhone 13']`, same read-only session approach as `scripts/ui-snapshot.js`.
 
 ---
 
@@ -340,7 +345,7 @@ git push
 
 ## Known Issues / In Progress
 
-- Mobile (bottom nav bar, hamburger drawer, collapsible schedule cards, full-screen modals): built 2026-08-17 but untested. Active priority as of 2026-11-12 ahead of Slater Solo launch (see "Current Priority" above) — no longer on hold.
+- Mobile: fixed in a simulated iPhone 2026-11-14 (see Mobile Responsive). Waiting on John's real-phone test.
 - Cloudflare "Browser Cache TTL" on productionlabs.io: set to "Respect Existing Headers" by John 2026-11-07 (was 4 hours, applied even to 404s, so browsers could mix old and new JS after a deploy). Verified live: JS/CSS are `public, max-age=0`, 404s carry no cache-control. Still true: when checking a deploy, don't poll a brand-new file URL through Cloudflare before the deploy is live (Cloudflare caches the 404); add a cache-busting query string.
 
 ---
