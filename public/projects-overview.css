@@ -136,7 +136,7 @@ button.po-co:hover{filter:brightness(1.25)}
   .po-body,.po-pc.past .po-body{grid-template-columns:1fr 1fr;gap:14px 22px}
   .po-kpis{grid-template-columns:repeat(3,1fr)}
 }
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   #po-root{position:fixed;z-index:60}
   .po-top{padding:14px 14px 0}
   .po-top-row{flex-direction:column;align-items:stretch}
@@ -155,7 +155,7 @@ button.po-co:hover{filter:brightness(1.25)}
 .po-pt-wk{z-index:7;background:var(--surface);padding:0 4px}
 
 /* Phones: timeline names show the project only (no client), every other date label. */
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   .po-pt-client{display:none}
   .po-pt-axis .po-pt-wk:nth-child(even){display:none}
 }

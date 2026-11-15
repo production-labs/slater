@@ -504,7 +504,7 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .exp-receipt-thumb-wrap{position:relative;width:48px;height:48px;flex-shrink:0}
 .exp-receipt-preview-btn{position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,.6);border:none;border-radius:3px;color:#fff;font-size:10px;line-height:1;padding:2px 3px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .exp-receipt-mobile-btns{display:none;flex-direction:column;gap:4px}
-@media(max-width:768px){.exp-receipt-preview-btn{display:none}.exp-receipt-mobile-btns{display:flex}}
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){.exp-receipt-preview-btn{display:none}.exp-receipt-mobile-btns{display:flex}}
 .exp-receipt-placeholder{width:48px;height:48px;border:2px dashed var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--film-can);text-align:center;cursor:pointer;line-height:1.2}
 .exp-reimb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--charcoal)}
 .exp-reimb input[type=checkbox]{accent-color:var(--charcoal)}
@@ -528,7 +528,7 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .day-details-toggle>span:first-child{font-size:11px;font-weight:600;color:var(--film-can);text-transform:uppercase;letter-spacing:.05em;flex:1}
 .day-details-chevron{color:var(--film-can);width:18px;height:18px;transition:transform .2s;flex-shrink:0}
 #mobile-bottom-nav,#mobile-more-menu{display:none}
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   .hdr{display:none!important}
   .lib-bar{flex-direction:row!important;align-items:center!important;padding:8px 12px!important;gap:8px!important;margin-bottom:.75rem!important}
   .lib-bar .select-wrap{display:none!important}
@@ -689,7 +689,7 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 body.sidebar-open{padding-right:0!important;transition:none!important}
 
 /* App shell mobile overrides */
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   .app-shell{grid-template-columns:1fr;height:auto;overflow:visible}
   .app-sidebar{display:none}
   .app-main{height:auto;overflow:visible}
@@ -786,7 +786,7 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .url-wb-row .select-wrap{flex:1;min-width:180px;max-width:100%}
 .url-wb-row select{padding:6px 28px 6px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit;background-color:var(--surface);color:var(--text-primary)}
 .url-wb-row select option{background:var(--surface);color:var(--text-primary)}
-@media (max-width:768px){.portal-admin .pa-link-row{flex-wrap:wrap}}
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){.portal-admin .pa-link-row{flex-wrap:wrap}}
 
 /* Client responses from the portal (V1.5 step 5c, portal-admin.js) */
 .pa-resp{border:1px solid var(--border);border-left:3px solid #3a9a5b;border-radius:8px;padding:9px 11px;margin-top:8px;background:var(--surface);font-size:13px}
@@ -888,7 +888,7 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 /* Project tab top row: Project type / Billing code / Agency (one column on phones). */
 .g3p{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .g3p>*{min-width:0}
-@media(max-width:768px){.g3p{grid-template-columns:1fr;gap:0}}
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){.g3p{grid-template-columns:1fr;gap:0}}
 
 /* Crew / talent / key personnel cards: the role box stretches like a schedule card's title,
    from the drag handle to just before the status pill. */
@@ -900,7 +900,7 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 
 /* ── Phones (2026-11-14): Slater as an on-set companion ──────────────────────────────── */
 .mobile-project{display:none}
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   /* The page scrolls (desktop locks html/body and scrolls inside the content column). */
   html,body{overflow-y:auto;height:auto}
   /* Top bar stays put and shows which project is open; tap it to switch. */
@@ -923,7 +923,7 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 
 /* Phones, batch 2: each screen fits the width. */
 .wb-m-back{display:none}
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   .desk-only{display:none!important}   /* template buttons, Workback List/Table switch: desk work */
   /* Safety net: nothing pushes the page sideways (fixed bars are unaffected by clip). */
   .app-content-col{overflow-x:clip}
@@ -962,7 +962,7 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 #kickoff-block .as:empty,#video-due-block .as:empty{display:none}
 
 /* Phones, batch 3: pop-ups. */
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   /* "Edit cast & crew for this day" fills the screen like the other phone pop-ups. */
   #day-staff-modal>div{width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;border-radius:0!important}
   /* Template windows: each row's buttons wrap under the name instead of running off the edge. */
@@ -974,7 +974,7 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 
 /* ── Phones: Schedule tab as read-only summary cards (public/schedule-mobile.js) ───── */
 .ssum,.ssum-editbar,.ssum-delete,.ssum-pin,.mobile-only{display:none}
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   /* Nothing may widen the page (iPhone date fields have a minimum width, and the
      layout column used to grow to fit them, shrinking the right margin). */
   .app-shell{grid-template-columns:minmax(0,1fr)!important}
@@ -1047,4 +1047,19 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
   .ssum-pin-t{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5B9BD5}
   .ssum-pin-s{font-size:15px;font-weight:600;color:var(--text-primary);margin-top:2px}
   .ssum-pin .lb{flex-shrink:0;min-height:44px;padding:0 18px}
+}
+
+/* Phone held sideways: crew and talent cards in two columns. */
+@media (max-height:500px) and (pointer:coarse) and (orientation:landscape){
+  #crew-list,#talent-list{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+  #crew-list:empty,#talent-list:empty{display:block}
+  #crew-list>.card,#talent-list>.card{margin:0!important;min-width:0}
+  /* Short screen: slimmer top bar and bottom nav (icon and label side by side). */
+  .app-topbar{height:44px;min-height:44px}
+  .app-main{padding-top:44px}
+  .mobile-project-kicker{display:none}
+  #mobile-bottom-nav{height:44px}
+  .mobile-nav-btn{flex-direction:row;gap:6px}
+  #mobile-more-menu{bottom:44px}
+  #daily-sidebar{top:44px;bottom:44px}
 }

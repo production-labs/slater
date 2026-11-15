@@ -99,7 +99,7 @@
 
 .cv2-loading{padding:40px;text-align:center;color:var(--text-muted);font-size:13px}
 
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   #contacts-v2-modal{padding-top:0}
   .cv2-box{width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;border-radius:0!important}
   .cv2-main{grid-template-columns:minmax(0,1fr)}
@@ -140,7 +140,7 @@
 .cv2-waiting{margin:6px 8px 8px;padding:8px 10px;border-radius:6px;background:#F5F0E8;color:#181818;font-size:12px;line-height:1.4;border-left:3px solid #D94B43}
 
 /* Phones: the four tabs fit (tighter padding; scroll sideways if a name is long). */
-@media(max-width:768px){
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
   .cv2-tabs{padding:0 4px;overflow-x:auto;scrollbar-width:none}
   .cv2-tab{padding:9px 10px;white-space:nowrap}
 }

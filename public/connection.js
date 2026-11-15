@@ -226,7 +226,7 @@
       '#conn-bar .conn-msg{flex:1;min-width:200px}' +
       '#conn-bar button{font:inherit;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer}' +
       '#conn-bar .conn-row.bad button{border-color:#fff}' +
-      '@media (max-width:768px){#conn-bar{bottom:calc(56px + 10px + env(safe-area-inset-bottom,0px))}#conn-bar .conn-row{padding:9px 12px;font-size:12px}}';
+      '@media (max-width:768px), (max-height:500px) and (pointer:coarse){#conn-bar{bottom:calc(56px + 10px + env(safe-area-inset-bottom,0px))}#conn-bar .conn-row{padding:9px 12px;font-size:12px}}';
     document.head.appendChild(st);
     bar = document.createElement('div');
     bar.id = 'conn-bar';

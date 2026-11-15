@@ -202,8 +202,10 @@ function closeMobileDrawer() {
   document.body.style.overflow = "";
 }
 
-// Phone layout (matches the 768px breakpoint in styles.css).
-function isPhone() { return !!(window.matchMedia && window.matchMedia("(max-width:768px)").matches); }
+// Phone layout: narrow screens, or a phone held sideways (short + touch). Same rule as
+// every phone @media block in the CSS: (max-width:768px), (max-height:500px) and (pointer:coarse).
+var PHONE_MQ = "(max-width:768px), (max-height:500px) and (pointer:coarse)";
+function isPhone() { return !!(window.matchMedia && window.matchMedia(PHONE_MQ).matches); }
 
 function mobileNavGo(tabId) {
   if (window.ProjectsOverview && ProjectsOverview.isOpen()) ProjectsOverview.close();
