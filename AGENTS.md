@@ -319,7 +319,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 ### Mobile Responsive (phones = on-set companion; decided by John 2026-11-14)
 - Scope: phones are a companion for on-set work (schedule, crew, Rundown, expenses + receipt photos). Heavy editing (workback building, templates) is done on a computer; on phones it only has to not break.
 - Status 2026-11-14: fixed and checked in a simulated iPhone 13 (3 batches, all live: 4fa5968, d053886, cd23c02). WAITING ON John's real-phone test (scroll feel, tap sizes, keyboard covering fields, receipt camera flow). Ask him for results first when mobile comes up.
-- Breakpoint: 768px (iPhone 13 target). `isPhone()` in app.js matches it.
+- Phone rule (2026-11-15): `(max-width:768px), (max-height:500px) and (pointer:coarse)`, so a phone held sideways (844px wide) still gets the phone layout. Every phone @media block, `isPhone()` (`PHONE_MQ` in app.js) and the offline banner (connection.js) use it; keep them in sync. Landscape phones: crew/talent cards in two columns, slimmer top bar and bottom nav.
 - Page scrolls (html/body are overflow:hidden on desktop only); top bar is fixed and shows the open project's name (`updateMobileTitle()`), tap it for the menu.
 - Bottom nav: Schedule, Crew, Rundown, Expenses, More (More = Project, Talent, Workback, URLs, Portal, Notes; More lights up for those). `updateMobileNav()`. Phones open on Schedule.
 - Rundown: a full screen between the top bar and bottom nav (`mobileOpenRundown()`), starts closed, closes when a tab is picked.
