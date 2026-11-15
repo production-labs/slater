@@ -1060,13 +1060,13 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
   #daily-sidebar{top:44px;bottom:44px}
 }
 
-/* ── Crew and Talent: a card grid sized by the room available (2026-11-15) ─────────────
+/* ── Crew, Talent and Key Personnel: a card grid sized by the room available (2026-11-15) ─
    Cards are at least ~360px wide, at most 4 columns. So: phone upright 1, phone sideways 2,
    laptop 2 (Rundown open) / 3 (closed), 1920 monitor 3 / 4, wider screens cap at 4. */
-#crew-list,#talent-list{display:grid;gap:12px;align-items:start;
+#crew-list,#talent-list,#kp-list{display:grid;gap:12px;align-items:start;
   grid-template-columns:repeat(auto-fill,minmax(max(min(360px,100%),calc((100% - 36px) / 4)),1fr))}
-#crew-list:empty,#talent-list:empty{display:block}
-#crew-list>.card,#talent-list>.card{margin:0;min-width:0}
+#crew-list:empty,#talent-list:empty,#kp-list:empty{display:block}
+#crew-list>.card,#talent-list>.card,#kp-list>.card{margin:0;min-width:0}
 /* Each card lays out Phone / Email / Status by its own width (crew, talent, key personnel):
    wide = one row; medium = Phone + Status, Email below; narrow = stacked. */
 #crew-list>.card,#talent-list>.card,#kp-list>.card{container-type:inline-size}
