@@ -153,3 +153,9 @@ button.po-co:hover{filter:brightness(1.25)}
 .po-pt-name-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .po-pt-client{color:var(--text-muted)}
 .po-pt-wk{z-index:7;background:var(--surface);padding:0 4px}
+
+/* Phones: timeline names show the project only (no client), every other date label. */
+@media(max-width:768px){
+  .po-pt-client{display:none}
+  .po-pt-axis .po-pt-wk:nth-child(even){display:none}
+}

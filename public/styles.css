@@ -920,3 +920,39 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
   .mobile-drawer-links button{display:flex;align-items:center;gap:10px;background:none;border:none;text-align:left;font-size:15px;color:var(--text-primary);cursor:pointer;padding:12px 4px;min-height:44px;font-family:inherit;border-radius:6px}
   .mobile-drawer-links button:active{background:var(--surface-2)}
 }
+
+/* Phones, batch 2: each screen fits the width. */
+.wb-m-back{display:none}
+@media(max-width:768px){
+  .desk-only{display:none!important}   /* template buttons, Workback List/Table switch: desk work */
+  /* Safety net: nothing pushes the page sideways (fixed bars are unaffected by clip). */
+  .app-content-col{overflow-x:clip}
+  /* Expenses: date + amount on top, description on its own line; totals in two columns. */
+  .exp-card{padding:12px}
+  .exp-header{flex-wrap:wrap;gap:8px}
+  .exp-header .exp-date{min-width:0;width:auto!important;flex:1 1 0!important}
+  .exp-header .exp-amount{width:110px!important;flex:0 0 auto}
+  .exp-header .exp-vendor{order:3;flex:1 0 100%!important;min-width:0;width:100%}
+  /* Receipt photo: a real button on phones (it opens the camera or photo library). */
+  .exp-receipt{justify-content:space-between;flex-wrap:wrap}
+  .exp-receipt-placeholder{width:auto;height:44px;padding:0 16px;border-style:solid;border-width:1px;font-size:13px;font-weight:500;color:var(--text-primary);gap:6px;flex-direction:row}
+  .exp-receipt-placeholder br{display:none}
+  .exp-totals>div{grid-template-columns:1fr 1fr!important}
+  .exp-totals>div>div:nth-child(3){grid-column:1/-1}
+  /* Schedule day cards: "Edit cast & crew" on its own line, tick boxes below it. */
+  .sday-checkrow{flex-direction:column;align-items:stretch!important;gap:8px;padding:10px 12px!important}
+  .sday-checks{justify-content:flex-start!important;gap:10px 16px!important}
+  /* Notes: long links wrap, images fit. */
+  .note-body{overflow-wrap:anywhere}
+  .note-body img{max-width:100%;height:auto}
+  #note-editor{max-width:100%;overflow-wrap:anywhere}
+  /* Workback: the list fills the screen; tapping an item swaps in the editor (Back returns). */
+  #wb-list-view{flex-direction:column;min-height:0;border:none}
+  .wb-list-panel{width:100%;border:1px solid var(--border);border-radius:8px}
+  .list-body{max-height:none}
+  .wb-edit-panel{display:none}
+  #wb-list-view.wb-editing .wb-list-panel{display:none}
+  #wb-list-view.wb-editing .wb-edit-panel{display:flex;border:1px solid var(--border);border-radius:8px;min-height:0}
+  .wb-m-back{display:inline-flex;align-self:flex-start;margin:10px 12px 0}
+  #wb-timeline{overflow:hidden}
+}

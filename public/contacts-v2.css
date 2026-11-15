@@ -138,3 +138,9 @@
 
 /* Offline save queue (Session 7) */
 .cv2-waiting{margin:6px 8px 8px;padding:8px 10px;border-radius:6px;background:#F5F0E8;color:#181818;font-size:12px;line-height:1.4;border-left:3px solid #D94B43}
+
+/* Phones: the four tabs fit (tighter padding; scroll sideways if a name is long). */
+@media(max-width:768px){
+  .cv2-tabs{padding:0 4px;overflow-x:auto;scrollbar-width:none}
+  .cv2-tab{padding:9px 10px;white-space:nowrap}
+}

@@ -149,7 +149,13 @@ function st(n) {
   if (isPhone() && sidebarOpen) toggleSidebar();  // phones: Rundown is a full screen; a tab replaces it
   updateMobileNav();
   updateMobileTitle();
-  if (n === "workback") refreshWbDaySelector();
+  if (n === "workback") {
+    refreshWbDaySelector();
+    if (isPhone()) {  // the table doesn't fit a phone: always the list there, starting on the list
+      if (_wbView !== "list") wbSetView("list");
+      var _lv = document.getElementById("wb-list-view"); if (_lv) _lv.classList.remove("wb-editing");
+    }
+  }
   if (n === "notes") setTimeout(initNoteEditorPaste, 50);
   if (window.BookingConflicts) BookingConflicts.changed();
   // Autosave on tab switch
@@ -1225,10 +1231,12 @@ function addScheduleDay(data, insertAfterDayId) {
   mainCb.onchange = function() { setMainEvent(dayId, this.checked); };
 
   var checksRight = document.createElement("div");
+  checksRight.className = "sday-checks";
   checksRight.style.cssText = "display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end";
   checksRight.appendChild(mainWrap); checksRight.appendChild(inPersonWrap); checksRight.appendChild(excludeWrap);
 
   var checkRow = document.createElement("div");
+  checkRow.className = "sday-checkrow";
   checkRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:6px 16px;background:var(--border);border-bottom:1px solid var(--border)";
 
   var crewLeft = document.createElement("div");
@@ -3027,6 +3035,7 @@ function wbSelectItem(id) {
       el.classList.toggle("active", el.id === "wb-li-" + id);
     });
     wbRenderEditPanel(id);
+    if (isPhone()) { wbMobileShowEditor(); return; }
     var li = document.getElementById("wb-li-" + id);
     if (li) li.scrollIntoView({block: "nearest", behavior: "smooth"});
   } else {
@@ -3036,6 +3045,27 @@ function wbSelectItem(id) {
     var row = document.getElementById("wb-tr-" + id);
     if (row) { row.scrollIntoView({block: "nearest", behavior: "smooth"}); wbShowToolbar(row); }
   }
+}
+
+// Phones: the list fills the screen; tapping an item swaps it for the editor, with a Back button.
+function wbMobileShowEditor() {
+  var view = document.getElementById("wb-list-view"), panel = document.getElementById("wb-edit-panel");
+  if (!view || !panel) return;
+  view.classList.add("wb-editing");
+  if (!panel.querySelector(".wb-m-back")) {
+    var back = document.createElement("button");
+    back.type = "button"; back.className = "lb wb-m-back";
+    back.innerHTML = icon("chevron-left", "btn-icon") + " All workback items";
+    back.onclick = wbMobileBack;
+    panel.insertBefore(back, panel.firstChild);
+  }
+  window.scrollTo(0, 0);
+}
+function wbMobileBack() {
+  var view = document.getElementById("wb-list-view");
+  if (view) view.classList.remove("wb-editing");
+  var id = _wbSelectedId;
+  setTimeout(function() { var li = id && document.getElementById("wb-li-" + id); if (li) li.scrollIntoView({block: "center"}); }, 0);
 }
 
 function wbRender() {
@@ -6555,7 +6585,7 @@ function addExpense(data) {
     mobileBtns.appendChild(mView); mobileBtns.appendChild(mReplace); receiptWrap.appendChild(mobileBtns);
   } else {
     const ph = document.createElement("div"); ph.className = "exp-receipt-placeholder";
-    ph.innerHTML = "&#128247;<br>Add<br>receipt"; ph.onclick = function() { fileInp.click(); };
+    ph.innerHTML = "&#128247;<br> Add<br> receipt"; /* phones hide the <br>s: "📷 Add receipt" */ ph.onclick = function() { fileInp.click(); };
     thumb.appendChild(ph);
   }
   const receiptHidden = document.createElement("input");

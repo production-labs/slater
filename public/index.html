@@ -213,8 +213,8 @@
             <div class="sh">Crew</div>
             <div class="tab-actions">
               <button class="lb accent" onclick="addCrew()"><i data-lucide="plus" class="lucide btn-icon"></i> Add crew</button>
-              <button class="lb" onclick="saveCrewConfig()"><i data-lucide="save" class="lucide btn-icon"></i> Save as template</button>
-              <button class="lb" onclick="openCrewConfigManager()"><i data-lucide="folder" class="lucide btn-icon"></i> Templates</button>
+              <button class="lb desk-only" onclick="saveCrewConfig()"><i data-lucide="save" class="lucide btn-icon"></i> Save as template</button>
+              <button class="lb desk-only" onclick="openCrewConfigManager()"><i data-lucide="folder" class="lucide btn-icon"></i> Templates</button>
             </div>
           </div>
           <div id="crew-status-bar">
@@ -260,15 +260,15 @@
           <div class="tab-head">
             <div class="sh">Workback</div>
             <div class="tab-actions">
-              <button class="lb" onclick="saveCurrentAsTemplate()"><i data-lucide="save" class="lucide btn-icon"></i> Save as template</button>
-              <button class="lb" onclick="openTemplateManager()"><i data-lucide="folder" class="lucide btn-icon"></i> Templates</button>
+              <button class="lb desk-only" onclick="saveCurrentAsTemplate()"><i data-lucide="save" class="lucide btn-icon"></i> Save as template</button>
+              <button class="lb desk-only" onclick="openTemplateManager()"><i data-lucide="folder" class="lucide btn-icon"></i> Templates</button>
               <button class="lb" id="wb-btn" onclick="generateWorkback()" title="Word document (.docx)"><i data-lucide="download" class="lucide btn-icon"></i> Download workback</button>
             </div>
           </div>
           <!-- Controls row: view, anchor, direction -->
           <div style="display:flex;align-items:flex-end;margin-bottom:.75rem;flex-wrap:wrap;gap:6px">
             <!-- View toggle -->
-            <div class="view-toggle">
+            <div class="view-toggle desk-only">
               <button class="vt-btn" id="wb-vt-list" onclick="wbSetView('list')" title="List + Edit panel">
                 <span class="vt-icon">&#8861;</span> List
               </button>
@@ -365,7 +365,7 @@
               <button class="lb" id="exp-docx-btn" onclick="generateExpenseDoc()" title="Word document (.docx)" style="display:none"><i data-lucide="download" class="lucide btn-icon"></i> Download expense report</button>
             </div>
           </div>
-          <div id="expense-totals" style="margin-bottom:1rem;padding:12px 16px;background:var(--tape);border:1px solid var(--border);border-radius:8px;display:none">
+          <div id="expense-totals" class="exp-totals" style="margin-bottom:1rem;padding:12px 16px;background:var(--tape);border:1px solid var(--border);border-radius:8px;display:none">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
               <div>
                 <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--film-can);margin-bottom:4px">Total Spent</div>
