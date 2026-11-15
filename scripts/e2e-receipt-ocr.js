@@ -146,6 +146,18 @@ async function main() {
     assert(/Couldn't open this image/.test((await note(id)).text));
   });
 
+  await step('newest expense shows on top; saved order and receipt slots unchanged', async () => {
+    const r = await page.evaluate(() => {
+      loadExpenses([{ vendor: 'First' }, { vendor: 'Second', receipt: 'data:image/png;base64,AAAA' }]);
+      addExpense({ vendor: 'Third' });
+      const shown = [...document.querySelectorAll('#expense-list .exp-card')].map(c => c.querySelector('.exp-vendor').value);
+      const saved = getExpenses().map(e => e.vendor + (e.receipt ? '+r' : ''));
+      return { shown, saved };
+    });
+    assert(r.shown.join() === 'Third,Second,First', 'shown ' + r.shown.join());
+    assert(r.saved.join() === 'First,Second+r,Third', 'saved ' + r.saved.join());
+  });
+
   await step('no page errors', async () => {
     const real = consoleErrors.filter(e => !/Failed to load resource/.test(e));
     assert(!real.length, real.join(' | '));

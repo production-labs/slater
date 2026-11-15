@@ -6612,7 +6612,10 @@ function addExpense(data) {
     if (ocrNote.dataset.kind === "warn") setOcrNote(id, "");
   });
 
-  document.getElementById("expense-list").appendChild(card);
+  // Newest on top. Only the screen order: the `expenses` array (saved order,
+  // and the receipt index each photo is stored under) stays oldest-first.
+  const expList = document.getElementById("expense-list");
+  expList.insertBefore(card, expList.firstChild);
   updateExpTotals();
 }
 
