@@ -6603,6 +6603,15 @@ function addExpense(data) {
   bottomRow.appendChild(receiptWrap);
   card.appendChild(bottomRow);
 
+  // Receipt-reading status line ("Reading receipt...", "Couldn't read...").
+  // Not saved; a problem note goes away once the user starts typing.
+  const ocrNote = document.createElement("div");
+  ocrNote.id = id+"_ocr_note"; ocrNote.className = "exp-ocr-note";
+  card.appendChild(ocrNote);
+  card.addEventListener("input", function() {
+    if (ocrNote.dataset.kind === "warn") setOcrNote(id, "");
+  });
+
   document.getElementById("expense-list").appendChild(card);
   updateExpTotals();
 }
@@ -6626,12 +6635,28 @@ function handleReceiptUpload(id, input) {
         // Try OCR
         ocrReceipt(id, compressed);
       };
+      // e.g. a HEIC photo on a browser that can't open it
+      img.onerror = function() {
+        setOcrNote(id, "Couldn't open this image. Try a JPG or PNG, or fill in the details by hand.", "warn");
+      };
       img.src = src;
     } else {
       setReceiptThumb(id, src);
+      setOcrNote(id, "PDF receipts aren't read automatically. Fill in the details by hand.", "warn");
     }
   };
+  reader.onerror = function() {
+    setOcrNote(id, "Couldn't open this file. Try again, or fill in the details by hand.", "warn");
+  };
   reader.readAsDataURL(file);
+}
+
+// kind: "busy" (muted) or "warn" (yellow); empty text hides the line.
+function setOcrNote(id, text, kind) {
+  var el = document.getElementById(id+"_ocr_note");
+  if (!el) return;
+  el.textContent = text || "";
+  el.dataset.kind = text ? (kind || "busy") : "";
 }
 
 // Receipts attached while offline can't be read yet: remembered here (this
@@ -6650,24 +6675,35 @@ function retryPendingOcr() {
 }
 if (window.SlaterConn) SlaterConn.addSource("receipt-reading", { pending: function() { return 0; }, retry: retryPendingOcr });
 
+var OCR_FAILED_MSG = "Couldn't read this receipt. Fill in the details by hand.";
+
 function ocrReceipt(id, imageData) {
-  // Show scanning indicator
-  var vendorEl = document.getElementById(id+"_vendor");
   if (window.SlaterConn && !SlaterConn.online) {
     _pendingOcr[id] = imageData;
-    if (vendorEl) vendorEl.placeholder = "Will read this receipt when you're back online";
+    setOcrNote(id, "Will read this receipt when you're back online.");
     return;
   }
-  if (vendorEl) { vendorEl.placeholder = "Scanning receipt..."; }
+  setOcrNote(id, "Reading receipt...");
 
   fetch('/api/ocr', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({image_data: imageData})
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    // Error pages may not be JSON; treat anything unreadable as a failure.
+    return r.json().catch(function() { return { error: "HTTP " + r.status }; });
+  })
   .then(function(data) {
-    if (data.error) { console.warn("OCR failed:", data.error); return; }
+    if (!data || data.error) {
+      console.warn("OCR failed:", data && data.error);
+      setOcrNote(id, OCR_FAILED_MSG, "warn");
+      return;
+    }
+    if (!data.vendor && !data.date && !data.amount) {
+      setOcrNote(id, "Couldn't find any details on this receipt. Fill them in by hand.", "warn");
+      return;
+    }
     // Auto-populate fields if they are empty
     var vendorEl  = document.getElementById(id+"_vendor");
     var dateEl    = document.getElementById(id+"_date");
@@ -6677,21 +6713,20 @@ function ocrReceipt(id, imageData) {
     if (dateEl    && !dateEl.value    && data.date)      dateEl.value    = data.date;
     if (amountEl  && !amountEl.value  && data.amount)    amountEl.value  = fmtCurrencyVal(data.amount);
     if (catEl     && data.category)                      catEl.value     = data.category;
-    if (vendorEl) vendorEl.placeholder = "Vendor / description";
+    setOcrNote(id, "");
     updateExpTotals();
     // Filled in by code, so no input event fires: save it.
     if (typeof autosaveTrigger === "function") autosaveTrigger();
   })
   .catch(function(err) {
-    var vendorEl = document.getElementById(id+"_vendor");
     // Couldn't reach the server (dropped mid-request): read it when back.
     if (window.SlaterConn && (!SlaterConn.online || SlaterConn.isOfflineError(err))) {
       _pendingOcr[id] = imageData;
-      if (vendorEl) vendorEl.placeholder = "Will read this receipt when you're back online";
+      setOcrNote(id, "Will read this receipt when you're back online.");
       return;
     }
     console.warn("OCR error:", err);
-    if (vendorEl) vendorEl.placeholder = "Vendor / description";
+    setOcrNote(id, OCR_FAILED_MSG, "warn");
   });
 }
 
