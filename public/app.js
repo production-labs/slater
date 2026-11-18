@@ -226,12 +226,14 @@ function mobileNavGo(tabId) {
   window.scrollTo(0, 0);
 }
 
-// Phones: Rundown is its own full screen, opened from the bottom nav.
+// Phones: Rundown is its own full screen, opened from the menu (under Overview:
+// both cover every project, the bottom nav is for the open project only).
 function mobileOpenRundown() {
   closeMobileMoreMenu();
   if (window.ProjectsOverview && ProjectsOverview.isOpen()) ProjectsOverview.close();
   if (!sidebarOpen) toggleSidebar();
   updateMobileNav();
+  window.scrollTo(0, 0);
 }
 
 function mobileOpenOverview() {
@@ -241,8 +243,8 @@ function mobileOpenOverview() {
   window.scrollTo(0, 0);
 }
 
-// Bottom nav highlight: the current tab; tabs that live in the More menu,
-// and Rundown (also in More) when it's open, light up More.
+// Bottom nav highlight: the current tab; tabs that live in the More menu light up More.
+// Rundown and Overview (both in the menu, not the bottom nav) light up nothing.
 var MOBILE_MORE_TABS = ["project", "workback", "urls", "portal", "notes"];
 function updateMobileNav() {
   var sec = document.querySelector(".sec.active");
@@ -250,8 +252,7 @@ function updateMobileNav() {
   var rundown = isPhone() && sidebarOpen;
   var overview = !!(window.ProjectsOverview && ProjectsOverview.isOpen());
   document.querySelectorAll(".mobile-nav-btn").forEach(function(btn) {
-    var on = rundown ? btn.id === "mobile-nav-more"
-      : overview ? false
+    var on = (rundown || overview) ? false
       : (btn.dataset.tab === cur || (btn.id === "mobile-nav-more" && MOBILE_MORE_TABS.indexOf(cur) > -1));
     btn.classList.toggle("active", on);
   });
