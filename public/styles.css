@@ -201,7 +201,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .url-open{padding:6px 14px;background:var(--surface-3);color:var(--text-primary);border:none;border-radius:5px;font-size:12px;font-family:inherit;cursor:pointer;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
 .url-open:hover{background:var(--accent);color:#fff}
 /* URLs grid (2026-11-24): collapsed links tile into a grid; an open one spans the full width */
-#url-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;align-items:start}
+#url-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(max(230px,calc((100% - 16px) / 3)),1fr));gap:8px;align-items:start}
 #url-list:empty::before{grid-column:1/-1}
 #url-list .url-card{margin-bottom:0;min-width:0}
 #url-list .url-card.expanded{grid-column:1/-1}
