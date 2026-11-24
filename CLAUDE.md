@@ -238,6 +238,7 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 - AM/PM always uppercase with a space, however typed (`upperAmPm()` / `fixProjectTimes()` in app.js, applied when a project is opened, cached for Rundown/Overview, and saved; the portal server does the same)
 - Client portal times (2026-11-14): shown in the viewer's own time zone, always with the zone (`clockText()` in `public/portal.js`; the server sends UTC `start`/`end`, rules in `clientTimes()` in `routes/portal.js`). Meetings and sessions: start + end. Shoot / Live Broadcast: Cameras Up / Go Live only. Rehearsal with crew: start + end. Kickoff and Delivery: their time. Setup, Wrap and Travel days and every crew call time: never shown. Zone = the project's, else the producer's My Info default. A time that can't be read ("TBD") shows as typed. Portal passwords: at least 8 characters (same as accounts). Test: `scripts/e2e-portal.js`
 - Collapsible cards with chevron indicator
+- Schedule rows (2026-11-24): time + description inputs are both 38px and top-aligned; the time-zone hint under the time (`.as`) is hidden while empty. Day Details toggle: arrow + label + summary of filled-in times while closed (`updateDayDetailsSummary()`; leaves out Breakfast/Lunch on day types without meals), whole row highlights on hover
 
 ### Crew Tab
 - Booking status: TBD (gray), Pencil (yellow), 1st Hold (orange), Confirmed (green)
