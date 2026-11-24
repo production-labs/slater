@@ -104,8 +104,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .modal p{font-size:14px;color:var(--text-muted);margin-bottom:1.25rem;line-height:1.5}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end}
 
-.sch-entry{display:grid;grid-template-columns:140px 1fr auto auto;gap:8px;align-items:center;margin-bottom:8px}
-.sch-entry input{padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface);width:100%}
+/* Time and description line up (2026-11-24): both inputs are the same height and sit at the top of the row; the
+   time-zone hint under the time takes no room while empty (before, its empty space pushed the time field up). */
+.sch-entry{display:grid;grid-template-columns:140px 1fr auto auto;gap:8px;align-items:start;margin-bottom:8px}
+.sch-entry .as:empty{display:none}
+.sch-entry>.rb{height:38px;display:flex;align-items:center;justify-content:center}
+.sch-entry input{height:38px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text-primary);background:var(--surface);width:100%}
 .sch-entry input:focus{outline:none;border-color:var(--border-strong)}
 
 .drag-handle{cursor:grab;color:var(--film-can);font-size:16px;padding:2px 4px;user-select:none;line-height:1}
@@ -599,6 +603,8 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
   .sday-daylabel-wrap{order:-2}
   .sday-shootdate-wrap{order:-1}
   .sch-entry{display:grid!important;grid-template-columns:1fr auto auto!important;grid-template-rows:auto auto;gap:4px 8px!important;margin-bottom:10px!important;align-items:start!important}
+  .sch-entry input{height:auto}
+  .sch-entry>.rb{height:auto}
   .sch-entry input:first-child{grid-column:1;grid-row:1;font-size:11px!important;color:var(--film-can)!important;padding:4px 8px!important}
   .sch-entry input:nth-child(2){grid-column:1;grid-row:2;font-size:13px!important}
   .sch-entry button:nth-child(3){grid-column:2;grid-row:1/span 2;align-self:center}
