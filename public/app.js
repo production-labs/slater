@@ -3919,12 +3919,13 @@ function addUrl(data) {
   const id = "url_" + (++_uid);
   urlItems.push(id);
   const el = document.createElement("div");
-  el.className = "url-card"; el.id = id;
+  el.className = "url-card" + (data.collapsed ? "" : " expanded"); el.id = id;
   const btnLabel = data.name ? data.name : "Open";
   el.innerHTML =
     '<div class="url-top-row">' +
       '<button class="url-toggle' + (data.collapsed ? '' : ' open') + '" id="' + id + '_toggle" onclick="toggleUrl(\'' + id + '\')" title="Expand/collapse">' + icon('chevron-right') + '</button>' +
       '<button class="url-open" id="' + id + '_btn" onclick="openUrl(\'' + id + '\')" title="Open in new window">&#x1F517; ' + btnLabel + '</button>' +
+      '<button class="url-copy" id="' + id + '_copy" onclick="copyUrl(\'' + id + '\')" title="Copy link">' + icon('copy') + '</button>' +
       '<button class="rb" onclick="removeUrl(\'' + id + '\')">&#x2715;</button>' +
     '</div>' +
     '<div class="url-fields' + (data.collapsed ? ' collapsed' : '') + '" id="' + id + '_fields">' +
@@ -3979,6 +3980,38 @@ function toggleUrl(id) {
   if (!fields || !toggle) return;
   const collapsed = fields.classList.toggle("collapsed");
   toggle.classList.toggle("open", !collapsed);
+  const card = document.getElementById(id);
+  if (card) card.classList.toggle("expanded", !collapsed);
+}
+
+// Copy a link's URL (2026-11-24). Same https:// fix-up as openUrl().
+function urlHref(id) {
+  const url = ((document.getElementById(id+"_url")||{}).value||"").trim();
+  if (!url) return "";
+  return url.startsWith("http") ? url : "https://" + url;
+}
+function copyUrl(id) {
+  const href = urlHref(id);
+  if (!href) { setStatus("This link has no URL yet.", "err"); return; }
+  const btn = document.getElementById(id+"_copy");
+  const done = function() {
+    setStatus("Link copied.", "ok");
+    if (btn) {
+      btn.innerHTML = icon('check'); btn.classList.add("copied");
+      clearTimeout(btn._t);
+      btn._t = setTimeout(function() { btn.innerHTML = icon('copy'); btn.classList.remove("copied"); }, 1500);
+    }
+  };
+  const fallback = function() {
+    const ta = document.createElement("textarea");
+    ta.value = href; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+    if (ok) done(); else setStatus("Couldn't copy. Open the link and copy it from there.", "err");
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(href).then(done, fallback);
+  else fallback();
 }
 
 function updateUrlBtn(id) {
@@ -3997,9 +4030,8 @@ function removeUrl(id) {
 }
 
 function openUrl(id) {
-  const url = (document.getElementById(id+"_url")||{}).value||"";
-  if (!url.trim()) return;
-  const href = url.trim().startsWith("http") ? url.trim() : "https://" + url.trim();
+  const href = urlHref(id);
+  if (!href) return;
   const a = document.createElement("a");
   a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
