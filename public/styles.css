@@ -201,11 +201,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .url-open{padding:6px 14px;background:var(--surface-3);color:var(--text-primary);border:none;border-radius:5px;font-size:12px;font-family:inherit;cursor:pointer;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
 .url-open:hover{background:var(--accent);color:#fff}
 /* URLs grid (2026-11-24): collapsed links tile into a grid; an open one spans the full width */
-#url-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(max(230px,calc((100% - 16px) / 3)),1fr));gap:8px;align-items:start}
-#url-list:empty::before{grid-column:1/-1}
-#url-list .url-card{margin-bottom:0;min-width:0}
-#url-list .url-card.expanded{grid-column:1/-1}
-#url-list .url-open{max-width:none}
+/* The portal card and the links share one grid: both wrappers are display:contents so their cards are the grid's tiles */
+.url-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(max(230px,calc((100% - 16px) / 3)),1fr));gap:8px;align-items:start}
+.url-grid>#url-portal-card,.url-grid>#url-list{display:contents}
+#url-list:empty::before{grid-column:1/-1;margin-bottom:0}
+.url-grid .url-card{margin-bottom:0;min-width:0}
+.url-grid .url-card.expanded{grid-column:1/-1}
+.url-grid .url-open{max-width:none}
+.url-grid .url-card-portal .url-top-row .url-open{flex:1}
+.url-grid .url-card-portal .url-portal-tag{margin-left:0}
 .url-copy{background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;line-height:0;border-radius:4px;flex-shrink:0}
 .url-copy:hover{color:var(--text-primary);background:var(--surface-3)}
 .url-copy.copied{color:#4CAF50}

@@ -3993,9 +3993,12 @@ function urlHref(id) {
 function copyUrl(id) {
   const href = urlHref(id);
   if (!href) { setStatus("This link has no URL yet.", "err"); return; }
-  const btn = document.getElementById(id+"_copy");
+  copyLinkText(href, document.getElementById(id+"_copy"), "Link copied.");
+}
+// Copy text; btn (optional) flashes a green check. Shared with the portal card (portal-admin.js).
+function copyLinkText(text, btn, msg) {
   const done = function() {
-    setStatus("Link copied.", "ok");
+    setStatus(msg || "Link copied.", "ok");
     if (btn) {
       btn.innerHTML = icon('check'); btn.classList.add("copied");
       clearTimeout(btn._t);
@@ -4004,13 +4007,13 @@ function copyUrl(id) {
   };
   const fallback = function() {
     const ta = document.createElement("textarea");
-    ta.value = href; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
     let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
     document.body.removeChild(ta);
     if (ok) done(); else setStatus("Couldn't copy. Open the link and copy it from there.", "err");
   };
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(href).then(done, fallback);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
   else fallback();
 }
 

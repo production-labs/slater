@@ -457,16 +457,23 @@
   // Same look as a URL card (app.js addUrl), but not one of data.urls: it's
   // drawn from the portal status, can't be edited or removed here, and is
   // gone while the portal is off. The Portal tab is where it's managed.
-  var urlCardOpen = true;
+  // Open/closed is remembered per project on this device (2026-11-24); it
+  // isn't one of data.urls, so it can't ride along with the project save.
+  function urlCardKey() { return 'slater_portal_card_open_' + key(); }
+  function urlCardIsOpen() {
+    try { return localStorage.getItem(urlCardKey()) !== '0'; } catch (e) { return true; }
+  }
   function renderUrlCard() {
     var box = document.getElementById('url-portal-card');
     if (!box) return;
     if (!key() || !state || forKey !== key() || state.error || !state.enabled || !state.token) { box.innerHTML = ''; return; }
+    var urlCardOpen = urlCardIsOpen();
     box.innerHTML =
-      '<div class="url-card url-card-portal">' +
+      '<div class="url-card url-card-portal' + (urlCardOpen ? ' expanded' : '') + '">' +
         '<div class="url-top-row">' +
           '<button class="url-toggle' + (urlCardOpen ? ' open' : '') + '" data-pu="toggle" title="Expand/collapse">' + (typeof icon === 'function' ? icon('chevron-right') : '&rsaquo;') + '</button>' +
           '<button class="url-open" data-pu="open" title="Open in new window">&#x1F517; Client portal</button>' +
+          '<button class="url-copy" data-pu="copy" title="Copy link">' + (typeof icon === 'function' ? icon('copy') : 'Copy') + '</button>' +
           '<span class="url-portal-tag">Portal</span>' +
         '</div>' +
         '<div class="url-fields' + (urlCardOpen ? '' : ' collapsed') + '">' +
@@ -483,17 +490,15 @@
     var b = e.target.closest('[data-pu]');
     if (!b) return;
     var a = b.getAttribute('data-pu');
-    if (a === 'toggle') { urlCardOpen = !urlCardOpen; renderUrlCard(); }
+    if (a === 'toggle') { try { localStorage.setItem(urlCardKey(), urlCardIsOpen() ? '0' : '1'); } catch (err) {} renderUrlCard(); }
     else if (a === 'open') window.open(link(), '_blank', 'noopener,noreferrer');
     else if (a === 'settings') st('portal');
     else if (a === 'field') b.select();
     else if (a === 'copy') {
       var url = link();
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(function () { toast('Portal link copied.', 'ok'); }, function () {
-          var f = document.querySelector('#url-portal-card [data-pu="field"]'); if (f) { f.focus(); f.select(); } toast('Press Cmd+C to copy the link.', 'ok');
-        });
-      }
+      var btn = b.classList.contains('url-copy') ? b : null;
+      if (typeof copyLinkText === 'function') copyLinkText(url, btn, 'Portal link copied.');
+      else if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { toast('Portal link copied.', 'ok'); });
     }
   });
   function renderPanel() {
