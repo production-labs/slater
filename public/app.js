@@ -259,9 +259,11 @@ function updateMobileNav() {
 }
 
 // Phone top bar: which project is open (tap it to switch projects).
+// While the Projects Overview is open it says so instead (2026-11-24).
 function updateMobileTitle() {
   var el = document.getElementById("mobile-project-name");
   if (!el) return;
+  if (window.ProjectsOverview && ProjectsOverview.isOpen()) { el.textContent = "Projects Overview"; return; }
   var t = ((document.getElementById("project_title") || {}).value || "").trim();
   el.textContent = t || (currentSheetKey ? "Untitled project" : "No project open");
 }

@@ -137,11 +137,15 @@ button.po-co:hover{filter:brightness(1.25)}
   .po-kpis{grid-template-columns:repeat(3,1fr)}
 }
 @media (max-width:768px), (max-height:500px) and (pointer:coarse){
-  #po-root{position:fixed;z-index:60}
-  .po-top{padding:14px 14px 0}
+  /* Between the fixed top bar and bottom nav (same as the Rundown), so nothing tucks under them (2026-11-24).
+     The top bar says "Projects Overview" here (updateMobileTitle), so the big title is hidden; the date stays. */
+  #po-root{position:fixed;z-index:60;top:56px;bottom:56px}
+  .po-h1{display:none}
+  .po-h1-sub{margin-top:0}
+  .po-top{padding:12px 14px 0}
   .po-top-row{flex-direction:column;align-items:stretch}
   .po-search{width:auto;flex:1}
-  .po-scroll{padding:14px 14px 90px}
+  .po-scroll{padding:14px 14px 24px}
   .po-body,.po-pc.past .po-body{grid-template-columns:1fr}
   .po-kpis,.po-kpis.po-kpis-4{grid-template-columns:1fr 1fr}
   .po-money{text-align:left}
@@ -158,4 +162,8 @@ button.po-co:hover{filter:brightness(1.25)}
 @media (max-width:768px), (max-height:500px) and (pointer:coarse){
   .po-pt-client{display:none}
   .po-pt-axis .po-pt-wk:nth-child(even){display:none}
+}
+/* Phone sideways: slimmer top bar and bottom nav (styles.css) */
+@media (max-height:500px) and (pointer:coarse) and (orientation:landscape){
+  #po-root{top:44px;bottom:44px}
 }

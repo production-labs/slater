@@ -272,6 +272,7 @@
     if (nav) nav.classList.add('active');
     document.querySelectorAll('.app-nav-item[data-tab]').forEach(function (b) { b.classList.add('po-dim'); });
     render();
+    if (window.updateMobileTitle) updateMobileTitle();
   }
 
   function close() {
@@ -282,6 +283,7 @@
     if (nav) nav.classList.remove('active');
     document.querySelectorAll('.app-nav-item[data-tab]').forEach(function (b) { b.classList.remove('po-dim'); });
     if (window.updateMobileNav) updateMobileNav();  // phones: bottom nav highlights the tab again
+    if (window.updateMobileTitle) updateMobileTitle();  // phones: top bar shows the project again
   }
 
   // ── render ────────────────────────────────────────────────────────────────
