@@ -307,6 +307,8 @@
     render: render,
     agencyInfo: agencyInfo,
     clientOrg: clientOrg,
+    // Client name picker (project-people-v2.js): fill an empty Company from the picked person's organization.
+    linkClient: function (o) { if (o && !o.archived_at) link(o); },
     onProjectLoaded: function () {
       pendingDefault = false;
       matchLegacy();

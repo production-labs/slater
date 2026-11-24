@@ -357,7 +357,8 @@
       list.innerHTML = '';
       if (!store.loaded) { close(list, st); return; }
       var k = key(roleEl.value);
-      var avail = active('roles');
+      // Client roles aren't crew / key personnel positions (2026-11-24).
+      var avail = active('roles').filter(function (r) { return r.category !== 'client'; });
       if (k) avail = avail.filter(function (r) {
         return key(r.name).indexOf(k) !== -1 || key(r.abbreviation).indexOf(k) !== -1 || key(r.department).indexOf(k) !== -1;
       });
@@ -503,8 +504,94 @@
       .sort(function (a, b) { return a.name.localeCompare(b.name); });
   }
 
+  // ------------------------------------------------------------ client name
+  // Project tab "Client name" (2026-11-24, John): picks from Contacts like the
+  // crew / talent / key personnel name fields. People at the project's client
+  // company come first, then people with a Client-category role. Picking fills
+  // the name (and an empty Company from their organization). The project still
+  // only saves the text (data.client_name); there is no contact link here.
+  function clientOrgId() { return (typeof _orgLinks !== 'undefined' && _orgLinks.client_org_id) || null; }
+  function isClientPerson(c) { return contactRoles(c).some(function (r) { return r.category === 'client'; }); }
+  function clientRole() {
+    return active('roles').filter(function (r) { return r.category === 'client' && r.is_global && key(r.name) === 'client'; })[0] || null;
+  }
+  function attachClientName() {
+    var input = el('client_name');
+    if (!input || input._pv2) return;
+    input._pv2 = true;
+    input.placeholder = 'Pick or type a name';
+    var list = makeList(input), st = { idx: -1 };
+
+    function rank(c, orgId) { return orgId && c.organization_id === orgId ? 0 : isClientPerson(c) ? 1 : 2; }
+    function matches(q) {
+      var k = key(q), orgId = clientOrgId();
+      var pool = active('contacts');
+      var hits = k
+        ? pool.filter(function (c) { return key(c.name).indexOf(k) !== -1 || key(c.sort_last_name).indexOf(k) === 0; })
+        : pool.filter(function (c) { return rank(c, orgId) < 2; });
+      hits.sort(function (a, b) {
+        var ra = rank(a, orgId), rb = rank(b, orgId);
+        if (ra !== rb) return ra - rb;
+        var sa = key(a.name).indexOf(k) === 0 ? 0 : 1, sb = key(b.name).indexOf(k) === 0 ? 0 : 1;
+        if (k && sa !== sb) return sa - sb;
+        return key(a.name) < key(b.name) ? -1 : key(a.name) > key(b.name) ? 1 : 0;
+      });
+      return hits.slice(0, k ? 8 : 20);
+    }
+    function orgText(c) { var o = c.organization_id ? store.organizations[c.organization_id] : null; return o ? o.name : ''; }
+    function render() {
+      list.innerHTML = '';
+      if (!store.loaded) { close(list, st); return; }
+      var q = input.value, k = key(q);
+      var ms = matches(q);
+      if (!k && ms.length) {
+        var h = document.createElement('div'); h.className = 'pv2-group';
+        var o = store.organizations[clientOrgId()];
+        h.textContent = o ? 'People at ' + o.name + ' and clients' : 'Clients';
+        list.appendChild(h);
+      }
+      ms.forEach(function (c) {
+        var roles = contactRoles(c).map(roleText).join(', ');
+        item(list, '<strong>' + esc(c.name) + '</strong><span>' + esc([roles, orgText(c), c.email].filter(Boolean).join(' \u00b7 ')) + '</span>', '', function () { pick(c); });
+      });
+      if (k && !active('contacts').some(function (c) { return key(c.name) === k; })) {
+        item(list, '<strong>+ Add "' + esc(q.trim()) + '" to contacts as a client</strong>', 'po2-add', addTyped);
+      }
+      show(list, st);
+    }
+    function pick(c) {
+      close(list, st);
+      input.value = c.name;
+      var company = el('client_company');
+      var o = c.organization_id ? store.organizations[c.organization_id] : null;
+      if (o && company && !company.value.trim() && window.ProjectOrgsV2 && ProjectOrgsV2.linkClient) ProjectOrgsV2.linkClient(o);
+      saved();
+    }
+    function addTyped() {
+      close(list, st);
+      var name = input.value.trim();
+      if (!name) return;
+      var existing = contactByName(name);
+      if (existing) { pick(existing); return; }
+      var fields = { name: name };
+      var r = clientRole();
+      if (r) fields.role_ids = [r.id];
+      if (clientOrgId()) fields.organization_id = clientOrgId();
+      CV2.createContact(fields).then(function (row) {
+        saved();
+        status('Added "' + row.name + '" to contacts.');
+      }, function (e) { status('Could not add contact: ' + e.message, 'err'); });
+    }
+    input.addEventListener('input', render);
+    input.addEventListener('focus', render);
+    input.addEventListener('click', function () { if (!list.classList.contains('open')) render(); });
+    input.addEventListener('blur', function () { close(list, st); });
+    keyNav(input, list, st);
+  }
+
   // ------------------------------------------------------------------ render
   function render() {
+    attachClientName();
     if (pendingLegacy) linkLegacy();
     cardIds().forEach(function (id) { attach(id); renderCard(id); });
     if (typeof refreshDayLocDisplay === 'function') dayIds().forEach(refreshDayLocDisplay);

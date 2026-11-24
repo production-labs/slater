@@ -280,7 +280,8 @@
   }
 
   // ---------------------------------------------------------------- roles
-  var CAT_LABEL = { staff: 'Staff', crew: 'Crew', talent: 'Talent' };
+  var CAT_LABEL = { staff: 'Staff', crew: 'Crew', talent: 'Talent', client: 'Client' };
+  var CATS = ['staff', 'crew', 'talent', 'client'];
   function role(id) { return store.roles[id] || null; }
   function roleLabel(r) { return r ? (r.abbreviation || r.name) : 'Archived role'; }
   function contactCategories(c) {
@@ -289,7 +290,7 @@
     return Object.keys(cats);
   }
   function roleGroups(list) {
-    // Staff, then crew by department (in seed order), then talent.
+    // Staff, then crew by department (in seed order), then talent, then client.
     var groups = {};
     list.forEach(function (r) {
       var key = r.category === 'crew' ? 'crew|' + (r.department || 'Other') : r.category;
@@ -298,7 +299,7 @@
     var order = Object.keys(groups).sort(function (a, b) {
       function rank(k) {
         var cat = k.split('|')[0];
-        var base = cat === 'staff' ? 0 : cat === 'crew' ? 1 : 2;
+        var base = cat === 'staff' ? 0 : cat === 'crew' ? 1 : cat === 'talent' ? 2 : 3;
         var minSort = Math.min.apply(null, groups[k].map(function (r) { return r.is_global ? r.sort_order : 99999; }));
         return base * 1e6 + minSort;
       }
@@ -475,7 +476,7 @@
       '<button class="lb primary cv2-small" data-act="new" title="Add">+ New</button></div>';
     if (ui.tab === 'people') {
       var all = rows('contacts');
-      var counts = { all: all.length, staff: 0, crew: 0, talent: 0, none: 0 };
+      var counts = { all: all.length, staff: 0, crew: 0, talent: 0, client: 0, none: 0 };
       var states = {};
       all.forEach(function (c) {
         var cats = contactCategories(c);
@@ -483,7 +484,7 @@
         cats.forEach(function (k) { counts[k]++; });
         if (c.state) states[c.state.toUpperCase()] = 1;
       });
-      html += '<div class="cv2-chips">' + [['all', 'All'], ['staff', 'Staff'], ['crew', 'Crew'], ['talent', 'Talent'], ['none', 'Uncategorized']].map(function (p) {
+      html += '<div class="cv2-chips">' + [['all', 'All'], ['staff', 'Staff'], ['crew', 'Crew'], ['talent', 'Talent'], ['client', 'Client'], ['none', 'Uncategorized']].map(function (p) {
         return '<button class="cv2-chip' + (ui.cat === p[0] ? ' active' : '') + '" data-act="cat" data-cat="' + p[0] + '">' + p[1] + ' ' + counts[p[0]] + '</button>';
       }).join('') + '</div>';
       var stateOpts = Object.keys(states).sort();
@@ -492,9 +493,9 @@
         '</select></div>' + archToggle() + '</div>';
     } else if (ui.tab === 'roles') {
       var rl = rows('roles');
-      var rc = { all: rl.length, mine: 0, staff: 0, crew: 0, talent: 0 };
+      var rc = { all: rl.length, mine: 0, staff: 0, crew: 0, talent: 0, client: 0 };
       rl.forEach(function (r) { rc[r.category]++; if (!r.is_global) rc.mine++; });
-      html += '<div class="cv2-chips">' + [['all', 'All'], ['mine', 'Your roles'], ['staff', 'Staff'], ['crew', 'Crew'], ['talent', 'Talent']].map(function (p) {
+      html += '<div class="cv2-chips">' + [['all', 'All'], ['mine', 'Your roles'], ['staff', 'Staff'], ['crew', 'Crew'], ['talent', 'Talent'], ['client', 'Client']].map(function (p) {
         return '<button class="cv2-chip' + (ui.cat === p[0] ? ' active' : '') + '" data-act="cat" data-cat="' + p[0] + '">' + p[1] + ' ' + rc[p[0]] + '</button>';
       }).join('') + '</div>';
       html += '<div class="cv2-filterrow" style="justify-content:flex-end">' + archToggle('Show deleted') + '</div>';
@@ -532,7 +533,7 @@
       list = list.filter(function (r) {
         if (r.archived_at && r.is_global) return false; // retired built-ins never listed
         if (ui.cat === 'mine' && r.is_global) return false;
-        if (['staff', 'crew', 'talent'].indexOf(ui.cat) !== -1 && r.category !== ui.cat) return false;
+        if (CATS.indexOf(ui.cat) !== -1 && r.category !== ui.cat) return false;
         return !q || [r.name, r.abbreviation, r.department].join(' ').toLowerCase().indexOf(q) !== -1;
       });
     } else {
@@ -873,7 +874,7 @@
   }
 
   function roleForm(r, isNew) {
-    var cat = isNew ? (['staff', 'crew', 'talent'].indexOf(ui.cat) !== -1 ? ui.cat : 'crew') : r.category;
+    var cat = isNew ? (CATS.indexOf(ui.cat) !== -1 ? ui.cat : 'crew') : r.category;
     document.getElementById('cv2-dept-list').innerHTML = crewDepartments().map(function (d) { return '<option value="' + esc(d) + '">'; }).join('');
     var users = isNew ? [] : roleUsers(r.id);
     return '' +
@@ -883,7 +884,7 @@
         fieldHtml('Abbreviation', 'abbreviation', r.abbreviation, { placeholder: 'Optional, e.g. DP' }) +
       '</div>' +
       '<div class="cv2-grid2">' +
-        fieldHtml('Category', 'category', cat, { type: 'select', options: [['staff', 'Staff'], ['crew', 'Crew'], ['talent', 'Talent']] }) +
+        fieldHtml('Category', 'category', cat, { type: 'select', options: CATS.map(function (k) { return [k, CAT_LABEL[k]]; }) }) +
         '<div id="cv2-dept-wrap"' + (cat === 'crew' ? '' : ' style="display:none"') + '>' +
           fieldHtml('Department', 'department', r.department, { list: 'cv2-dept-list', placeholder: 'Optional, e.g. Camera' }) + '</div>' +
       '</div>' +
@@ -1017,7 +1018,7 @@
 
   function showNewRoleForm(name) {
     closePicker();
-    var guessCat = ['staff', 'crew', 'talent'].indexOf(ui.cat) !== -1 ? ui.cat : 'crew';
+    var guessCat = CATS.indexOf(ui.cat) !== -1 ? ui.cat : 'crew';
     document.getElementById('cv2-dept-list').innerHTML = crewDepartments().map(function (d) { return '<option value="' + esc(d) + '">'; }).join('');
     document.getElementById('cv2-newrole').innerHTML =
       '<div class="cv2-newrole"><div style="font-size:12px;font-weight:600">New custom role</div>' +
@@ -1025,7 +1026,7 @@
           '<div class="fl"><label>Role name</label><input id="cv2-nr-name" value="' + esc(name) + '" autocomplete="off"></div>' +
           '<div class="fl"><label>Abbreviation</label><input id="cv2-nr-abbr" placeholder="Optional" autocomplete="off"></div>' +
           '<div class="fl"><label>Category</label><div class="select-wrap"><select id="cv2-nr-cat">' +
-            ['staff', 'crew', 'talent'].map(function (c) { return '<option value="' + c + '"' + (c === guessCat ? ' selected' : '') + '>' + CAT_LABEL[c] + '</option>'; }).join('') +
+            CATS.map(function (c) { return '<option value="' + c + '"' + (c === guessCat ? ' selected' : '') + '>' + CAT_LABEL[c] + '</option>'; }).join('') +
           '</select></div></div>' +
           '<div class="fl" id="cv2-nr-dept-wrap"' + (guessCat === 'crew' ? '' : ' style="display:none"') + '><label>Department</label><input id="cv2-nr-dept" list="cv2-dept-list" placeholder="Optional, e.g. Camera" autocomplete="off"></div>' +
         '</div>' +

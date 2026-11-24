@@ -1,5 +1,5 @@
 // Built-in global roles (roles.owner_id = NULL). List revised by John 2026-10-03;
-// ASL Interpreter added 2026-10-10 (81 roles: 14 staff / 56 crew / 11 talent).
+// ASL Interpreter added 2026-10-10; client roles 2026-11-24 (84 roles: 14 staff / 56 crew / 11 talent / 3 client).
 // Source of truth for the seed. Re-running the migration updates existing
 // global roles to match this list (matched by lowercased name), inserts
 // missing ones, and ARCHIVES global roles that are no longer on the list
@@ -115,6 +115,13 @@ const TALENT = [
   ['Background / Extra', null],
 ];
 
+// Client roles added 2026-11-24 (John): people on the client side.
+const CLIENT = [
+  ['Client', null],
+  ['Stakeholder', null],
+  ['Approver', null],
+];
+
 // Built-in roles renamed in place: old name -> new name. The seed renames the
 // existing row (same id) BEFORE matching by name, so contacts and projects
 // that already use the role keep it. Without this, a renamed entry would be
@@ -134,6 +141,8 @@ function build() {
       out.push({ name, abbreviation, category: 'crew', department, sort_order: base + 10 * (i + 1) })));
   TALENT.forEach(([name, abbreviation], i) =>
     out.push({ name, abbreviation, category: 'talent', department: null, sort_order: 2000 + 10 * (i + 1) }));
+  CLIENT.forEach(([name, abbreviation], i) =>
+    out.push({ name, abbreviation, category: 'client', department: null, sort_order: 3000 + 10 * (i + 1) }));
   return out;
 }
 

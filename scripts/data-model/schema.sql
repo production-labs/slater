@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS roles (
   name          TEXT NOT NULL,                  -- "Director of Photography"
   abbreviation  TEXT,                           -- "DP", optional (answer #3)
   category      TEXT NOT NULL
-                  CHECK (category IN ('staff', 'crew', 'talent')),
+                  CHECK (category IN ('staff', 'crew', 'talent', 'client')),
   department    TEXT,                           -- picker grouping, mainly crew: "Camera",
                                                 -- "Audio", "Live and Broadcast", ...
                                                 -- NULL = ungrouped ("Other" in the UI)
@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS roles (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 'client' category added 2026-11-24 (John). CREATE TABLE IF NOT EXISTS above
+-- doesn't touch an existing table, so swap the check on databases made earlier.
+ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_category_check;
+ALTER TABLE roles ADD CONSTRAINT roles_category_check
+  CHECK (category IN ('staff', 'crew', 'talent', 'client'));
 
 -- Two partial unique indexes instead of v1's COALESCE(owner_id, 0)
 -- trick, which relied on no user ever having id 0.

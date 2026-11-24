@@ -270,7 +270,8 @@ JSZip XML patch in `generateWorkback()` is critical — injects gridSpan attribu
 
 ### Contacts
 - Tabs: People, Organizations, Locations (`contacts-v2.js`)
-- People: no buckets; category (Staff / Crew / Talent / Uncategorized) comes from their roles (multiple role pills per person); union status, gear/kit, travel, notes
+- People: no buckets; category (Staff / Crew / Talent / Client / Uncategorized) comes from their roles (multiple role pills per person); union status, gear/kit, travel, notes
+- Client category (2026-11-24, John; DB check widened on local + production the same day, prod backup in ~/slater-db-backups): built-in roles Client, Stakeholder, Approver. Client roles are left out of the crew / key personnel role pickers. Project tab Client name picks from Contacts (`attachClientName()` in project-people-v2.js): client-company people first, then client-role people; picking fills an empty Company (`ProjectOrgsV2.linkClient`); "+ Add ... to contacts as a client" gives the Client role + client company. Saves text only (data.client_name), no contact link
 - Roles: built-in list plus per-user custom roles
 - Organizations: agencies and client companies in one list (`is_agency` flag); logo (512px square crop), website, billing contact, invoicing defaults
 - Stored in PostgreSQL tables (see Database Schema), synced per record (`/api/v2/sync`); soft delete via archive

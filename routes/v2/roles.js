@@ -17,7 +17,7 @@ const { HttpError, clean, parseId, handle } = require('./fields');
 const { maxCursor } = require('./resource');
 const { projectsReferencing, refuseIfUsed, tombstone, pullDeleted } = require('./purge');
 
-const CATEGORIES = ['staff', 'crew', 'talent'];
+const CATEGORIES = ['staff', 'crew', 'talent', 'client'];
 const SPEC = {
   name:         { type: 'text', required: true },
   abbreviation: { type: 'text' },
