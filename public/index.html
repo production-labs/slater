@@ -65,7 +65,7 @@
         <span class="mobile-project-kicker">SLATER</span>
         <span class="mobile-project-name" id="mobile-project-name">No project open</span>
       </button>
-      <button type="button" class="mobile-po-close" id="mobile-po-close" onclick="if(window.ProjectsOverview)ProjectsOverview.close()" title="Close the Overview" aria-label="Close the Overview"><i data-lucide="x" class="lucide"></i></button>
+      <button type="button" class="close-x mobile-po-close" id="mobile-po-close" onclick="if(window.ProjectsOverview)ProjectsOverview.close()" title="Close the Overview" aria-label="Close the Overview"><i data-lucide="x" class="lucide"></i></button>
     </div>
 
     <!-- Content + Rundown side by side -->
@@ -463,7 +463,7 @@
         <div id="daily-resize"></div>
         <div class="daily-head">
           <div><h3 style="display:flex;align-items:center;gap:6px"><i data-lucide="clipboard-list" class="lucide nav-icon" style="opacity:.75"></i> Rundown</h3><div class="daily-head-date" id="daily-date"></div></div>
-          <button class="daily-close" onclick="toggleSidebar()"><i data-lucide="x" class="lucide"></i></button>
+          <button class="close-x" onclick="toggleSidebar()" title="Close the Rundown" aria-label="Close the Rundown"><i data-lucide="x" class="lucide"></i></button>
         </div>
         <div class="daily-tabs">
           <div class="daily-tab active" id="dtab-pending" onclick="switchDailyTab('pending')">Pending</div>
@@ -645,7 +645,7 @@
   <div id="mobile-drawer-panel" style="position:absolute;top:0;left:0;width:280px;height:100%;background:var(--surface);overflow-y:auto;display:flex;flex-direction:column;padding:16px;box-sizing:border-box">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="font-size:16px;font-weight:700;color:var(--charcoal);letter-spacing:.06em">SLATER</div>
-      <button onclick="closeMobileDrawer()" style="background:none;border:none;font-size:20px;color:var(--film-can);cursor:pointer;min-height:unset;padding:4px 8px">&#x2715;</button>
+      <button class="close-x" onclick="closeMobileDrawer()" title="Close the menu" aria-label="Close the menu"><i data-lucide="x" class="lucide"></i></button>
     </div>
     <div style="margin-bottom:12px" id="mobile-lib-select-wrap"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px" id="mobile-lib-buttons"></div>

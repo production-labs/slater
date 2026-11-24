@@ -203,7 +203,7 @@
           '<div class="po-actions">' +
             '<label class="po-search">' + ic('search') + '<input id="po-q" placeholder="Search projects, clients..." autocomplete="off"></label>' +
             '<button class="po-btn primary" id="po-new">' + ic('plus') + 'New Project</button>' +
-            '<button class="po-btn" id="po-close" title="Back to the open project">' + ic('x') + '</button>' +
+            '<button class="close-x" id="po-close" title="Back to the open project" aria-label="Close the Overview">' + ic('x') + '</button>' +
           '</div>' +
         '</div>' +
         '<div class="po-tabs">' +

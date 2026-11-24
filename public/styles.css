@@ -228,8 +228,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{background-image:url("data
 .daily-head{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .daily-head h3{margin:0;font-size:17px;font-weight:700;color:var(--text-primary)}
 .daily-head-date{font-size:11px;color:var(--text-muted);margin-top:2px}
-.daily-close{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;padding:0;line-height:1}
-.daily-close:hover{color:var(--text-primary)}
+/* One close X everywhere (2026-11-24): Rundown, Projects Overview (desktop + phone top bar), menu drawer */
+.close-x{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;margin:0;background:none;border:none;border-radius:6px;color:var(--text-muted);cursor:pointer;min-height:unset;flex-shrink:0;font-family:inherit}
+.close-x:hover{color:var(--text-primary);background:var(--surface-3)}
+.close-x .lucide,#po-root .close-x .lucide{width:18px;height:18px;stroke-width:2}
 .daily-body{flex:1;overflow-y:auto;padding:10px 14px}
 .daily-section{margin-bottom:16px}
 .daily-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
@@ -936,8 +938,8 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 .mobile-project{display:none}
 .mobile-po-close{display:none}
 @media (max-width:768px), (max-height:500px) and (pointer:coarse){
-  .mobile-po-close.show{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex-shrink:0;margin-left:auto;padding:0;min-height:unset;background:none;border:none;border-radius:8px;color:var(--text-primary);cursor:pointer}
-  .mobile-po-close .lucide{width:22px;height:22px}
+  .mobile-po-close.show{display:flex;margin-left:auto}
+  .close-x{width:40px;height:40px}  /* bigger tap target on phones, same look */
 }
 @media (max-width:768px), (max-height:500px) and (pointer:coarse){
   /* The page scrolls (desktop locks html/body and scrolls inside the content column). */
