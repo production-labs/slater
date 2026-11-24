@@ -1413,10 +1413,12 @@ function addScheduleDay(data, insertAfterDayId) {
   lunch.onblur = function() { var n=normalizeTimeStr(this.value); if(n&&n!==this.value){this.value=n;autosaveTrigger();} updateTimeHint(this,lunchHint,dayId); };
   if (!isPost) {
     var ddToggle = document.createElement("div");
-    ddToggle.className = "day-details-toggle";
-    var ddLabel = document.createElement("span"); ddLabel.textContent = "Day Details";
+    ddToggle.className = "day-details-toggle"; ddToggle.title = "Show or hide Day Details";
+    // Arrow first, then the label, then what's inside (2026-11-24, John: the arrow at the far right didn't read as part of it).
     var ddChevron = document.createElement("span"); ddChevron.className = "day-details-chevron"; ddChevron.innerHTML = icon('chevron-right');
-    ddToggle.appendChild(ddLabel); ddToggle.appendChild(ddChevron);
+    var ddLabel = document.createElement("span"); ddLabel.className = "day-details-label"; ddLabel.textContent = "Day Details";
+    var ddSummary = document.createElement("span"); ddSummary.className = "day-details-summary"; ddSummary.id = dayId+"_dd_summary";
+    ddToggle.appendChild(ddChevron); ddToggle.appendChild(ddLabel); ddToggle.appendChild(ddSummary);
 
     var ddBody = document.createElement("div");
     ddBody.className = "day-details-body";
@@ -1444,7 +1446,10 @@ function addScheduleDay(data, insertAfterDayId) {
       var isOpen = ddBody.style.display !== "none";
       ddBody.style.display = isOpen ? "none" : "block";
       ddChevron.style.transform = isOpen ? "" : "rotate(90deg)";
+      ddToggle.classList.toggle("open", !isOpen);
     };
+    ddBody.addEventListener("input", function() { updateDayDetailsSummary(dayId); });
+    ddBody.addEventListener("focusout", function() { updateDayDetailsSummary(dayId); });
 
   }
 
@@ -1627,7 +1632,7 @@ function addScheduleDay(data, insertAfterDayId) {
   body.appendChild(schedHdr);
 
   // Check show blacks on load
-  setTimeout(function() { checkShowBlacks(dayId); triggerSunLookup(dayId); }, 100);
+  setTimeout(function() { checkShowBlacks(dayId); triggerSunLookup(dayId); updateDayDetailsSummary(dayId); }, 100);
   const schedList = document.createElement("div"); schedList.id = dayId+"_sched_list";
   body.appendChild(schedList);
 
@@ -1715,6 +1720,7 @@ function applyCategoryConfig(dayId, category) {
   var lunchWrap     = document.getElementById(dayId+'_lunch_wrap');
   if (breakfastWrap) breakfastWrap.style.display = cfg.hasMeals ? '' : 'none';
   if (lunchWrap)     lunchWrap.style.display     = cfg.hasMeals ? '' : 'none';
+  updateDayDetailsSummary(dayId);
 }
 
 function removeScheduleDay(dayId) {
@@ -6505,6 +6511,18 @@ function triggerSunLookup(dayId) {
   if (addr && iso) lookupSunForDayWithAddr(dayId, iso, addr);
 }
 
+// Closed Day Details shows what's inside: the filled-in times, else the field names.
+function updateDayDetailsSummary(dayId) {
+  var el = document.getElementById(dayId+"_dd_summary");
+  if (!el) return;
+  // Breakfast / Lunch are hidden on day types without meals (applyCategoryConfig): leave them out then.
+  var meals = (document.getElementById(dayId+"_breakfast_wrap")||{style:{}}).style.display !== "none";
+  var fields = (meals ? [["Breakfast","_breakfast"],["Lunch","_lunch"]] : []).concat([["Sunrise","_sunrise"],["Sunset","_sunset"]]);
+  var parts = fields.map(function(f) { var x = v(dayId+f[1]); return x ? f[0] + " " + x : ""; }).filter(Boolean);
+  el.textContent = parts.length ? parts.join(" \u00B7 ")
+    : fields.map(function(f, i) { return i ? f[0].toLowerCase() : f[0]; }).join(", ");
+}
+
 function lookupSunForDayWithAddr(dayId, iso, addr) {
   var statusEl = document.getElementById(dayId+"_sun_status");
   if (!iso || !addr) return;
@@ -6517,12 +6535,14 @@ function lookupSunForDayWithAddr(dayId, iso, addr) {
     if (sr && result.sunrise) sr.value = f12(result.sunrise);
     if (ss && result.sunset)  ss.value = f12(result.sunset);
     if (statusEl) statusEl.textContent = "Sun times updated.";
+    updateDayDetailsSummary(dayId);
   }).catch(function() {
     if (statusEl) statusEl.textContent = "Could not fetch sun times.";
     var sr = document.getElementById(dayId+"_sunrise");
     var ss = document.getElementById(dayId+"_sunset");
     if (sr) sr.value = "";
     if (ss) ss.value = "";
+    updateDayDetailsSummary(dayId);
   });
 }
 

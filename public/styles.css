@@ -548,9 +548,18 @@ select{-webkit-appearance:none;appearance:none;background:var(--surface);padding
 .mobile-brand{display:none}
 .sday-chevron{display:none;color:var(--film-can);width:18px;height:18px;transition:transform .2s;margin-left:auto;margin-right:8px;flex-shrink:0}
 
-.day-details-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 0;border-top:1px solid var(--border);margin-top:8px;user-select:none}
-.day-details-toggle>span:first-child{font-size:11px;font-weight:600;color:var(--film-can);text-transform:uppercase;letter-spacing:.05em;flex:1}
-.day-details-chevron{color:var(--film-can);width:18px;height:18px;transition:transform .2s;flex-shrink:0}
+/* Day Details toggle (2026-11-24): arrow + label + a summary of what's inside, the whole row lights up on hover.
+   The row reaches 8px past the content on each side so the hover background has room; the rule stays content-width. */
+.day-details-toggle{position:relative;display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 8px;margin:8px -8px 0;border-radius:6px;user-select:none;transition:background .15s}
+.day-details-toggle::before{content:"";position:absolute;top:0;left:8px;right:8px;border-top:1px solid var(--border)}
+.day-details-toggle:hover{background:var(--surface-3)}
+.day-details-toggle:hover::before{border-top-color:transparent}
+.day-details-label{font-size:11px;font-weight:600;color:var(--film-can);text-transform:uppercase;letter-spacing:.05em;flex-shrink:0;transition:color .15s}
+.day-details-summary{flex:1;min-width:0;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day-details-toggle.open .day-details-summary{display:none}
+.day-details-chevron{color:var(--film-can);width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;transition:transform .2s,color .15s;flex-shrink:0}
+.day-details-chevron .lucide{width:16px;height:16px}
+.day-details-toggle:hover .day-details-label,.day-details-toggle:hover .day-details-chevron{color:var(--text-primary)}
 #mobile-bottom-nav,#mobile-more-menu{display:none}
 @media (max-width:768px), (max-height:500px) and (pointer:coarse){
   .hdr{display:none!important}
