@@ -263,7 +263,11 @@ function updateMobileNav() {
 function updateMobileTitle() {
   var el = document.getElementById("mobile-project-name");
   if (!el) return;
-  if (window.ProjectsOverview && ProjectsOverview.isOpen()) { el.textContent = "Projects Overview"; return; }
+  // Its close button lives in the top bar on phones (an X beside New Project looked like delete, John 2026-11-24).
+  var po = !!(window.ProjectsOverview && ProjectsOverview.isOpen());
+  var poClose = document.getElementById("mobile-po-close");
+  if (poClose) poClose.classList.toggle("show", po);
+  if (po) { el.textContent = "Projects Overview"; return; }
   var t = ((document.getElementById("project_title") || {}).value || "").trim();
   el.textContent = t || (currentSheetKey ? "Untitled project" : "No project open");
 }

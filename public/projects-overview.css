@@ -141,6 +141,7 @@ button.po-co:hover{filter:brightness(1.25)}
      The top bar says "Projects Overview" here (updateMobileTitle), so the big title is hidden; the date stays. */
   #po-root{position:fixed;z-index:60;top:56px;bottom:56px}
   .po-h1{display:none}
+  #po-close{display:none}  /* phones: the close X is in the top bar (#mobile-po-close) */
   .po-h1-sub{margin-top:0}
   .po-top{padding:12px 14px 0}
   .po-top-row{flex-direction:column;align-items:stretch}

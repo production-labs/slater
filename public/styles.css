@@ -934,6 +934,11 @@ body.sidebar-open{padding-right:0!important;transition:none!important}
 
 /* ── Phones (2026-11-14): Slater as an on-set companion ──────────────────────────────── */
 .mobile-project{display:none}
+.mobile-po-close{display:none}
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
+  .mobile-po-close.show{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex-shrink:0;margin-left:auto;padding:0;min-height:unset;background:none;border:none;border-radius:8px;color:var(--text-primary);cursor:pointer}
+  .mobile-po-close .lucide{width:22px;height:22px}
+}
 @media (max-width:768px), (max-height:500px) and (pointer:coarse){
   /* The page scrolls (desktop locks html/body and scrolls inside the content column). */
   html,body{overflow-y:auto;height:auto}
