@@ -806,8 +806,11 @@
       '</div>' +
       '<div class="fl"><label>Roles</label>' +
         '<div class="cv2-pills" id="cv2-pills"></div>' +
-        '<div class="cv2-picker"><input class="cv2-input" id="cv2-role-input" placeholder="Add a role: type to search, or create your own" autocomplete="off">' +
-          '<div class="cv2-picker-list" id="cv2-picker-list"></div></div>' +
+        (window.PhonePicker && PhonePicker.isPhone()
+          // Phones: a tap target that opens the big-row panel (phone-picker.js)
+          ? '<button type="button" class="cv2-input cv2-role-btn" data-act="role-sheet">+ Add a role</button>'
+          : '<div class="cv2-picker"><input class="cv2-input" id="cv2-role-input" placeholder="Add a role: type to search, or create your own" autocomplete="off">' +
+            '<div class="cv2-picker-list" id="cv2-picker-list"></div></div>') +
         '<div id="cv2-newrole"></div>' +
       '</div>' +
       '<div class="cv2-hint">The first role is the primary one. Click a role to make it primary.</div>' +
@@ -967,9 +970,10 @@
     }).join('');
   }
 
-  function pickerItems() {
+  function pickerItems(typed) { // typed: the phone panel's search text; else the role box
     var input = document.getElementById('cv2-role-input');
-    var q = (input ? input.value : '').trim().toLowerCase();
+    var raw = typed != null ? typed : (input ? input.value : '');
+    var q = raw.trim().toLowerCase();
     var avail = rows('roles').filter(function (r) { return ui.formRoles.indexOf(r.id) === -1; });
     if (q) avail = avail.filter(function (r) {
       return r.name.toLowerCase().indexOf(q) !== -1 || (r.abbreviation || '').toLowerCase().indexOf(q) !== -1 ||
@@ -977,7 +981,24 @@
     });
     var groups = roleGroups(avail);
     var exact = q && rows('roles').some(function (r) { return r.name.toLowerCase() === q; });
-    return { groups: groups, create: q && !exact ? input.value.trim() : null };
+    return { groups: groups, create: q && !exact ? raw.trim() : null };
+  }
+  function openRoleSheet() {
+    PhonePicker.open({
+      title: 'Add a role',
+      placeholder: 'Search roles',
+      emptyText: ui.formRoles.length && !rows('roles').some(function (r) { return ui.formRoles.indexOf(r.id) === -1; }) ? 'No more roles to add' : 'No roles match',
+      groups: function (q) {
+        return pickerItems(q).groups.map(function (g) {
+          return { label: g.label, items: g.items.map(function (r) {
+            return { id: r.id, label: r.name, meta: [r.abbreviation !== r.name ? r.abbreviation : '', r.is_global ? '' : 'custom'].filter(Boolean).join(' · ') };
+          }) };
+        });
+      },
+      createLabel: function (q) { var c = pickerItems(q).create; return c ? '+ Create role "' + c + '"' : null; },
+      onPick: function (id) { addRole(id); },
+      onCreate: function (q) { showNewRoleForm(q); },
+    });
   }
   function openPicker() {
     var list = document.getElementById('cv2-picker-list');
@@ -1358,7 +1379,7 @@
     if (!t || t.disabled) return;
     var act = t.getAttribute('data-act');
     var id = t.getAttribute('data-id');
-    var EDIT_ACTS = ['logo-upload', 'logo-crop', 'logo-remove', 'set-default', 'clear-default', 'pill-primary', 'pill-remove', 'pick-role', 'create-role', 'ta-pick'];
+    var EDIT_ACTS = ['logo-upload', 'logo-crop', 'logo-remove', 'set-default', 'clear-default', 'pill-primary', 'pill-remove', 'pick-role', 'create-role', 'ta-pick', 'role-sheet'];
     if (ui.baseline && ui.baseline.archived_at && EDIT_ACTS.indexOf(act) !== -1) return; // archived = read-only
     switch (act) {
       case 'close': return close();
@@ -1383,6 +1404,7 @@
       case 'logo-crop': return ui.formLogo && cropLogo(ui.formLogo);
       case 'logo-remove': ui.formLogo = null; return renderDetailKeepForm();
       case 'pick-role': return addRole(Number(id));
+      case 'role-sheet': return openRoleSheet();
       case 'ta-pick': return pickTA(t.getAttribute('data-key'), Number(t.getAttribute('data-idx')));
       case 'create-role': return showNewRoleForm(document.getElementById('cv2-role-input').value.trim());
       case 'newrole-cancel': document.getElementById('cv2-newrole').innerHTML = ''; return;
