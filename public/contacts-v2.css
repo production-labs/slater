@@ -101,7 +101,9 @@
 
 @media (max-width:768px), (max-height:500px) and (pointer:coarse){
   #contacts-v2-modal{padding-top:0}
-  .cv2-input{font-size:16px}
+  /* iOS zooms into any focused field under 16px and never zooms back out.
+     The id beats the app-wide .fl input rule (14px). */
+  #contacts-v2-modal input,#contacts-v2-modal select,#contacts-v2-modal textarea{font-size:16px}
   .cv2-box{width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;border-radius:0!important}
   .cv2-main{grid-template-columns:minmax(0,1fr)}
   .cv2-listpane{border-right:none}
