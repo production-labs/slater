@@ -293,6 +293,70 @@
       }
     });
     keyNav(nameEl, list, st);
+
+    // Phones: the big-row panel (phone-picker.js) instead of the list.
+    if (window.PhonePicker) PhonePicker.bind(nameEl, function () {
+      var cur = nameEl.value.trim();
+      return {
+        title: kind === 'kp' ? 'Key personnel' : kind === 'talent' ? 'Talent' : 'Crew',
+        placeholder: 'Search contacts',
+        selectedId: link(id).contactId,
+        clearLabel: cur ? 'Clear' : null,
+        onClear: function () { typeInto(nameEl, ''); },
+        groups: function (q) { return peopleGroups(q, cat, kind === 'talent' ? null : role(link(id).roleId)); },
+        actions: function (q) {
+          if (!q || active('contacts').some(function (c) { return key(c.name) === key(q); })) return [];
+          return [
+            { label: '+ Add "' + q + '" to contacts', run: function () { typeInto(nameEl, q); addTyped(); } },
+            { label: 'Use "' + q + '" without adding to contacts', run: function () { typeInto(nameEl, q); } },
+          ];
+        },
+        onPick: function (cid) {
+          var c = contact(cid);
+          if (!c) return;
+          // Switching people: same as typing over the name first, so the old
+          // contact's phone / email / notes don't stick to the new one.
+          if (link(id).contactId && link(id).contactId !== c.id) nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+          pick(c);
+        },
+      };
+    });
+  }
+
+  // Phone panel: what typing then leaving the box does on a computer.
+  function typeInto(input, v) {
+    input.value = v;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('blur'));
+  }
+  function personRow(c, extra) {
+    return { id: c.id, label: c.name, meta: [contactRoles(c).map(roleText).join(', ')].concat(extra || []).filter(Boolean).join(' · ') };
+  }
+  function byNameFirst(k) {
+    return function (a, b) {
+      var sa = k && key(a.name).indexOf(k) === 0 ? 0 : 1, sb = k && key(b.name).indexOf(k) === 0 ? 0 : 1;
+      if (sa !== sb) return sa - sb;
+      return key(a.name) < key(b.name) ? -1 : key(a.name) > key(b.name) ? 1 : 0;
+    };
+  }
+  function searchContacts(q) {
+    var k = key(q);
+    return active('contacts').filter(function (c) { return !k || key(c.name).indexOf(k) !== -1 || key(c.sort_last_name).indexOf(k) === 0; })
+      .sort(byNameFirst(k));
+  }
+  // Crew / talent / key personnel panel: people with the card's role (or a
+  // role in its category) first, then everyone else, so no "Show all" toggle.
+  var CAT_HEAD = { crew: 'Crew', talent: 'Talent', staff: 'Staff' };
+  function peopleGroups(q, cat, cardRole) {
+    var hits = searchContacts(q), first = [], rest = [];
+    hits.forEach(function (c) {
+      var inFirst = cardRole ? (c.role_ids || []).indexOf(cardRole.id) !== -1 : !!firstRoleIn(c, cat);
+      (inFirst ? first : rest).push(personRow(c));
+    });
+    return [
+      { label: cardRole ? 'People with the role ' + cardRole.name : CAT_HEAD[cat], items: first },
+      { label: first.length ? 'Everyone else' : 'Contacts', items: rest },
+    ];
   }
 
   // Picked from the list: the card takes the contact's details.
@@ -353,10 +417,8 @@
     var list = makeList(roleEl, 'pv2-role-wrap'), st = { idx: -1 };
     var cat = KINDS[kind].cat;
 
-    function render() {
-      list.innerHTML = '';
-      if (!store.loaded) { close(list, st); return; }
-      var k = key(roleEl.value);
+    function roleGroupsFor(q) {
+      var k = key(q);
       // Client roles aren't crew / key personnel positions (2026-11-24).
       var avail = active('roles').filter(function (r) { return r.category !== 'client'; });
       if (k) avail = avail.filter(function (r) {
@@ -367,7 +429,12 @@
       groups.sort(function (a, b) {
         return (a.items[0].category === cat ? 0 : 1) - (b.items[0].category === cat ? 0 : 1);
       });
-      groups.forEach(function (g) {
+      return groups;
+    }
+    function render() {
+      list.innerHTML = '';
+      if (!store.loaded) { close(list, st); return; }
+      roleGroupsFor(roleEl.value).forEach(function (g) {
         var h = document.createElement('div'); h.className = 'pv2-group'; h.textContent = g.label; list.appendChild(h);
         g.items.forEach(function (r) {
           item(list, '<strong>' + esc(r.name) + '</strong>' + (r.abbreviation || !r.is_global ? '<span>' + esc([r.abbreviation, r.is_global ? '' : 'custom'].filter(Boolean).join(' · ')) + '</span>' : ''), '', function () { pick(r); });
@@ -391,6 +458,26 @@
       }
     });
     keyNav(roleEl, list, st);
+
+    if (window.PhonePicker) PhonePicker.bind(roleEl, function () {
+      var cur = roleEl.value.trim();
+      return {
+        title: kind === 'kp' ? 'Role' : 'Position',
+        placeholder: 'Search roles',
+        selectedId: Number(val(id + '_role_id')) || null,
+        clearLabel: cur ? 'Clear' : null,
+        onClear: function () { typeInto(roleEl, ''); },
+        groups: function (q) {
+          return roleGroupsFor(q).map(function (g) {
+            return { label: g.label, items: g.items.map(function (r) {
+              return { id: r.id, label: r.name, meta: [r.abbreviation !== r.name ? r.abbreviation : '', r.is_global ? '' : 'custom'].filter(Boolean).join(' · ') };
+            }) };
+          });
+        },
+        actions: function (q) { return q && !roleByText(q, cat) ? [{ label: 'Use "' + q + '"', run: function () { typeInto(roleEl, q); } }] : []; },
+        onPick: function (rid) { var r = role(rid); if (r) pick(r); },
+      };
+    });
   }
 
   // ------------------------------------------------- "details changed" bar
@@ -587,6 +674,35 @@
     input.addEventListener('click', function () { if (!list.classList.contains('open')) render(); });
     input.addEventListener('blur', function () { close(list, st); });
     keyNav(input, list, st);
+
+    if (window.PhonePicker) PhonePicker.bind(input, function () {
+      var cur = input.value.trim(), here = contactByName(cur);
+      return {
+        title: 'Client name',
+        placeholder: 'Search contacts',
+        selectedId: here ? here.id : null,
+        clearLabel: cur ? 'Clear' : null,
+        onClear: function () { typeInto(input, ''); },
+        groups: function (q) {
+          var orgId = clientOrgId(), o = store.organizations[orgId];
+          var g = [[], [], []];
+          searchContacts(q).forEach(function (c) { g[rank(c, orgId)].push(personRow(c, [orgText(c)])); });
+          return [
+            { label: o ? 'People at ' + o.name : '', items: g[0] },
+            { label: 'Clients', items: g[1] },
+            { label: g[0].length || g[1].length ? 'Everyone else' : 'Contacts', items: g[2] },
+          ];
+        },
+        actions: function (q) {
+          if (!q || active('contacts').some(function (c) { return key(c.name) === key(q); })) return [];
+          return [
+            { label: '+ Add "' + q + '" to contacts as a client', run: function () { typeInto(input, q); addTyped(); } },
+            { label: 'Use "' + q + '" without adding to contacts', run: function () { typeInto(input, q); } },
+          ];
+        },
+        onPick: function (cid) { var c = contact(cid); if (c) pick(c); },
+      };
+    });
   }
 
   // ------------------------------------------------------------------ render

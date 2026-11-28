@@ -1141,5 +1141,11 @@ html.pp-lock,html.pp-lock body{overflow:hidden}
 .pp-meta{font-size:14px;color:var(--text-muted);flex-shrink:0}
 .pp-check{color:var(--accent);font-size:18px;font-weight:700;flex-shrink:0}
 .pp-row.selected .pp-label{font-weight:600}
-.pp-create{color:var(--accent);font-weight:500}
+.pp-act{color:var(--accent);font-weight:500}
+.pp-clear{color:var(--text-muted)}
+/* Phones: the panel replaces every inline pick list. */
+@media (max-width:768px), (max-height:500px) and (pointer:coarse){
+  .ac-list,.cv2-picker-list{display:none!important}
+  input.pp-field{cursor:pointer;-webkit-user-select:none;user-select:none}
+}
 .pp-empty{padding:28px 18px;text-align:center;color:var(--text-muted);font-size:15px}

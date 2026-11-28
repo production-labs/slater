@@ -119,6 +119,38 @@
       var a = e.target.closest('[data-po2-add]');
       if (a) { e.preventDefault(); addTyped(); }
     });
+
+    // Phones: the big-row panel (phone-picker.js) instead of the list.
+    // typed() = what typing then leaving the box does on a computer.
+    function typed(v) {
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('blur'));
+    }
+    if (window.PhonePicker) PhonePicker.bind(input, function () {
+      var cur = input.value.trim();
+      return {
+        title: 'Client company',
+        placeholder: 'Search organizations',
+        selectedId: _orgLinks.client_org_id,
+        clearLabel: cur ? 'Clear' : null,
+        onClear: function () { typed(''); },
+        groups: function (q) {
+          var k = key(q);
+          return [{ label: 'Organizations', items: activeOrgs().filter(function (o) { return !k || key(o.name).indexOf(k) !== -1; })
+            .map(function (o) { return { id: o.id, label: o.name, meta: o.is_agency ? 'Agency' : '' }; }) }];
+        },
+        actions: function (q) {
+          if (!q || byName(q)) return [];
+          return [
+            { label: '+ Add "' + q + '" to organizations', run: function () { typed(q); addTyped(); } },
+            { label: 'Use "' + q + '" without adding', run: function () { typed(q); } },
+          ];
+        },
+        emptyText: 'No organizations yet',
+        onPick: function (oid) { var o = org(oid); if (o) link(o); },
+      };
+    });
   }
   function autosaveTriggerSafe() { if (typeof autosaveTrigger === 'function') autosaveTrigger(); }
   function mark(items) {

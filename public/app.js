@@ -1551,6 +1551,36 @@ function addScheduleDay(data, insertAfterDayId) {
     }
   });
 
+  // Phones: the big-row panel (phone-picker.js) instead of the list.
+  if (window.PhonePicker) PhonePicker.bind(locInp, function() {
+    function idOf(l) { return l.id != null ? l.id : "name:" + l.name; }
+    var cur = locInp.value.trim();
+    return {
+      title: "Location",
+      placeholder: "Search locations",
+      selectedId: locIdInp.value ? Number(locIdInp.value) : (cur ? "name:" + cur : null),
+      clearLabel: cur ? "Clear" : null,
+      onClear: function() { locInp.value = ""; locIdInp.value = ""; _applyLocSelection(null); autosaveTrigger(); },
+      groups: function(q) {
+        var k = q.toLowerCase();
+        return [{ label: "Locations", items: scheduleLocations().filter(function(l) { return !k || l.name.toLowerCase().indexOf(k) !== -1; })
+          .map(function(l) { return { id: idOf(l), label: l.name, meta: [l.city, l.state].filter(Boolean).join(", ") }; }) }];
+      },
+      actions: function(q) {
+        return q && !getLocByName(q) && window.ContactsV2 ? [{ label: '+ Add "' + q + '" as a new location', run: function() { locInp.value = q; addLocBtn.onclick(); } }] : [];
+      },
+      emptyText: "No locations yet. Search for a name to add one.",
+      onPick: function(lid) {
+        var loc = scheduleLocations().find(function(l) { return idOf(l) === lid; });
+        if (!loc) return;
+        locInp.value = loc.name;
+        locIdInp.value = loc.id != null && window.ProjectPeopleV2 ? String(loc.id) : "";
+        _applyLocSelection(loc);
+        autosaveTrigger();
+      },
+    };
+  });
+
   locWrap.appendChild(locInp);
   locWrap.appendChild(locIdInp);
   locWrap.appendChild(locList);
@@ -3282,7 +3312,7 @@ function wbRenderEditPanel(id) {
     '<div class="ep-body">' +
     (window.PortalAdmin ? PortalAdmin.editPanelHtml(d.uuid) : '') +
     '<div class="ep-sec"><div class="ep-lbl">Item name</div><input class="ep-inp" value="' + (d.item||"").replace(/"/g,"&quot;") + '" oninput="_wbData[\'' + id + '\'].item=this.value;var n=document.querySelector(\'#wb-li-' + id + ' .li-name\');if(n)n.textContent=this.value"></div>' +
-    '<div class="ep-grid"><div class="ep-sec" style="margin:0"><div class="ep-lbl">Owner</div><input class="ep-inp" list="wb-owner-opts" placeholder="Pick or type a name" value="' + wbEsc(d.owner||"") + '" onfocus="wbRefreshOwnerOptions()" oninput="wbEpOwnerInput(\'' + id + '\',this.value)"></div>' +
+    '<div class="ep-grid"><div class="ep-sec" style="margin:0"><div class="ep-lbl">Owner</div><input class="ep-inp" id="wb-ep-owner" list="wb-owner-opts" placeholder="Pick or type a name" value="' + wbEsc(d.owner||"") + '" onfocus="wbRefreshOwnerOptions()" oninput="wbEpOwnerInput(\'' + id + '\',this.value)"></div>' +
     '<div class="ep-sec" style="margin:0"><div class="ep-lbl">Status</div><select class="ep-sel" onchange="wbEpSetStatus(\'' + id + '\',this.value)">' +
     statuses.map(function(s) { return '<option value="' + s + '"' + (d.status===s?' selected':'') + '>' + s + '</option>'; }).join("") +
     '</select></div></div>' +
@@ -3295,6 +3325,12 @@ function wbRenderEditPanel(id) {
     '<div style="display:flex;align-items:center;justify-content:space-between"><label class="ep-check"><input type="checkbox"' + (d.internal?' checked':'') + ' onchange="_wbData[\'' + id + '\'].internal=this.checked"> Internal only</label>' +
     '<button class="ep-del" onclick="wbDeleteItem(\'' + id + '\')">Remove</button></div>' +
     '</div>';
+
+  // Phones: Owner opens the big-row panel (phone-picker.js); picks and typed
+  // names go through the box's own oninput (wbEpOwnerInput).
+  var ownerInp = document.getElementById("wb-ep-owner");
+  if (ownerInp && window.PhonePicker) PhonePicker.bindText(ownerInp, { title: "Owner", groupLabel: "Client and Key Personnel", placeholder: "Search or type a name", clearLabel: "No owner",
+    options: function() { return wbOwnerOptions().map(function(o) { return { value: o.value, meta: o.label }; }); } });
 
   // Restore direction select value
   var dirSel = document.getElementById("wb_direction");

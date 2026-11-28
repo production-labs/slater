@@ -670,6 +670,7 @@
     // "go to person" links stay usable.
     if (archived) el.querySelectorAll('#cv2-form button:not(.cv2-link)').forEach(function (x) { x.disabled = true; });
     if (ui.tab === 'people') renderPills();
+    bindPhonePickers();
     updateDirty();
   }
 
@@ -727,9 +728,9 @@
   }
 
   var ta = { key: null, idx: -1 };
-  function taItems(key) {
+  function taItems(key, typed) { // typed: the phone panel's search text; else the box
     var el = document.getElementById('cv2f_' + key);
-    var q = el ? el.value : '';
+    var q = typed != null ? typed : (el ? el.value : '');
     if (key === 'country') {
       return Regions.searchCountries(q, 60).map(function (c) { return { value: c.code, label: c.name, meta: c.code }; });
     }
@@ -760,8 +761,8 @@
     });
     if (!only || ta.key === only) { ta.key = null; ta.idx = -1; }
   }
-  function pickTA(key, idx) {
-    var it = taItems(key)[idx];
+  function pickTA(key, idx) { applyTA(key, taItems(key)[idx]); }
+  function applyTA(key, it) {
     if (!it) return;
     if (key === 'country') {
       setCountry(it.value);
@@ -995,9 +996,51 @@
           }) };
         });
       },
-      createLabel: function (q) { var c = pickerItems(q).create; return c ? '+ Create role "' + c + '"' : null; },
+      actions: function (q) { var c = pickerItems(q).create; return c ? [{ label: '+ Create role "' + c + '"', run: function () { showNewRoleForm(c); } }] : []; },
       onPick: function (id) { addRole(id); },
-      onCreate: function (q) { showNewRoleForm(q); },
+    });
+  }
+
+  // Phones: State / Country / free-text-with-suggestions boxes open the
+  // phone panel (phone-picker.js). Bound after every form render.
+  function taSheetOpts(key) {
+    var el = document.getElementById('cv2f_' + key);
+    var country = currentCountry();
+    var shown = {}; // id -> item, for the rows on screen
+    return {
+      title: key === 'country' ? 'Country' : stateLabel(country),
+      placeholder: key === 'country' ? 'Search countries' : 'Search',
+      selectedId: key === 'country' ? country : (el.value.trim() ? el.value.trim().toUpperCase() + '|' + (country || 'US') : null),
+      clearLabel: el.value.trim() ? 'Clear' : null,
+      onClear: function () { if (key === 'country') setCountry(null); else el.value = ''; updateDirty(); },
+      groups: function (q) {
+        shown = {};
+        return [{ label: '', items: taItems(key, q).map(function (it) {
+          var id = key === 'country' ? it.value : it.value + '|' + it.country;
+          shown[id] = it;
+          return { id: id, label: it.label, meta: it.meta };
+        }) }];
+      },
+      onPick: function (id) { applyTA(key, shown[id]); },
+    };
+  }
+  function bindPhonePickers() {
+    if (!window.PhonePicker) return;
+    ['state', 'country'].forEach(function (key) {
+      var el = document.getElementById('cv2f_' + key);
+      if (!el) return;
+      // State abroad (no state list) stays a plain text box.
+      PhonePicker.bind(el, function () { return taSheetOpts(key); },
+        key === 'state' ? function () { var c = currentCountry(); return !c || Regions.hasRegionList(c); } : null);
+    });
+    var lists = { cv2f_union_status: [UNION_SUGGESTIONS, 'Union status'], cv2f_travel_availability: [TRAVEL_SUGGESTIONS, 'Travel availability'] };
+    Object.keys(lists).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) PhonePicker.bindText(el, { title: lists[id][1], options: function () { return lists[id][0].map(function (v) { return { value: v }; }); } });
+    });
+    ['cv2f_department', 'cv2-nr-dept'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) PhonePicker.bindText(el, { title: 'Department', groupLabel: 'Departments', options: function () { return crewDepartments().map(function (d) { return { value: d }; }); } });
     });
   }
   function openPicker() {
@@ -1053,6 +1096,7 @@
         '</div>' +
         '<div class="cv2-newrole-btns"><button class="lb cv2-small" data-act="newrole-cancel">Cancel</button><button class="lb primary cv2-small" data-act="newrole-save">Create role</button></div>' +
       '</div>';
+    bindPhonePickers();
     document.getElementById('cv2-nr-name').focus();
   }
   function saveNewRole() {
