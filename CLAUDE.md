@@ -17,6 +17,7 @@ It was built by John McDonald, Executive Producer at Worktank (a Seattle-based v
 Slater Solo is close to launch-ready. Focus from here:
 1. **Mobile**: done in a simulated iPhone 2026-11-14 (see "Mobile Responsive" under Key Features Built); waiting on John's real-phone test.
 2. **Small tweaks/polish** picked up along the way.
+3. **Crew call sheet improvements (added by John 2026-11-27, needed before go-to-market):** the call sheet doc (`generateDoc()`) has to follow how the project is set up. His example: a project with no talent gets no talent table. He has more improvements in mind; at the start of the session, ask him for his full list before changing anything (and check the other sections the same way: empty crew, key personnel, locations, Day Details, etc.).
 
 **2026-11-27:** Contacts phone zoom fixed (8cf1923, John confirmed): iOS zooms into any focused field under 16px and never zooms back out; Contacts fields were 14px from the app-wide `.fl input` rule. Now 16px on phones inside `#contacts-v2-modal` (a plain class rule loses to `.fl input`). John saw the same zoom on every tab, so app-wide fix (same day): `public/ios-no-zoom.js`, loaded right after the viewport meta in index/portal/login/reset-password, adds `maximum-scale=1` on iPhone/iPad only (stops focus auto-zoom; iOS still allows pinch-zoom). Not on Android (would block pinch-zoom; Android doesn't auto-zoom). External file because the portal CSP forbids inline scripts. Keeps the approved 14px look on every tab.
 
@@ -399,6 +400,9 @@ Scheduled alongside V1.5 (not part of the client portal spec itself, just built 
 
 ## V2.0 — Team Tier (Premium)
 Project sharing, shared contacts/configs/templates, Microsoft Entra SSO, Azure migration.
+
+### Repeating schedule items (requested by John 2026-11-27)
+Enter something like a weekly client meeting once and set it to repeat, the way an Outlook meeting does (daily / weekly / monthly, until a date or a number of times). Not scoped yet. Questions to settle with John first: how much of Outlook's set of options to copy; whether editing one instance asks "this one or the whole series"; how repeats show on the Schedule tab, call sheets, ICS files, the workback pins, the Rundown and the client portal.
 
 ### Grid view: paste-from-spreadsheet editing (decided 2026-11-05, moved to V2.0 2026-11-10)
 John: "we need to do this, but not right now." An editable spreadsheet-style grid of project/event details inside Slater, where whole rows or columns copied from Excel or Google Sheets can be pasted in.
